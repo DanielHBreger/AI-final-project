@@ -12,6 +12,8 @@ Usage:
 """
 
 import argparse
+import json
+import datetime
 import numpy as np
 import matplotlib
 matplotlib.use('Agg')   # non-interactive backend for figure saving
@@ -44,6 +46,30 @@ def print_summary(all_results: dict[str, list[dict]], g0_values: list[float]) ->
     print("="*80)
 
 
+# ── JSON results log ──────────────────────────────────────────────────────────
+
+def save_results_log(all_results: dict[str, list[dict]],
+                     g0_values:   list[float],
+                     run_config:  dict,
+                     log_path:    str) -> None:
+    models_log = {}
+    for name, fold_metrics in all_results.items():
+        fold_entries = [
+            {'fold': i, 'g0': g0, 'metrics': {k: float(v) for k, v in m.items()}}
+            for i, (g0, m) in enumerate(zip(g0_values, fold_metrics))
+        ]
+        summary = {}
+        for metric in ('R2', 'RMSE', 'MAE'):
+            vals = [m[metric] for m in fold_metrics]
+            summary[metric] = {'mean': float(np.mean(vals)), 'std': float(np.std(vals))}
+        models_log[name] = {'folds': fold_entries, 'summary': summary}
+
+    log = {'run_config': run_config, 'g0_values': g0_values, 'models': models_log}
+    with open(log_path, 'w') as f:
+        json.dump(log, f, indent=2)
+    print(f"Results log saved -> {log_path}")
+
+
 # ── Per-G0 R² bar chart ───────────────────────────────────────────────────────
 
 def plot_r2_comparison(all_results: dict[str, list[dict]],
@@ -68,7 +94,7 @@ def plot_r2_comparison(all_results: dict[str, list[dict]],
     ax.set_ylim(bottom=0)
     plt.tight_layout()
     plt.savefig(save_path, dpi=150)
-    print(f"Saved R² comparison chart → {save_path}")
+    print(f"Saved R2 comparison chart -> {save_path}")
     plt.close()
 
 
@@ -93,7 +119,7 @@ def plot_scatter(y_true_log: np.ndarray, y_pred_log: np.ndarray,
     plt.tight_layout()
     path = save_path or f'scatter_{model_name.replace(" ", "_")}_G0{g0}.png'
     plt.savefig(path, dpi=150)
-    print(f"Saved scatter → {path}")
+    print(f"Saved scatter -> {path}")
     plt.close()
 
 
@@ -103,10 +129,20 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--skip-cnn',    action='store_true',
                         help='Skip CNN training (faster, classical models only)')
-    parser.add_argument('--cnn-epochs',  type=int, default=50)
+    parser.add_argument('--cnn-epochs',  type=int, default=150)
     parser.add_argument('--cnn-all-ops', action='store_true',
                         help='Use all 48 Oh ops for CNN augmentation')
+    parser.add_argument('--log',         type=str, default=None,
+                        help='Path for JSON results log (default: evaluation_TIMESTAMP.json)')
     args = parser.parse_args()
+
+    _ts = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
+    _run_config = {
+        'timestamp':    datetime.datetime.now().isoformat(timespec='seconds'),
+        'skip_cnn':     args.skip_cnn,
+        'cnn_epochs':   args.cnn_epochs,
+        'cnn_all_ops':  args.cnn_all_ops,
+    }
 
     # ── Load data ──────────────────────────────────────────────────────────────
     print("Loading data...")
@@ -143,6 +179,10 @@ if __name__ == '__main__':
 
     # ── Summary ───────────────────────────────────────────────────────────────
     print_summary(all_results, g0_vals)
+
+    # ── Results log ───────────────────────────────────────────────────────────
+    log_path = args.log or f'evaluation_{_ts}.json'
+    save_results_log(all_results, g0_vals, _run_config, log_path)
 
     # ── Plots ─────────────────────────────────────────────────────────────────
     plot_r2_comparison(all_results, g0_vals)

@@ -21,17 +21,20 @@ import torch.nn.functional as F
 # ── Building blocks ───────────────────────────────────────────────────────────
 
 class ConvBlock(nn.Module):
-    """Two Conv3d layers with BatchNorm and ReLU."""
-    def __init__(self, in_ch: int, out_ch: int):
+    """Two Conv3d layers with InstanceNorm and ReLU, plus optional Dropout3d."""
+    def __init__(self, in_ch: int, out_ch: int, dropout: float = 0.0):
         super().__init__()
-        self.block = nn.Sequential(
+        layers = [
             nn.Conv3d(in_ch, out_ch, kernel_size=3, padding=1, bias=False),
-            nn.BatchNorm3d(out_ch),
+            nn.InstanceNorm3d(out_ch, affine=True),
             nn.ReLU(inplace=True),
             nn.Conv3d(out_ch, out_ch, kernel_size=3, padding=1, bias=False),
-            nn.BatchNorm3d(out_ch),
+            nn.InstanceNorm3d(out_ch, affine=True),
             nn.ReLU(inplace=True),
-        )
+        ]
+        if dropout > 0.0:
+            layers.append(nn.Dropout3d(dropout))
+        self.block = nn.Sequential(*layers)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return self.block(x)
@@ -39,10 +42,10 @@ class ConvBlock(nn.Module):
 
 class Down(nn.Module):
     """MaxPool then ConvBlock."""
-    def __init__(self, in_ch: int, out_ch: int):
+    def __init__(self, in_ch: int, out_ch: int, dropout: float = 0.0):
         super().__init__()
         self.pool = nn.MaxPool3d(2)
-        self.conv = ConvBlock(in_ch, out_ch)
+        self.conv = ConvBlock(in_ch, out_ch, dropout=dropout)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return self.conv(self.pool(x))
@@ -50,9 +53,9 @@ class Down(nn.Module):
 
 class Up(nn.Module):
     """Trilinear upsample, concatenate skip, then ConvBlock."""
-    def __init__(self, in_ch: int, skip_ch: int, out_ch: int):
+    def __init__(self, in_ch: int, skip_ch: int, out_ch: int, dropout: float = 0.0):
         super().__init__()
-        self.conv = ConvBlock(in_ch + skip_ch, out_ch)
+        self.conv = ConvBlock(in_ch + skip_ch, out_ch, dropout=dropout)
 
     def forward(self, x: torch.Tensor, skip: torch.Tensor) -> torch.Tensor:
         x = F.interpolate(x, scale_factor=2, mode='trilinear', align_corners=False)
@@ -71,23 +74,25 @@ class UNet3D(nn.Module):
     Args:
         n_channels : number of input feature channels (default 14)
         base_ch    : base number of feature maps (default 32)
+        dropout    : Dropout3d rate applied after each ConvBlock (default 0.10);
+                     the bottleneck uses 2× this rate for stronger regularisation
     """
 
-    def __init__(self, n_channels: int = 14, base_ch: int = 32):
+    def __init__(self, n_channels: int = 14, base_ch: int = 32, dropout: float = 0.10):
         super().__init__()
         b = base_ch
         # Encoder
-        self.enc1 = ConvBlock(n_channels, b)       # (B, b,   D, H, W)
-        self.enc2 = Down(b,   b*2)                 # (B, b*2, D/2, ...)
-        self.enc3 = Down(b*2, b*4)                 # (B, b*4, D/4, ...)
-        # Bottleneck
-        self.bot  = Down(b*4, b*8)                 # (B, b*8, D/8, ...)
+        self.enc1 = ConvBlock(n_channels, b,   dropout=dropout)    # (B, b,   D, H, W)
+        self.enc2 = Down(b,   b*2,             dropout=dropout)    # (B, b*2, D/2, ...)
+        self.enc3 = Down(b*2, b*4,             dropout=dropout)    # (B, b*4, D/4, ...)
+        # Bottleneck — stronger dropout to regularise the most compressed representation
+        self.bot  = Down(b*4, b*8,             dropout=dropout*2)  # (B, b*8, D/8, ...)
         # Decoder
-        self.dec3 = Up(b*8, b*4, b*4)              # (B, b*4, D/4, ...)
-        self.dec2 = Up(b*4, b*2, b*2)              # (B, b*2, D/2, ...)
-        self.dec1 = Up(b*2, b,   b)                # (B, b,   D,   ...)
+        self.dec3 = Up(b*8, b*4, b*4,          dropout=dropout)    # (B, b*4, D/4, ...)
+        self.dec2 = Up(b*4, b*2, b*2,          dropout=dropout)    # (B, b*2, D/2, ...)
+        self.dec1 = Up(b*2, b,   b,            dropout=dropout)    # (B, b,   D,   ...)
         # Output
-        self.out  = nn.Conv3d(b, 1, kernel_size=1) # (B, 1,   D, H, W)
+        self.out  = nn.Conv3d(b, 1, kernel_size=1)                 # (B, 1,   D, H, W)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         s1 = self.enc1(x)
@@ -109,7 +114,7 @@ def count_parameters(model: nn.Module) -> int:
 # ── Quick smoke test ───────────────────────────────────────────────────────────
 
 if __name__ == '__main__':
-    model = UNet3D(n_channels=14, base_ch=32)
+    model = UNet3D(n_channels=14, base_ch=32, dropout=0.10)
     print(f"UNet3D parameters: {count_parameters(model):,}")
 
     x = torch.randn(1, 14, 64, 64, 64)
