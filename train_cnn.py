@@ -1,0 +1,221 @@
+"""
+train_cnn.py
+Train the 3D U-Net with leave-one-G0-out cross-validation and on-the-fly
+symmetry augmentation.
+
+Each training cube is converted to a multi-channel (128³) volume, downsampled
+to 64³, then augmented with the safe z-preserving operations at load time.
+The held-out cube is never augmented.
+
+Usage:
+    python train_cnn.py [--safe-only] [--all-ops] [--epochs N] [--save]
+"""
+
+import argparse
+import numpy as np
+import torch
+import torch.nn as nn
+from torch.utils.data import Dataset, DataLoader
+import torch.nn.functional as F
+
+from data_loader import (load_all_cubes, cube_to_volumes,
+                         get_g0_values, FEATURE_COLS, LOG_TARGET_COL)
+from augmentation import augment_cube, get_symmetry_ops
+from cnn_model import UNet3D, count_parameters
+from classical_models import compute_metrics, print_results
+
+# ── Columns that form the CNN input channels ──────────────────────────────────
+# (same as FEATURE_COLS but expressed as volume keys, not flat-table names)
+CNN_INPUT_COLS  = FEATURE_COLS                 # 14 channels
+CNN_TARGET_COL  = LOG_TARGET_COL               # log10(fh2)
+GRID_SIZE       = 64                           # spatial resolution fed to CNN
+RAW_GRID        = 128                          # native resolution
+
+
+# ── Dataset ───────────────────────────────────────────────────────────────────
+
+class CubeDataset(Dataset):
+    """
+    Each item is one (possibly augmented) 64³ cube.
+    Returns (input_tensor, target_tensor) of shapes (C, 64, 64, 64) and (1, 64, 64, 64).
+
+    All preprocessing (augmentation, stacking, downsampling) is done once in __init__
+    so that __getitem__ is a trivial list lookup with no CPU work per training step.
+    """
+    def __init__(self, cube_vols: list[dict[str, np.ndarray]],
+                 ops: list[np.ndarray] | None,
+                 augment: bool = True):
+        """
+        cube_vols : list of volume dicts (one per source cube)
+        ops       : list of 3x3 symmetry matrices; None means no augmentation
+        augment   : if True, apply ops; if False, use identity only
+        """
+        self.xs: list[torch.Tensor] = []
+        self.ys: list[torch.Tensor] = []
+
+        identity   = np.eye(3, dtype=int)
+        active_ops = ops if (augment and ops) else [identity]
+
+        for vol in cube_vols:
+            for R in active_ops:
+                aug = augment_cube(vol, R)
+
+                channels = np.stack([aug[c] for c in CNN_INPUT_COLS], axis=0)  # (C, 128, 128, 128)
+                target   = aug[CNN_TARGET_COL][None]                            # (1, 128, 128, 128)
+
+                ch_t  = torch.from_numpy(channels).unsqueeze(0)   # (1, C, 128, 128, 128)
+                tgt_t = torch.from_numpy(target).unsqueeze(0)     # (1, 1, 128, 128, 128)
+
+                ch_t  = F.avg_pool3d(ch_t,  kernel_size=2, stride=2).squeeze(0).float()  # (C, 64, 64, 64)
+                tgt_t = F.avg_pool3d(tgt_t, kernel_size=2, stride=2).squeeze(0).float()  # (1, 64, 64, 64)
+
+                self.xs.append(torch.nan_to_num(ch_t))
+                self.ys.append(torch.nan_to_num(tgt_t))
+
+    def __len__(self) -> int:
+        return len(self.xs)
+
+    def __getitem__(self, idx: int) -> tuple[torch.Tensor, torch.Tensor]:
+        return self.xs[idx], self.ys[idx]
+
+
+# ── Training loop ─────────────────────────────────────────────────────────────
+
+def train_one_fold(train_vols: list[dict],
+                   val_vols:   list[dict],
+                   ops:        list[np.ndarray],
+                   device:     torch.device,
+                   epochs:     int = 50,
+                   lr:         float = 1e-3) -> tuple[UNet3D, dict]:
+
+    train_ds = CubeDataset(train_vols, ops, augment=True)
+    val_ds   = CubeDataset(val_vols,   ops=None, augment=False)
+
+    use_amp  = False   # batch_size=1 → no AMP throughput benefit; unscaled physical inputs risk fp16 overflow
+    pin_mem  = device.type == 'cuda'
+
+    train_dl = DataLoader(train_ds, batch_size=1, shuffle=True,
+                          num_workers=0, pin_memory=pin_mem)
+    val_dl   = DataLoader(val_ds,   batch_size=1, shuffle=False,
+                          num_workers=0, pin_memory=pin_mem)
+
+    model      = UNet3D(n_channels=len(CNN_INPUT_COLS), base_ch=32).to(device)
+    opt        = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=1e-5)
+    sched      = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=epochs)
+    loss_fn    = nn.MSELoss()
+    scaler_amp = torch.amp.GradScaler('cuda', enabled=use_amp)
+
+    best_val_loss = float('inf')
+    best_state    = None
+
+    for epoch in range(1, epochs + 1):
+        # --- Train ---
+        model.train()
+        train_loss = 0.0
+        for xb, yb in train_dl:
+            xb, yb = xb.to(device, non_blocking=pin_mem), yb.to(device, non_blocking=pin_mem)
+            opt.zero_grad(set_to_none=True)
+            with torch.amp.autocast('cuda', enabled=use_amp):
+                pred = model(xb)
+                loss = loss_fn(pred, yb)
+            scaler_amp.scale(loss).backward()
+            scaler_amp.step(opt)
+            scaler_amp.update()
+            train_loss += loss.item()
+        sched.step()
+        train_loss /= len(train_dl)
+
+        # --- Validate ---
+        model.eval()
+        val_loss = 0.0
+        with torch.no_grad(), torch.amp.autocast('cuda', enabled=use_amp):
+            for xb, yb in val_dl:
+                xb, yb = xb.to(device, non_blocking=pin_mem), yb.to(device, non_blocking=pin_mem)
+                val_loss += loss_fn(model(xb), yb).item()
+        val_loss /= len(val_dl)
+
+        if val_loss < best_val_loss:
+            best_val_loss = val_loss
+            best_state    = {k: v.cpu().clone() for k, v in model.state_dict().items()}
+
+        if epoch % 10 == 0 or epoch == 1:
+            print(f"    epoch {epoch:3d}/{epochs}  "
+                  f"train_loss={train_loss:.4f}  val_loss={val_loss:.4f}")
+
+    # Restore best weights and compute final metrics
+    model.load_state_dict(best_state)
+    model.eval()
+    y_true_all, y_pred_all = [], []
+    with torch.no_grad(), torch.amp.autocast('cuda', enabled=use_amp):
+        for xb, yb in val_dl:
+            xb = xb.to(device, non_blocking=pin_mem)
+            pred = model(xb).float().cpu().numpy().ravel()
+            true = yb.numpy().ravel()
+            y_true_all.append(true)
+            y_pred_all.append(pred)
+    y_true = np.concatenate(y_true_all)
+    y_pred = np.concatenate(y_pred_all)
+    metrics = compute_metrics(y_true, y_pred)
+
+    return model, metrics
+
+
+# ── Main CV loop ──────────────────────────────────────────────────────────────
+
+def run_cnn_cv(safe_only: bool = True,
+               epochs:    int = 50,
+               save_models: bool = False) -> list[dict]:
+
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    print(f"Device: {device}")
+
+    print("Loading cubes...")
+    cubes   = load_all_cubes()
+    g0_vals = get_g0_values(cubes)
+    n_folds = len(cubes)
+
+    # Pre-compute all volume dicts (expensive but done once)
+    vol_cols = CNN_INPUT_COLS + [CNN_TARGET_COL]
+    avail    = [c for c in vol_cols if c in cubes[0].columns]
+    print("Converting cubes to volumes (128³)...")
+    all_vols = [cube_to_volumes(df, avail) for df in cubes]
+
+    ops = get_symmetry_ops(safe_only=safe_only)
+    print(f"Symmetry ops: {len(ops)}  ({'safe z-preserving' if safe_only else 'full Oh'})")
+    print(f"UNet3D params: {count_parameters(UNet3D(n_channels=len(CNN_INPUT_COLS))):,}")
+
+    fold_metrics = []
+    for fold in range(n_folds):
+        print(f"\n[Fold {fold+1}/{n_folds}] Val G0={g0_vals[fold]:.1f}")
+        train_vols = [v for i, v in enumerate(all_vols) if i != fold]
+        val_vols   = [all_vols[fold]]
+
+        model, metrics = train_one_fold(
+            train_vols, val_vols, ops, device, epochs=epochs)
+
+        fold_metrics.append(metrics)
+        print(f"  R²={metrics['R2']:.4f}  RMSE={metrics['RMSE']:.4e}  MAE={metrics['MAE']:.4e}")
+
+        if save_models:
+            path = f"cnn_fold{fold}_G0{g0_vals[fold]}.pt"
+            torch.save(model.state_dict(), path)
+            print(f"  Saved → {path}")
+
+    print_results("3D U-Net CNN", fold_metrics, g0_vals)
+    return fold_metrics
+
+
+# ── Entry point ───────────────────────────────────────────────────────────────
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--all-ops', action='store_true',
+                        help='Use all 48 Oh operations (default: 8 safe z-preserving)')
+    parser.add_argument('--epochs', type=int, default=50)
+    parser.add_argument('--save',   action='store_true',
+                        help='Save best model weights per fold')
+    args = parser.parse_args()
+
+    run_cnn_cv(safe_only=not args.all_ops,
+               epochs=args.epochs,
+               save_models=args.save)

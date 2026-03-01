@@ -12,7 +12,7 @@ def main():
     # Ask user to select CSV file
     file_path = filedialog.askopenfilename(
         title="Select CSV file",
-        initialdir=r"c:\Users\danib\OneDrive\Documents\Technion\AI final project\icedrive-dl-182bd",
+        initialdir=r".",
         filetypes=[("CSV files", "*.csv")]
     )
 
@@ -38,8 +38,25 @@ def main():
         print("No data columns found.")
         return
 
-    # Columns to visualize in 3x2 grid
-    columns = ['nH', 'nH2', 'nHp', 'T', 'ext', 'fh2']
+    # Create column selection dialog
+    selected_column = [None]
+
+    def select_column():
+        dialog = tk.Toplevel(root)
+        dialog.title("Select Column")
+        dialog.geometry(f"300x{min(600, 120 + len(available_cols)*25)}")
+        tk.Label(dialog, text="Choose a column to visualize:").pack(pady=10)
+        var = tk.StringVar(value=available_cols[0])
+        for col in available_cols:
+            tk.Radiobutton(dialog, text=col, variable=var, value=col).pack(anchor='w', padx=20)
+        def ok():
+            selected_column[0] = var.get()
+            dialog.destroy()
+        tk.Button(dialog, text="OK", command=ok).pack(pady=10)
+        dialog.wait_window()
+
+    select_column()
+    chosen_col = selected_column[0] or 'nH'
 
     # Create 3D visualization using volume rendering with GPU acceleration
     # Reshape data into 3D grid (32x32x32 after downsampling)
@@ -51,34 +68,42 @@ def main():
     iy_vals = df['iy'].values.astype(int)
     iz_vals = df['iz'].values.astype(int)
 
-    # Plotter with 3x2 subplots
-    plotter = pv.Plotter(shape=(3, 2))
+    # Fill volume_data
+    volume_data = np.zeros((129, 129, 129))
+    volume_data[ix_vals, iy_vals, iz_vals] = df[chosen_col].values
+    volume_data_log_10 = np.log10(volume_data + 1e-10)
 
-    for i, chosen_col in enumerate(columns):
-        plotter.subplot(i // 2, i % 2)
+    # Downsample
+    volume_data_log_10 = volume_data_log_10[1:129:scale_factor, 1:129:scale_factor, 1:129:scale_factor]
 
-        # Fill volume_data
-        volume_data = np.zeros((129, 129, 129))
-        volume_data[ix_vals, iy_vals, iz_vals] = df[chosen_col].values
-        volume_data_log_10 = np.log10(volume_data + 1e-10)
+    # Create grid
+    grid = pv.ImageData()
+    grid.dimensions = np.array(volume_data_log_10.shape) + 1
+    grid.origin = (1, 1, 1)
+    grid.spacing = (scale_factor, scale_factor, scale_factor)
+    grid.cell_data['values'] = volume_data_log_10.flatten(order='F')
 
-        # Downsample
-        volume_data_log_10 = volume_data_log_10[1:129:scale_factor, 1:129:scale_factor, 1:129:scale_factor]
+    vmin = np.nanmin(volume_data_log_10)
+    vmax = np.nanmax(volume_data_log_10)
+    clim = (vmin, vmax)
 
-        # Create grid
-        grid = pv.ImageData()
-        grid.dimensions = np.array(volume_data_log_10.shape) + 1
-        grid.origin = (1, 1, 1)
-        grid.spacing = (scale_factor, scale_factor, scale_factor)
-        grid.cell_data['values'] = volume_data_log_10.flatten(order='F')
+    # Single plotter
+    plotter = pv.Plotter()
+    plotter.window_size = (800, 600)
+    plotter.background_color = 'black'
 
-        vmin = np.nanmin(volume_data_log_10)
-        vmax = np.nanmax(volume_data_log_10)
-        clim = (vmin, vmax)
-        opacity = [0, 0, 0.1 * (vmax - vmin) / 10, 0.3 * (vmax - vmin) / 10, 1]
+    # Add volume
+    plotter.add_volume(grid, scalars='values', cmap='magma', opacity='sigmoid', clim=clim)
 
-        plotter.add_volume(grid, scalars='values', cmap='magma', opacity=opacity, clim=clim)
-        plotter.add_text(chosen_col, position='upper_left')
+    # Add text labels
+    plotter.add_text("3D Volume Visualization", position='upper_right', font_size=14, color='white')
+    plotter.add_text(f"Column: {chosen_col}", position='upper_left', font_size=12, color='white')
+
+    # Add axes
+    plotter.add_axes(color='white')
+
+    # Set isometric view
+    plotter.view_isometric()
 
     plotter.show()
 

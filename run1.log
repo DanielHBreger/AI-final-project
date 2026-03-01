@@ -1,0 +1,562 @@
+[Running] python -u "c:\Users\danib\OneDrive\Documents\GitHub\AI-final-project\data_loader.py"
+Loading cubes...
+  G0=0.1   | rows=2,097,152 | fh2=[8.46e-25, 4.94e-01]
+  G0=0.2   | rows=2,097,152 | fh2=[2.26e-30, 4.75e-01]
+  G0=0.4   | rows=2,097,152 | fh2=[3.14e-24, 5.07e-01]
+  G0=0.8   | rows=2,097,152 | fh2=[9.28e-26, 5.07e-01]
+  G0=1.6   | rows=2,097,152 | fh2=[2.64e-24, 5.04e-01]
+  G0=3.2   | rows=2,097,152 | fh2=[1.20e-30, 5.05e-01]
+  G0=6.4   | rows=2,097,152 | fh2=[2.72e-30, 5.00e-01]
+
+--- fh2 distribution (raw) ---
+  min    : 1.2010e-30
+  max    : 5.0710e-01
+  mean   : 1.9612e-01
+  median : 2.1980e-01
+  < 0.01 : 20.8%
+  > 0.99 : 0.0%
+
+--- log10(fh2) distribution ---
+  min    : -29.92
+  max    : -0.29
+  mean   : -1.19
+  std    : 1.12
+
+Feature matrix : (14680064, 14)  dtype=float32
+Target (log)   : (14680064,)  range=[-29.92, -0.29]
+Folds          : [2097152, 2097152, 2097152, 2097152, 2097152, 2097152, 2097152]
+Features       : ['log_nH', 'log_T', 'log_nHp', 'ext', 'log_G0', 'vx', 'vy', 'vz', 'bxl', 'bxr', 'byl', 'byr', 'bzl', 'bzr']
+
+[Done] exited with code=0 in 46.391 seconds
+
+[Running] python -u "c:\Users\danib\OneDrive\Documents\GitHub\AI-final-project\classical_models.py"
+Loading data...
+  G0=0.1   | rows=2,097,152 | fh2=[8.46e-25, 4.94e-01]
+  G0=0.2   | rows=2,097,152 | fh2=[2.26e-30, 4.75e-01]
+  G0=0.4   | rows=2,097,152 | fh2=[3.14e-24, 5.07e-01]
+  G0=0.8   | rows=2,097,152 | fh2=[9.28e-26, 5.07e-01]
+  G0=1.6   | rows=2,097,152 | fh2=[2.64e-24, 5.04e-01]
+  G0=3.2   | rows=2,097,152 | fh2=[1.20e-30, 5.05e-01]
+  G0=6.4   | rows=2,097,152 | fh2=[2.72e-30, 5.00e-01]
+Total samples: 14,680,064  |  Features: 14
+
+[1/3] Linear Regression
+  Linear  fold=0 (G0=0.1)  R�=-0.8760
+  Linear  fold=1 (G0=0.2)  R�=-0.2377
+  Linear  fold=2 (G0=0.4)  R�=0.3092
+  Linear  fold=3 (G0=0.8)  R�=0.4702
+  Linear  fold=4 (G0=1.6)  R�=0.5524
+  Linear  fold=5 (G0=3.2)  R�=0.6478
+  Linear  fold=6 (G0=6.4)  R�=0.7404
+
+============================================================
+  Linear Regression
+============================================================
+  G0             R�         RMSE          MAE
+  ------------------------------------------
+  0.1       -0.8760   1.7657e-01   7.3692e-02
+  0.2       -0.2377   1.4748e-01   8.0821e-02
+  0.4        0.3092   1.0650e-01   6.4509e-02
+  0.8        0.4702   8.3208e-02   5.2308e-02
+  1.6        0.5524   6.4798e-02   4.1473e-02
+  3.2        0.6478   5.0680e-02   3.3240e-02
+  6.4        0.7404   3.8120e-02   2.8724e-02
+  ------------------------------------------
+  Mean       0.2295   9.5338e-02   5.3538e-02
+  Std        0.5405   4.7496e-02   1.8692e-02
+
+[2/3] XGBoost
+  XGBoost fold=0 (G0=0.1)  R�=0.8931
+
+[Done] exited with code=1 in 194.502 seconds
+
+[Running] python -u "c:\Users\danib\OneDrive\Documents\GitHub\AI-final-project\classical_models.py"
+Loading data...
+  G0=0.1   | rows=2,097,152 | fh2=[8.46e-25, 4.94e-01]
+  G0=0.2   | rows=2,097,152 | fh2=[2.26e-30, 4.75e-01]
+  G0=0.4   | rows=2,097,152 | fh2=[3.14e-24, 5.07e-01]
+  G0=0.8   | rows=2,097,152 | fh2=[9.28e-26, 5.07e-01]
+  G0=1.6   | rows=2,097,152 | fh2=[2.64e-24, 5.04e-01]
+  G0=3.2   | rows=2,097,152 | fh2=[1.20e-30, 5.05e-01]
+  G0=6.4   | rows=2,097,152 | fh2=[2.72e-30, 5.00e-01]
+Total samples: 14,680,064  |  Features: 14
+
+[1/3] Linear Regression
+  Linear  fold=0 (G0=0.1)  R�=-0.8760
+  Linear  fold=1 (G0=0.2)  R�=-0.2377
+  Linear  fold=2 (G0=0.4)  R�=0.3092
+  Linear  fold=3 (G0=0.8)  R�=0.4702
+  Linear  fold=4 (G0=1.6)  R�=0.5524
+  Linear  fold=5 (G0=3.2)  R�=0.6478
+  Linear  fold=6 (G0=6.4)  R�=0.7404
+
+============================================================
+  Linear Regression
+============================================================
+  G0             R�         RMSE          MAE
+  ------------------------------------------
+  0.1       -0.8760   1.7657e-01   7.3692e-02
+  0.2       -0.2377   1.4748e-01   8.0821e-02
+  0.4        0.3092   1.0650e-01   6.4509e-02
+  0.8        0.4702   8.3208e-02   5.2308e-02
+  1.6        0.5524   6.4798e-02   4.1473e-02
+  3.2        0.6478   5.0680e-02   3.3240e-02
+  6.4        0.7404   3.8120e-02   2.8724e-02
+  ------------------------------------------
+  Mean       0.2295   9.5338e-02   5.3538e-02
+  Std        0.5405   4.7496e-02   1.8692e-02
+
+[2/3] XGBoost
+  XGBoost device: cuda
+  XGBoost fold=0 (G0=0.1)  R�=0.8911
+  XGBoost fold=1 (G0=0.2)  R�=0.7514
+  XGBoost fold=2 (G0=0.4)  R�=0.8658
+  XGBoost fold=3 (G0=0.8)  R�=0.9069
+  XGBoost fold=4 (G0=1.6)  R�=0.9101
+  XGBoost fold=5 (G0=3.2)  R�=0.9315
+  XGBoost fold=6 (G0=6.4)  R�=0.9522
+
+============================================================
+  XGBoost
+============================================================
+  G0             R�         RMSE          MAE
+  ------------------------------------------
+  0.1        0.8911   4.2537e-02   1.8258e-02
+  0.2        0.7514   6.6101e-02   3.7075e-02
+  0.4        0.8658   4.6937e-02   2.3841e-02
+  0.8        0.9069   3.4881e-02   1.6804e-02
+  1.6        0.9101   2.9044e-02   1.4231e-02
+  3.2        0.9315   2.2355e-02   1.1670e-02
+  6.4        0.9522   1.6361e-02   1.0996e-02
+  ------------------------------------------
+  Mean       0.8870   3.6888e-02   1.8982e-02
+  Std        0.0610   1.5512e-02   8.4180e-03
+
+--- XGBoost Feature Importance (mean across folds) ---
+   1. log_T        0.6471
+   2. log_nH       0.1925
+   3. log_nHp      0.0933
+   4. ext          0.0338
+   5. log_G0       0.0061
+   6. bxr          0.0048
+   7. byl          0.0037
+   8. byr          0.0036
+   9. bxl          0.0034
+  10. bzl          0.0029
+  11. bzr          0.0028
+  12. vx           0.0021
+  13. vy           0.0019
+  14. vz           0.0019
+
+[3/3] MLP
+  MLP device: cuda  AMP: True
+
+[Done] exited with code=1 in 346.018 seconds
+
+[Running] python -u "c:\Users\danib\OneDrive\Documents\GitHub\AI-final-project\classical_models.py"
+Loading data...
+  G0=0.1   | rows=2,097,152 | fh2=[8.46e-25, 4.94e-01]
+  G0=0.2   | rows=2,097,152 | fh2=[2.26e-30, 4.75e-01]
+  G0=0.4   | rows=2,097,152 | fh2=[3.14e-24, 5.07e-01]
+  G0=0.8   | rows=2,097,152 | fh2=[9.28e-26, 5.07e-01]
+  G0=1.6   | rows=2,097,152 | fh2=[2.64e-24, 5.04e-01]
+  G0=3.2   | rows=2,097,152 | fh2=[1.20e-30, 5.05e-01]
+  G0=6.4   | rows=2,097,152 | fh2=[2.72e-30, 5.00e-01]
+Total samples: 14,680,064  |  Features: 14
+
+[1/3] Linear Regression
+  Linear  fold=0 (G0=0.1)  R�=-0.8760
+  Linear  fold=1 (G0=0.2)  R�=-0.2377
+  Linear  fold=2 (G0=0.4)  R�=0.3092
+  Linear  fold=3 (G0=0.8)  R�=0.4702
+  Linear  fold=4 (G0=1.6)  R�=0.5524
+  Linear  fold=5 (G0=3.2)  R�=0.6478
+  Linear  fold=6 (G0=6.4)  R�=0.7404
+
+============================================================
+  Linear Regression
+============================================================
+  G0             R�         RMSE          MAE
+  ------------------------------------------
+  0.1       -0.8760   1.7657e-01   7.3692e-02
+  0.2       -0.2377   1.4748e-01   8.0821e-02
+  0.4        0.3092   1.0650e-01   6.4509e-02
+  0.8        0.4702   8.3208e-02   5.2308e-02
+  1.6        0.5524   6.4798e-02   4.1473e-02
+  3.2        0.6478   5.0680e-02   3.3240e-02
+  6.4        0.7404   3.8120e-02   2.8724e-02
+  ------------------------------------------
+  Mean       0.2295   9.5338e-02   5.3538e-02
+  Std        0.5405   4.7496e-02   1.8692e-02
+
+[2/3] XGBoost
+  XGBoost device: cuda
+  XGBoost fold=0 (G0=0.1)  R�=0.8911
+  XGBoost fold=1 (G0=0.2)  R�=0.7514
+  XGBoost fold=2 (G0=0.4)  R�=0.8658
+  XGBoost fold=3 (G0=0.8)  R�=0.9069
+  XGBoost fold=4 (G0=1.6)  R�=0.9101
+  XGBoost fold=5 (G0=3.2)  R�=0.9315
+  XGBoost fold=6 (G0=6.4)  R�=0.9522
+
+============================================================
+  XGBoost
+============================================================
+  G0             R�         RMSE          MAE
+  ------------------------------------------
+  0.1        0.8911   4.2537e-02   1.8258e-02
+  0.2        0.7514   6.6101e-02   3.7075e-02
+  0.4        0.8658   4.6937e-02   2.3841e-02
+  0.8        0.9069   3.4881e-02   1.6804e-02
+  1.6        0.9101   2.9044e-02   1.4231e-02
+  3.2        0.9315   2.2355e-02   1.1670e-02
+  6.4        0.9522   1.6361e-02   1.0996e-02
+  ------------------------------------------
+  Mean       0.8870   3.6888e-02   1.8982e-02
+  Std        0.0610   1.5512e-02   8.4180e-03
+
+--- XGBoost Feature Importance (mean across folds) ---
+   1. log_T        0.6471
+   2. log_nH       0.1925
+   3. log_nHp      0.0933
+   4. ext          0.0338
+   5. log_G0       0.0061
+   6. bxr          0.0048
+   7. byl          0.0037
+   8. byr          0.0036
+   9. bxl          0.0034
+  10. bzl          0.0029
+  11. bzr          0.0028
+  12. vx           0.0021
+  13. vy           0.0019
+  14. vz           0.0019
+
+[3/3] MLP
+  MLP device: cuda  AMP: True
+
+[Done] exited with code=1 in 414.649 seconds
+
+[Running] python -u "c:\Users\danib\OneDrive\Documents\GitHub\AI-final-project\classical_models.py"
+Loading data...
+  G0=0.1   | rows=2,097,152 | fh2=[8.46e-25, 4.94e-01]
+  G0=0.2   | rows=2,097,152 | fh2=[2.26e-30, 4.75e-01]
+  G0=0.4   | rows=2,097,152 | fh2=[3.14e-24, 5.07e-01]
+  G0=0.8   | rows=2,097,152 | fh2=[9.28e-26, 5.07e-01]
+  G0=1.6   | rows=2,097,152 | fh2=[2.64e-24, 5.04e-01]
+  G0=3.2   | rows=2,097,152 | fh2=[1.20e-30, 5.05e-01]
+  G0=6.4   | rows=2,097,152 | fh2=[2.72e-30, 5.00e-01]
+Total samples: 14,680,064  |  Features: 14
+
+[1/3] Linear Regression
+  Linear  fold=0 (G0=0.1)  R�=-0.8760
+  Linear  fold=1 (G0=0.2)  R�=-0.2377
+  Linear  fold=2 (G0=0.4)  R�=0.3092
+  Linear  fold=3 (G0=0.8)  R�=0.4702
+  Linear  fold=4 (G0=1.6)  R�=0.5524
+  Linear  fold=5 (G0=3.2)  R�=0.6478
+  Linear  fold=6 (G0=6.4)  R�=0.7404
+
+============================================================
+  Linear Regression
+============================================================
+  G0             R�         RMSE          MAE
+  ------------------------------------------
+  0.1       -0.8760   1.7657e-01   7.3692e-02
+  0.2       -0.2377   1.4748e-01   8.0821e-02
+  0.4        0.3092   1.0650e-01   6.4509e-02
+  0.8        0.4702   8.3208e-02   5.2308e-02
+  1.6        0.5524   6.4798e-02   4.1473e-02
+  3.2        0.6478   5.0680e-02   3.3240e-02
+  6.4        0.7404   3.8120e-02   2.8724e-02
+  ------------------------------------------
+  Mean       0.2295   9.5338e-02   5.3538e-02
+  Std        0.5405   4.7496e-02   1.8692e-02
+
+[2/3] XGBoost
+  XGBoost device: cuda
+  XGBoost fold=0 (G0=0.1)  R�=0.8911
+  XGBoost fold=1 (G0=0.2)  R�=0.7514
+  XGBoost fold=2 (G0=0.4)  R�=0.8658
+  XGBoost fold=3 (G0=0.8)  R�=0.9069
+  XGBoost fold=4 (G0=1.6)  R�=0.9101
+  XGBoost fold=5 (G0=3.2)  R�=0.9315
+  XGBoost fold=6 (G0=6.4)  R�=0.9522
+
+============================================================
+  XGBoost
+============================================================
+  G0             R�         RMSE          MAE
+  ------------------------------------------
+  0.1        0.8911   4.2537e-02   1.8258e-02
+  0.2        0.7514   6.6101e-02   3.7075e-02
+  0.4        0.8658   4.6937e-02   2.3841e-02
+  0.8        0.9069   3.4881e-02   1.6804e-02
+  1.6        0.9101   2.9044e-02   1.4231e-02
+  3.2        0.9315   2.2355e-02   1.1670e-02
+  6.4        0.9522   1.6361e-02   1.0996e-02
+  ------------------------------------------
+  Mean       0.8870   3.6888e-02   1.8982e-02
+  Std        0.0610   1.5512e-02   8.4180e-03
+
+--- XGBoost Feature Importance (mean across folds) ---
+   1. log_T        0.6471
+   2. log_nH       0.1925
+   3. log_nHp      0.0933
+   4. ext          0.0338
+   5. log_G0       0.0061
+   6. bxr          0.0048
+   7. byl          0.0037
+   8. byr          0.0036
+   9. bxl          0.0034
+  10. bzl          0.0029
+  11. bzr          0.0028
+  12. vx           0.0021
+  13. vy           0.0019
+  14. vz           0.0019
+
+[3/3] MLP
+  MLP device: cuda  AMP: True
+  MLP     fold=0 (G0=0.1)  R�=0.8509
+  MLP     fold=1 (G0=0.2)  R�=0.8469
+  MLP     fold=2 (G0=0.4)  R�=0.8905
+  MLP     fold=3 (G0=0.8)  R�=0.9051
+  MLP     fold=4 (G0=1.6)  R�=0.9233
+  MLP     fold=5 (G0=3.2)  R�=0.9236
+  MLP     fold=6 (G0=6.4)  R�=0.8770
+
+============================================================
+  MLP
+============================================================
+  G0             R�         RMSE          MAE
+  ------------------------------------------
+  0.1        0.8509   4.9771e-02   2.2793e-02
+  0.2        0.8469   5.1864e-02   2.5980e-02
+  0.4        0.8905   4.2404e-02   2.2029e-02
+  0.8        0.9051   3.5216e-02   2.1437e-02
+  1.6        0.9233   2.6816e-02   1.7504e-02
+  3.2        0.9236   2.3606e-02   1.5801e-02
+  6.4        0.8770   2.6237e-02   1.9006e-02
+  ------------------------------------------
+  Mean       0.8882   3.6559e-02   2.0650e-02
+  Std        0.0293   1.0784e-02   3.1991e-03
+
+[Done] exited with code=0 in 378.447 seconds
+
+[Running] python -u "c:\Users\danib\OneDrive\Documents\GitHub\AI-final-project\cnn_model.py"
+UNet3D parameters: 5,848,673
+Input : (1, 14, 64, 64, 64)
+Output: (1, 1, 64, 64, 64)
+Smoke test passed.
+
+[Done] exited with code=0 in 4.831 seconds
+
+[Running] python -u "c:\Users\danib\OneDrive\Documents\GitHub\AI-final-project\train_cnn.py"
+Traceback (most recent call last):
+  File "c:\Users\danib\OneDrive\Documents\GitHub\AI-final-project\train_cnn.py", line 23, in <module>
+    from augmentation import augment_cube, get_symmetry_ops
+  File "c:\Users\danib\OneDrive\Documents\GitHub\AI-final-project\augmentation.py", line 57, in <module>
+    assert len(_Z_PRESERVING) == 8, f"Expected 8 z-preserving ops, got {len(_Z_PRESERVING)}"
+           ^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: Expected 8 z-preserving ops, got 16
+
+[Done] exited with code=1 in 3.095 seconds
+
+[Running] python -u "c:\Users\danib\OneDrive\Documents\GitHub\AI-final-project\augmentation.py"
+Traceback (most recent call last):
+  File "c:\Users\danib\OneDrive\Documents\GitHub\AI-final-project\augmentation.py", line 57, in <module>
+    assert len(_Z_PRESERVING) == 8, f"Expected 8 z-preserving ops, got {len(_Z_PRESERVING)}"
+           ^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: Expected 8 z-preserving ops, got 16
+
+[Done] exited with code=1 in 0.176 seconds
+
+[Running] python -u "c:\Users\danib\OneDrive\Documents\GitHub\AI-final-project\augmentation.py"
+Loading cubes...
+  G0=0.1   | rows=2,097,152 | fh2=[8.46e-25, 4.94e-01]
+  G0=0.2   | rows=2,097,152 | fh2=[2.26e-30, 4.75e-01]
+  G0=0.4   | rows=2,097,152 | fh2=[3.14e-24, 5.07e-01]
+  G0=0.8   | rows=2,097,152 | fh2=[9.28e-26, 5.07e-01]
+  G0=1.6   | rows=2,097,152 | fh2=[2.64e-24, 5.04e-01]
+  G0=3.2   | rows=2,097,152 | fh2=[1.20e-30, 5.05e-01]
+  G0=6.4   | rows=2,097,152 | fh2=[2.72e-30, 5.00e-01]
+Converting first cube to volumes...
+Testing 8 safe (z-preserving) operations on first cube...
+  Sanity check passed: scalar statistics unchanged after augmentation.
+  Sanity check passed: scalar statistics unchanged after augmentation.
+  Sanity check passed: scalar statistics unchanged after augmentation.
+  Sanity check passed: scalar statistics unchanged after augmentation.
+  Sanity check passed: scalar statistics unchanged after augmentation.
+  Sanity check passed: scalar statistics unchanged after augmentation.
+  Sanity check passed: scalar statistics unchanged after augmentation.
+  Sanity check passed: scalar statistics unchanged after augmentation.
+
+All 8 operations passed.
+
+Oh group: 48 total | z-preserving: 8
+
+[Done] exited with code=0 in 43.469 seconds
+
+[Running] python -u "c:\Users\danib\OneDrive\Documents\GitHub\AI-final-project\train_cnn.py"
+Device: cuda
+Loading cubes...
+  G0=0.1   | rows=2,097,152 | fh2=[8.46e-25, 4.94e-01]
+  G0=0.2   | rows=2,097,152 | fh2=[2.26e-30, 4.75e-01]
+  G0=0.4   | rows=2,097,152 | fh2=[3.14e-24, 5.07e-01]
+  G0=0.8   | rows=2,097,152 | fh2=[9.28e-26, 5.07e-01]
+  G0=1.6   | rows=2,097,152 | fh2=[2.64e-24, 5.04e-01]
+  G0=3.2   | rows=2,097,152 | fh2=[1.20e-30, 5.05e-01]
+  G0=6.4   | rows=2,097,152 | fh2=[2.72e-30, 5.00e-01]
+Converting cubes to volumes (128�)...
+Symmetry ops: 8  (safe z-preserving)
+UNet3D params: 5,848,673
+
+[Fold 1/7] Val G0=0.1
+Traceback (most recent call last):
+  File "c:\Users\danib\OneDrive\Documents\GitHub\AI-final-project\train_cnn.py", line 215, in <module>
+    run_cnn_cv(safe_only=not args.all_ops,
+    ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+               epochs=args.epochs,
+               ^^^^^^^^^^^^^^^^^^^
+               save_models=args.save)
+               ^^^^^^^^^^^^^^^^^^^^^^
+  File "c:\Users\danib\OneDrive\Documents\GitHub\AI-final-project\train_cnn.py", line 189, in run_cnn_cv
+    model, metrics = train_one_fold(
+                     ~~~~~~~~~~~~~~^
+        train_vols, val_vols, ops, device, epochs=epochs)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "c:\Users\danib\OneDrive\Documents\GitHub\AI-final-project\train_cnn.py", line 111, in train_one_fold
+    for xb, yb in train_dl:
+                  ^^^^^^^^
+  File "C:\Users\danib\AppData\Local\Programs\Python\Python313\Lib\site-packages\torch\utils\data\dataloader.py", line 732, in __next__
+    data = self._next_data()
+  File "C:\Users\danib\AppData\Local\Programs\Python\Python313\Lib\site-packages\torch\utils\data\dataloader.py", line 788, in _next_data
+    data = self._dataset_fetcher.fetch(index)  # may raise StopIteration
+  File "C:\Users\danib\AppData\Local\Programs\Python\Python313\Lib\site-packages\torch\utils\data\_utils\fetch.py", line 52, in fetch
+    data = [self.dataset[idx] for idx in possibly_batched_index]
+            ~~~~~~~~~~~~^^^^^
+  File "c:\Users\danib\OneDrive\Documents\GitHub\AI-final-project\train_cnn.py", line 65, in __getitem__
+    channels = np.stack([vol[c] for c in CNN_INPUT_COLS], axis=0)  # (C, 128, 128, 128)
+                         ~~~^^^
+KeyError: 'vx'
+
+[Done] exited with code=1 in 59.584 seconds
+
+[Running] python -u "c:\Users\danib\OneDrive\Documents\GitHub\AI-final-project\train_cnn.py"
+Device: cuda
+Loading cubes...
+  G0=0.1   | rows=2,097,152 | fh2=[8.46e-25, 4.94e-01]
+  G0=0.2   | rows=2,097,152 | fh2=[2.26e-30, 4.75e-01]
+  G0=0.4   | rows=2,097,152 | fh2=[3.14e-24, 5.07e-01]
+  G0=0.8   | rows=2,097,152 | fh2=[9.28e-26, 5.07e-01]
+  G0=1.6   | rows=2,097,152 | fh2=[2.64e-24, 5.04e-01]
+  G0=3.2   | rows=2,097,152 | fh2=[1.20e-30, 5.05e-01]
+  G0=6.4   | rows=2,097,152 | fh2=[2.72e-30, 5.00e-01]
+Converting cubes to volumes (128�)...
+Symmetry ops: 8  (safe z-preserving)
+UNet3D params: 5,848,673
+
+[Fold 1/7] Val G0=0.1
+C:\Users\danib\AppData\Local\Programs\Python\Python313\Lib\site-packages\torch\optim\lr_scheduler.py:192: UserWarning: Detected call of `lr_scheduler.step()` before `optimizer.step()`. In PyTorch 1.1.0 and later, you should call them in the opposite order: `optimizer.step()` before `lr_scheduler.step()`.  Failure to do this will result in PyTorch skipping the first value of the learning rate schedule. See more details at https://pytorch.org/docs/stable/optim.html#how-to-adjust-learning-rate
+  warnings.warn(
+    epoch   1/50  train_loss=nan  val_loss=nan
+    epoch  10/50  train_loss=nan  val_loss=nan
+    epoch  20/50  train_loss=nan  val_loss=nan
+    epoch  30/50  train_loss=nan  val_loss=nan
+
+[Done] exited with code=1 in 222.051 seconds
+
+[Running] python -u "c:\Users\danib\OneDrive\Documents\GitHub\AI-final-project\train_cnn.py"
+Device: cuda
+Loading cubes...
+  G0=0.1   | rows=2,097,152 | fh2=[8.46e-25, 4.94e-01]
+  G0=0.2   | rows=2,097,152 | fh2=[2.26e-30, 4.75e-01]
+  G0=0.4   | rows=2,097,152 | fh2=[3.14e-24, 5.07e-01]
+  G0=0.8   | rows=2,097,152 | fh2=[9.28e-26, 5.07e-01]
+  G0=1.6   | rows=2,097,152 | fh2=[2.64e-24, 5.04e-01]
+  G0=3.2   | rows=2,097,152 | fh2=[1.20e-30, 5.05e-01]
+  G0=6.4   | rows=2,097,152 | fh2=[2.72e-30, 5.00e-01]
+Converting cubes to volumes (128�)...
+Symmetry ops: 8  (safe z-preserving)
+UNet3D params: 5,848,673
+
+[Fold 1/7] Val G0=0.1
+    epoch   1/50  train_loss=1.0843  val_loss=2.6322
+    epoch  10/50  train_loss=0.8227  val_loss=2.4833
+    epoch  20/50  train_loss=0.5667  val_loss=3.0340
+    epoch  30/50  train_loss=0.3875  val_loss=3.0652
+    epoch  40/50  train_loss=0.2699  val_loss=3.1596
+    epoch  50/50  train_loss=0.2423  val_loss=3.0230
+  R�=-0.0052  RMSE=1.2636e-01  MAE=8.8884e-02
+
+[Fold 2/7] Val G0=0.2
+    epoch   1/50  train_loss=1.5167  val_loss=2.0994
+    epoch  10/50  train_loss=0.9945  val_loss=1.5576
+    epoch  20/50  train_loss=0.6721  val_loss=1.6399
+    epoch  30/50  train_loss=0.4025  val_loss=1.4903
+    epoch  40/50  train_loss=0.2811  val_loss=1.7228
+    epoch  50/50  train_loss=0.2519  val_loss=1.7755
+  R�=-0.2147  RMSE=1.4487e-01  MAE=1.1093e-01
+
+[Fold 3/7] Val G0=0.4
+    epoch   1/50  train_loss=1.4171  val_loss=1.6156
+    epoch  10/50  train_loss=1.0409  val_loss=1.4790
+    epoch  20/50  train_loss=0.6201  val_loss=1.4486
+    epoch  30/50  train_loss=0.4064  val_loss=1.4194
+    epoch  40/50  train_loss=0.2794  val_loss=1.5465
+    epoch  50/50  train_loss=0.2545  val_loss=1.5152
+  R�=-0.4979  RMSE=1.5663e-01  MAE=1.3073e-01
+
+[Fold 4/7] Val G0=0.8
+    epoch   1/50  train_loss=1.5679  val_loss=1.3630
+    epoch  10/50  train_loss=1.1509  val_loss=1.0441
+    epoch  20/50  train_loss=0.6279  val_loss=1.0317
+    epoch  30/50  train_loss=0.4016  val_loss=1.0559
+    epoch  40/50  train_loss=0.2893  val_loss=1.3277
+    epoch  50/50  train_loss=0.2609  val_loss=1.4818
+  R�=-1.0047  RMSE=1.6385e-01  MAE=1.4408e-01
+
+[Fold 5/7] Val G0=1.6
+    epoch   1/50  train_loss=1.7259  val_loss=0.5842
+    epoch  10/50  train_loss=0.9918  val_loss=0.8759
+    epoch  20/50  train_loss=0.4916  val_loss=0.8078
+    epoch  30/50  train_loss=0.3254  val_loss=0.6490
+    epoch  40/50  train_loss=0.2432  val_loss=0.8347
+    epoch  50/50  train_loss=0.2255  val_loss=0.6603
+  R�=-1.1281  RMSE=1.4400e-01  MAE=1.1655e-01
+
+[Fold 6/7] Val G0=3.2
+    epoch   1/50  train_loss=1.7770  val_loss=0.4176
+    epoch  10/50  train_loss=1.1604  val_loss=0.5605
+    epoch  20/50  train_loss=0.6323  val_loss=0.5185
+    epoch  30/50  train_loss=0.4011  val_loss=0.5688
+    epoch  40/50  train_loss=0.2883  val_loss=0.5729
+    epoch  50/50  train_loss=0.2627  val_loss=0.4673
+  R�=-70.2601  RMSE=7.3303e-01  MAE=2.0246e-01
+
+[Fold 7/7] Val G0=6.4
+    epoch   1/50  train_loss=1.8572  val_loss=1.8791
+    epoch  10/50  train_loss=1.0802  val_loss=0.5151
+    epoch  20/50  train_loss=0.6821  val_loss=0.3835
+    epoch  30/50  train_loss=0.4108  val_loss=0.4053
+    epoch  40/50  train_loss=0.2964  val_loss=0.5471
+    epoch  50/50  train_loss=0.2719  val_loss=0.3819
+  R�=-3.8715  RMSE=1.6641e-01  MAE=1.4125e-01
+
+============================================================
+  3D U-Net CNN
+============================================================
+  G0             R�         RMSE          MAE
+  ------------------------------------------
+  0.1       -0.0052   1.2636e-01   8.8884e-02
+  0.2       -0.2147   1.4487e-01   1.1093e-01
+  0.4       -0.4979   1.5663e-01   1.3073e-01
+  0.8       -1.0047   1.6385e-01   1.4408e-01
+  1.6       -1.1281   1.4400e-01   1.1655e-01
+  3.2      -70.2601   7.3303e-01   2.0246e-01
+  6.4       -3.8715   1.6641e-01   1.4125e-01
+  ------------------------------------------
+  Mean     -10.9974   2.3359e-01   1.3356e-01
+  Std       24.2235   2.0429e-01   3.3215e-02
+
+[Done] exited with code=0 in 1490.785 seconds
+
