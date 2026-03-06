@@ -74,11 +74,11 @@ class UNet3D(nn.Module):
     Args:
         n_channels : number of input feature channels (default 14)
         base_ch    : base number of feature maps (default 32)
-        dropout    : Dropout3d rate applied after each ConvBlock (default 0.10);
+        dropout    : Dropout3d rate applied after each ConvBlock (default 0.0 = disabled);
                      the bottleneck uses 2× this rate for stronger regularisation
     """
 
-    def __init__(self, n_channels: int = 14, base_ch: int = 32, dropout: float = 0.10):
+    def __init__(self, n_channels: int = 14, base_ch: int = 32, dropout: float = 0.0):
         super().__init__()
         b = base_ch
         # Encoder
@@ -114,7 +114,7 @@ def count_parameters(model: nn.Module) -> int:
 # ── Quick smoke test ───────────────────────────────────────────────────────────
 
 if __name__ == '__main__':
-    model = UNet3D(n_channels=14, base_ch=32, dropout=0.10)
+    model = UNet3D(n_channels=14, base_ch=32)
     print(f"UNet3D parameters: {count_parameters(model):,}")
 
     x = torch.randn(1, 14, 64, 64, 64)

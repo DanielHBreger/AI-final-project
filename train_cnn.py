@@ -118,7 +118,7 @@ def train_one_fold(train_vols: list[dict],
                           num_workers=0, pin_memory=pin_mem)
 
     model      = UNet3D(n_channels=len(CNN_INPUT_COLS), base_ch=32).to(device)
-    opt        = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=1e-4)
+    opt        = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=1e-5)
     sched      = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=epochs)
     loss_fn    = nn.MSELoss()
     scaler_amp = torch.amp.GradScaler('cuda', enabled=use_amp)
