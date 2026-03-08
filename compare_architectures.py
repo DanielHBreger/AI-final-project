@@ -77,20 +77,17 @@ Extras (Paths B-E)
 
 Usage
 -----
-  # Fast smoke test (XGBoost + MLP, 5 MLP epochs, no CNN):
-  python compare_architectures.py --skip-cnn --mlp-epochs 5
+  # Fast smoke test (XGBoost + MLP, 5 MLP epochs, no CNN, no spatial):
+  python compare_architectures.py --skip-cnn --no-spatial --mlp-epochs 5
 
-  # XGBoost + MLP only (production quality, 60 MLP epochs):
+  # XGBoost + MLP only with spatial features (production quality):
   python compare_architectures.py --skip-cnn
 
-  # Full comparison with default 150 CNN epochs:
+  # Full comparison (default: 200 CNN epochs, spatial on, stacked ensemble):
   python compare_architectures.py
 
-  # Include spatial neighbourhood features:
-  python compare_architectures.py --spatial
-
-  # All paths including guided CNN:
-  python compare_architectures.py --spatial
+  # Disable spatial neighbourhood features:
+  python compare_architectures.py --no-spatial
 """
 
 import argparse
@@ -102,6 +99,7 @@ import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
 import torch.nn.functional as F
 from sklearn.preprocessing import StandardScaler
+from sklearn.linear_model import Ridge
 import xgboost as xgb
 
 from data_loader import (load_all_cubes, cube_to_volumes, get_X_y,
@@ -609,6 +607,51 @@ def run_ensemble_cv(ensemble_name: str,
     return fold_metrics
 
 
+def run_stacked_ensemble_cv(ensemble_name: str,
+                             model_names: list[str],
+                             all_preds_64: dict[str, tuple[list, list]],
+                             g0_values: list[float]) -> list[dict]:
+    """Ridge-regression stacked ensemble trained on OOF predictions (no leakage).
+
+    For each held-out fold i:
+      - Meta-train: stack per-cell OOF predictions from the 6 other folds.
+        X_meta_tr shape (6 * 262_144, n_models); y_meta_tr = ground-truth log_fh2.
+      - Fit Ridge(alpha=1.0) on meta-train, then predict on fold i's predictions.
+      - Reported weights show which model dominates for each fold.
+
+    all_preds_64 must already be normalized to 64^3 space (call
+    _normalize_preds_to_64 first).
+    """
+    n_folds = len(g0_values)
+    fold_metrics: list[dict] = []
+    for fold in range(n_folds):
+        y_true_val = all_preds_64[model_names[0]][0][fold]
+
+        X_meta_tr_parts, y_meta_tr_parts = [], []
+        for j in range(n_folds):
+            if j == fold:
+                continue
+            yt_j = all_preds_64[model_names[0]][0][j]
+            yp_j = np.stack([all_preds_64[m][1][j] for m in model_names], axis=1)
+            X_meta_tr_parts.append(yp_j)
+            y_meta_tr_parts.append(yt_j)
+
+        X_meta_tr  = np.concatenate(X_meta_tr_parts, axis=0)   # (6*262144, n_models)
+        y_meta_tr  = np.concatenate(y_meta_tr_parts, axis=0)   # (6*262144,)
+        X_meta_val = np.stack([all_preds_64[m][1][fold] for m in model_names], axis=1)
+
+        meta = Ridge(alpha=1.0, fit_intercept=True)
+        meta.fit(X_meta_tr, y_meta_tr)
+        y_stacked = meta.predict(X_meta_val).astype(np.float32)
+
+        metrics = compute_metrics(y_true_val, y_stacked)
+        fold_metrics.append(metrics)
+        weights = {m: f"{w:.3f}" for m, w in zip(model_names, meta.coef_)}
+        print(f"  {ensemble_name:<24}  fold={fold} (G0={g0_values[fold]:.1f})  "
+              f"R2={metrics['R2']:.4f}  w={weights}")
+    return fold_metrics
+
+
 def run_cnn_cv_guided(variant_name: str,
                       config: dict,
                       all_vols: list[dict],
@@ -713,15 +756,16 @@ if __name__ == '__main__':
                         help='Skip all MLP variants')
     parser.add_argument('--skip-cnn',   action='store_true',
                         help='Skip all CNN variants (including guided CNN)')
-    parser.add_argument('--cnn-epochs', type=int, default=150,
-                        help='CNN epochs per variant/fold (default 150)')
+    parser.add_argument('--cnn-epochs', type=int, default=200,
+                        help='CNN epochs per variant/fold (default 200)')
     parser.add_argument('--mlp-epochs', type=int, default=100,
                         help='MLP epochs per variant/fold (default 100)')
     parser.add_argument('--all-ops',    action='store_true',
                         help='Use all 48 Oh symmetry ops for CNN (default: 8 z-preserving)')
-    parser.add_argument('--spatial',    action='store_true',
-                        help='Also run XGBoost and MLP variants with local 3^3 '
-                             'neighbourhood-mean features appended (requires volumes)')
+    parser.add_argument('--no-spatial', action='store_false', dest='spatial',
+                        help='Disable spatial 3^3 neighbourhood-mean feature variants '
+                             '(enabled by default when volumes are loaded)')
+    parser.set_defaults(spatial=True)
     parser.add_argument('--log',        type=str, default=None,
                         help='Output JSON path '
                              '(default: arch_comparison_TIMESTAMP.json)')
@@ -835,17 +879,26 @@ if __name__ == '__main__':
 
     # ── Ensemble variants ──────────────────────────────────────────────────────
     ens_groups = [
-        ('ens_xgb+mlp', ['xgb_standard', 'mlp_wide']),
-        ('ens_xgb+cnn', ['xgb_standard', 'unet_standard']),
-        ('ens_all',     ['xgb_standard', 'mlp_wide', 'unet_standard']),
+        ('ens_xgb+mlp',     ['xgb_standard', 'mlp_wide']),
+        ('ens_xgb+cnn',     ['xgb_standard', 'unet_standard']),
+        ('ens_all',         ['xgb_standard', 'mlp_wide', 'unet_standard']),
     ]
-    ens_to_run = [(n, ms) for n, ms in ens_groups if all(m in all_preds for m in ms)]
-    if ens_to_run:
+    stacked_groups = [
+        ('stacked_xgb+mlp', ['xgb_standard', 'mlp_wide']),
+        ('stacked_xgb+cnn', ['xgb_standard', 'unet_standard']),
+        ('stacked_all',     ['xgb_standard', 'mlp_wide', 'unet_standard']),
+    ]
+    ens_to_run     = [(n, ms) for n, ms in ens_groups     if all(m in all_preds for m in ms)]
+    stacked_to_run = [(n, ms) for n, ms in stacked_groups if all(m in all_preds for m in ms)]
+    if ens_to_run or stacked_to_run:
         print("\n--- Ensemble variants ---")
         ens_preds = _normalize_preds_to_64(all_preds, cubes, g0_vals)
         for ens_name, members in ens_to_run:
             all_results[ens_name] = run_ensemble_cv(
                 ens_name, members, ens_preds, g0_vals)
+        for stk_name, members in stacked_to_run:
+            all_results[stk_name] = run_stacked_ensemble_cv(
+                stk_name, members, ens_preds, g0_vals)
 
     print_comparison(all_results, g0_vals)
     save_comparison_log(all_results, g0_vals, run_config, log_path)
