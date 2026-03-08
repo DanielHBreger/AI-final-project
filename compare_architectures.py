@@ -61,16 +61,36 @@ CNN (3 variants)
     Upper bound.  Predicted to NOT improve: 480 000 : 1 param-to-sample ratio.
     Included to confirm the over-parameterisation hypothesis.
 
+Extras (Paths B-E)
+  ens_xgb+mlp / ens_xgb+cnn / ens_all
+    Equal-weight prediction ensemble across model families.
+
+  xgb_standard_sp / mlp_wide_sp  (--spatial flag)
+    Append local 3^3 neighbourhood-mean features via scipy.ndimage.uniform_filter.
+    Gives pointwise models a glimpse of spatial context without full CNN.
+
+  unet_xgb_guided
+    3D U-Net with XGBoost's OOB prediction prepended as a 15th input channel.
+    Each cube's XGBoost volume comes from the fold where it was held out (no
+    leakage). Hypothesis: providing a near-correct "prior" speeds convergence
+    and improves extrapolation folds.
+
 Usage
 -----
-  # Fast smoke test (XGBoost + MLP, 5 MLP epochs):
+  # Fast smoke test (XGBoost + MLP, 5 MLP epochs, no CNN):
   python compare_architectures.py --skip-cnn --mlp-epochs 5
 
-  # Full comparison with 50 CNN epochs (~30 min on GPU):
-  python compare_architectures.py --cnn-epochs 50
+  # XGBoost + MLP only (production quality, 60 MLP epochs):
+  python compare_architectures.py --skip-cnn
 
-  # Production-quality CNN comparison (matches best known config):
-  python compare_architectures.py --cnn-epochs 150
+  # Full comparison with default 150 CNN epochs:
+  python compare_architectures.py
+
+  # Include spatial neighbourhood features:
+  python compare_architectures.py --spatial
+
+  # All paths including guided CNN:
+  python compare_architectures.py --spatial
 """
 
 import argparse
@@ -93,8 +113,9 @@ from augmentation import augment_cube, get_symmetry_ops
 
 # ── Shared constants ──────────────────────────────────────────────────────────
 
-CNN_INPUT_COLS = FEATURE_COLS   # 14 physical field channels
-CNN_TARGET_COL = LOG_TARGET_COL # log10(fh2)
+CNN_INPUT_COLS        = FEATURE_COLS                    # 14 physical field channels
+CNN_TARGET_COL        = LOG_TARGET_COL                  # log10(fh2)
+CNN_INPUT_COLS_GUIDED = CNN_INPUT_COLS + ['xgb_pred']  # 15 channels (XGBoost-guided)
 
 
 # ── XGBoost variant configs ───────────────────────────────────────────────────
@@ -118,6 +139,13 @@ XGB_VARIANTS: dict[str, dict] = {
         subsample=0.3, colsample_bytree=0.8, tree_method='hist',
         random_state=42, verbosity=0,
     ),
+}
+
+
+# ── CNN guided variant configs ─────────────────────────────────────────────────
+
+CNN_GUIDED_VARIANTS: dict[str, dict] = {
+    'unet_xgb_guided': {'base_ch': 32},
 }
 
 
@@ -198,21 +226,38 @@ CNN_VARIANTS: dict[str, dict] = {
 }
 
 
-# ── Shared CubeDataset (mirrors train_cnn.CubeDataset exactly) ─────────────────
+# ── Shared CubeDataset ────────────────────────────────────────────────────────
 
 class CubeDataset(Dataset):
-    """Pre-computes all augmented, pooled, and normalised tensors at init time."""
+    """Pre-computes all augmented, pooled, and normalised tensors at init time.
+
+    Accepts an optional input_cols list to support the guided CNN variant
+    (15-channel input with XGBoost prediction prepended).
+    """
     def __init__(self, cube_vols: list[dict],
                  ops: list[np.ndarray] | None,
-                 augment: bool = True):
+                 augment: bool = True,
+                 input_cols: list[str] | None = None):
+        _cols = input_cols if input_cols is not None else CNN_INPUT_COLS
         self.xs: list[torch.Tensor] = []
         self.ys: list[torch.Tensor] = []
         identity   = np.eye(3, dtype=int)
         active_ops = ops if (augment and ops) else [identity]
         for vol in cube_vols:
             for R in active_ops:
-                aug      = augment_cube(vol, R)
-                channels = np.stack([aug[c] for c in CNN_INPUT_COLS], axis=0)
+                aug = augment_cube(vol, R)
+                # augment_cube only handles known physical fields; apply the same
+                # scalar grid transformation to any extra channels (e.g. 'xgb_pred')
+                perm  = [int(np.nonzero(R[i])[0][0]) for i in range(3)]
+                signs = [int(R[i, perm[i]])           for i in range(3)]
+                for extra in _cols:
+                    if extra not in aug and extra in vol:
+                        v = np.transpose(vol[extra], perm)
+                        for ax, s in enumerate(signs):
+                            if s == -1:
+                                v = np.flip(v, axis=ax)
+                        aug[extra] = np.ascontiguousarray(v)
+                channels = np.stack([aug[c] for c in _cols], axis=0)
                 target   = aug[CNN_TARGET_COL][None]
                 ch_t     = torch.from_numpy(channels).unsqueeze(0)
                 tgt_t    = torch.from_numpy(target).unsqueeze(0)
@@ -228,6 +273,48 @@ class CubeDataset(Dataset):
         return self.xs[idx], self.ys[idx]
 
 
+# ── Volume helpers ────────────────────────────────────────────────────────────
+
+def _preds_to_volume(cube_df, y_pred_log: np.ndarray) -> np.ndarray:
+    """Reshape flat per-cell predictions back to a 128^3 numpy volume.
+
+    cube_df must have integer 1-indexed columns ix, iy, iz.
+    """
+    vol = np.zeros((128, 128, 128), dtype=np.float32)
+    ix  = cube_df['ix'].values.astype(int) - 1
+    iy  = cube_df['iy'].values.astype(int) - 1
+    iz  = cube_df['iz'].values.astype(int) - 1
+    vol[ix, iy, iz] = y_pred_log.astype(np.float32)
+    return np.nan_to_num(vol)
+
+
+def _compute_spatial_X(cubes: list,
+                        all_vols: list[dict],
+                        feature_cols: list[str],
+                        kernel_size: int = 3) -> np.ndarray:
+    """Local neighbourhood mean for each feature channel via scipy uniform_filter.
+
+    For each cube and each feature channel, computes the 3^3 (or kernel_size^3)
+    neighbourhood mean at every grid point using scipy.ndimage.uniform_filter,
+    then indexes back to DataFrame row order using ix/iy/iz.
+
+    Returns (N, len(feature_cols)) float32 array of neighbourhood means.
+    These are appended to X to give pointwise models spatial context.
+    """
+    from scipy.ndimage import uniform_filter
+    parts = []
+    for cube, vol in zip(cubes, all_vols):
+        ix = cube['ix'].values.astype(int) - 1
+        iy = cube['iy'].values.astype(int) - 1
+        iz = cube['iz'].values.astype(int) - 1
+        extra = np.stack([
+            uniform_filter(vol[col], size=kernel_size)[ix, iy, iz]
+            for col in feature_cols
+        ], axis=-1).astype(np.float32)
+        parts.append(extra)
+    return np.concatenate(parts, axis=0)   # (N, len(feature_cols))
+
+
 # ── Training helpers ──────────────────────────────────────────────────────────
 
 def run_xgb_cv(variant_name: str,
@@ -235,11 +322,21 @@ def run_xgb_cv(variant_name: str,
                X: np.ndarray,
                y: np.ndarray,
                fold_labels: np.ndarray,
-               g0_values: list[float]) -> list[dict]:
-    """7-fold leave-one-G0-out CV for one XGBoost config."""
+               g0_values: list[float],
+               cubes: list,
+               ) -> tuple[list[dict], list[np.ndarray], list[np.ndarray], list[np.ndarray]]:
+    """7-fold leave-one-G0-out CV for one XGBoost config.
+
+    Returns (fold_metrics, y_true_folds, y_pred_folds, xgb_vols_128).
+    xgb_vols_128[i] is the 128^3 log_fh2 prediction volume for cube i from the
+    fold where it was held out — fully OOB, no data leakage.
+    """
     _dev = 'cuda' if torch.cuda.is_available() else 'cpu'
     cfg  = {**config, 'device': _dev}
-    fold_metrics: list[dict] = []
+    fold_metrics: list[dict]       = []
+    y_true_folds: list[np.ndarray] = []
+    y_pred_folds: list[np.ndarray] = []
+    xgb_vols:     list[np.ndarray] = []
     for fold in range(len(g0_values)):
         mask   = fold_labels != fold
         X_tr, y_tr = X[mask],  y[mask]
@@ -249,10 +346,14 @@ def run_xgb_cv(variant_name: str,
         X_va_s = sc.transform(X_va)
         model = xgb.XGBRegressor(**cfg)
         model.fit(X_tr_s, y_tr, eval_set=[(X_va_s, y_va)], verbose=False)
-        fold_metrics.append(compute_metrics(y_va, model.predict(X_va_s)))
+        y_pred = model.predict(X_va_s).astype(np.float32)
+        fold_metrics.append(compute_metrics(y_va, y_pred))
+        y_true_folds.append(y_va.astype(np.float32))
+        y_pred_folds.append(y_pred)
+        xgb_vols.append(_preds_to_volume(cubes[fold], y_pred))
         print(f"  {variant_name:<16}  fold={fold} (G0={g0_values[fold]:.1f})  "
               f"R2={fold_metrics[-1]['R2']:.4f}")
-    return fold_metrics
+    return fold_metrics, y_true_folds, y_pred_folds, xgb_vols
 
 
 def _build_mlp(config: dict, in_dim: int) -> nn.Module:
@@ -270,17 +371,23 @@ def run_mlp_cv(variant_name: str,
                y: np.ndarray,
                fold_labels: np.ndarray,
                g0_values: list[float],
-               epochs: int = 30,
+               epochs: int = 60,
                batch_size: int = 262144,
-               lr: float = 1e-3) -> list[dict]:
+               lr: float = 1e-3,
+               ) -> tuple[list[dict], list[np.ndarray], list[np.ndarray]]:
     """7-fold CV for one MLP config.
+
     Training loop is identical to classical_models.run_mlp (GPU-preload,
     torch.randperm batching, AMP, CosineAnnealingLR) but uses a configurable
     model architecture.
+
+    Returns (fold_metrics, y_true_folds, y_pred_folds).
     """
     device  = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     use_amp = device.type == 'cuda'
-    fold_metrics: list[dict] = []
+    fold_metrics: list[dict]       = []
+    y_true_folds: list[np.ndarray] = []
+    y_pred_folds: list[np.ndarray] = []
 
     for fold in range(len(g0_values)):
         mask   = fold_labels != fold
@@ -321,10 +428,12 @@ def run_mlp_cv(variant_name: str,
             y_pred = model(torch.from_numpy(X_va_s).to(device)).float().cpu().numpy()
 
         fold_metrics.append(compute_metrics(y_va, y_pred))
+        y_true_folds.append(y_va.astype(np.float32))
+        y_pred_folds.append(y_pred.astype(np.float32))
         print(f"  {variant_name:<16}  fold={fold} (G0={g0_values[fold]:.1f})  "
               f"R2={fold_metrics[-1]['R2']:.4f}")
 
-    return fold_metrics
+    return fold_metrics, y_true_folds, y_pred_folds
 
 
 def _train_cnn_fold(train_vols: list[dict],
@@ -333,10 +442,17 @@ def _train_cnn_fold(train_vols: list[dict],
                     device: torch.device,
                     epochs: int,
                     lr: float,
-                    base_ch: int) -> dict:
-    """Single CNN fold.  Mirrors train_cnn.train_one_fold but parametrizes base_ch."""
-    train_ds = CubeDataset(train_vols, ops, augment=True)
-    val_ds   = CubeDataset(val_vols,   ops=None, augment=False)
+                    base_ch: int,
+                    input_cols: list[str] | None = None,
+                    ) -> tuple[dict, np.ndarray, np.ndarray]:
+    """Single CNN fold.  Mirrors train_cnn.train_one_fold but parametrizes
+    base_ch and accepts an optional input_cols list.
+
+    Returns (metrics_dict, y_true_log, y_pred_log) in original log_fh2 space.
+    """
+    _cols    = input_cols if input_cols is not None else CNN_INPUT_COLS
+    train_ds = CubeDataset(train_vols, ops, augment=True,  input_cols=_cols)
+    val_ds   = CubeDataset(val_vols,   ops=None, augment=False, input_cols=_cols)
 
     # Per-channel input normalisation (training stats only)
     all_x   = torch.stack(train_ds.xs)
@@ -358,7 +474,7 @@ def _train_cnn_fold(train_vols: list[dict],
     val_dl   = DataLoader(val_ds,   batch_size=1, shuffle=False,
                           num_workers=0, pin_memory=pin_mem)
 
-    model   = UNet3D(n_channels=len(CNN_INPUT_COLS), base_ch=base_ch).to(device)
+    model   = UNet3D(n_channels=len(_cols), base_ch=base_ch).to(device)
     opt     = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=1e-5)
     sched   = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=epochs)
     loss_fn = nn.MSELoss()
@@ -407,7 +523,7 @@ def _train_cnn_fold(train_vols: list[dict],
     y_mean_np = y_mean.item()
     y_true = np.concatenate(y_true_parts) * y_std_np + y_mean_np
     y_pred = np.concatenate(y_pred_parts) * y_std_np + y_mean_np
-    return compute_metrics(y_true, y_pred)
+    return compute_metrics(y_true, y_pred), y_true.astype(np.float32), y_pred.astype(np.float32)
 
 
 def run_cnn_cv_variant(variant_name: str,
@@ -416,22 +532,122 @@ def run_cnn_cv_variant(variant_name: str,
                        g0_values: list[float],
                        device: torch.device,
                        ops: list[np.ndarray],
-                       epochs: int = 50,
-                       lr: float = 1e-3) -> list[dict]:
-    """7-fold CV for one CNN config variant."""
+                       epochs: int = 150,
+                       lr: float = 1e-3,
+                       ) -> tuple[list[dict], list[np.ndarray], list[np.ndarray]]:
+    """7-fold CV for one CNN config variant.
+    Returns (fold_metrics, y_true_folds, y_pred_folds).
+    """
     base_ch  = config['base_ch']
     n_params = count_parameters(UNet3D(n_channels=len(CNN_INPUT_COLS), base_ch=base_ch))
     print(f"  {variant_name}  base_ch={base_ch}  params={n_params:,}")
-    fold_metrics: list[dict] = []
+    fold_metrics: list[dict]       = []
+    y_true_folds: list[np.ndarray] = []
+    y_pred_folds: list[np.ndarray] = []
     for fold in range(len(g0_values)):
         print(f"  [Fold {fold + 1}/{len(g0_values)}] Val G0={g0_values[fold]:.1f}")
         train_vols = [v for i, v in enumerate(all_vols) if i != fold]
         val_vols   = [all_vols[fold]]
-        metrics = _train_cnn_fold(train_vols, val_vols, ops, device, epochs, lr, base_ch)
+        metrics, y_true, y_pred = _train_cnn_fold(
+            train_vols, val_vols, ops, device, epochs, lr, base_ch)
         fold_metrics.append(metrics)
+        y_true_folds.append(y_true)
+        y_pred_folds.append(y_pred)
         print(f"  {variant_name:<16}  fold={fold} (G0={g0_values[fold]:.1f})  "
               f"R2={metrics['R2']:.4f}")
+    return fold_metrics, y_true_folds, y_pred_folds
+
+
+def _normalize_preds_to_64(all_preds: dict,
+                            cubes: list,
+                            g0_values: list[float]) -> dict:
+    """Return a copy of all_preds where every model's predictions are in 64³
+    raveled space (262 144 values per fold).
+
+    XGBoost/MLP produce flat 128³ row-ordered predictions.  They are mapped
+    back to a 128³ volume via _preds_to_volume, then avg_pool3d to 64³.
+    CNN models already predict in 64³ and are passed through unchanged.
+    """
+    cnn_size = 64 ** 3   # 262 144
+    out = {}
+    for name, (yt_folds, yp_folds) in all_preds.items():
+        if len(yp_folds[0]) == cnn_size:
+            out[name] = (yt_folds, yp_folds)
+        else:
+            yt64, yp64 = [], []
+            for fold in range(len(g0_values)):
+                def _pool(flat, fold=fold):
+                    vol = torch.from_numpy(
+                        _preds_to_volume(cubes[fold], flat)
+                    ).unsqueeze(0).unsqueeze(0)   # (1,1,128,128,128)
+                    return F.avg_pool3d(vol, kernel_size=2, stride=2).numpy().ravel()
+                yt64.append(_pool(yt_folds[fold]))
+                yp64.append(_pool(yp_folds[fold]))
+            out[name] = (yt64, yp64)
+    return out
+
+
+def run_ensemble_cv(ensemble_name: str,
+                    model_names: list[str],
+                    all_preds: dict[str, tuple[list, list]],
+                    g0_values: list[float]) -> list[dict]:
+    """Equal-weight average ensemble of per-fold predictions from listed models.
+
+    all_preds[name] = (y_true_folds, y_pred_folds) in log_fh2 space.
+    All prediction arrays must have the same length per fold (call
+    _normalize_preds_to_64 first when mixing pointwise and CNN models).
+    y_true is taken from the first model (all val cubes share the same target).
+    """
+    fold_metrics: list[dict] = []
+    for fold in range(len(g0_values)):
+        y_true_log = all_preds[model_names[0]][0][fold]
+        y_preds    = [all_preds[name][1][fold] for name in model_names]
+        y_ens      = np.mean(y_preds, axis=0)
+        fold_metrics.append(compute_metrics(y_true_log, y_ens))
+        print(f"  {ensemble_name:<20}  fold={fold} (G0={g0_values[fold]:.1f})  "
+              f"R2={fold_metrics[-1]['R2']:.4f}")
     return fold_metrics
+
+
+def run_cnn_cv_guided(variant_name: str,
+                      config: dict,
+                      all_vols: list[dict],
+                      xgb_vols: list[np.ndarray],
+                      g0_values: list[float],
+                      device: torch.device,
+                      ops: list[np.ndarray],
+                      epochs: int = 150,
+                      lr: float = 1e-3,
+                      ) -> tuple[list[dict], list[np.ndarray], list[np.ndarray]]:
+    """CNN fold training where XGBoost's OOB predictions are the 15th input channel.
+
+    xgb_vols[i] is the 128^3 prediction volume for cube i from its own held-out
+    XGBoost fold.  This is fully OOB for both training and val cubes, so there
+    is no data leakage.
+
+    Returns (fold_metrics, y_true_folds, y_pred_folds).
+    """
+    base_ch  = config['base_ch']
+    n_params = count_parameters(UNet3D(n_channels=len(CNN_INPUT_COLS_GUIDED), base_ch=base_ch))
+    print(f"  {variant_name}  base_ch={base_ch}  n_channels=15  params={n_params:,}")
+    fold_metrics: list[dict]       = []
+    y_true_folds: list[np.ndarray] = []
+    y_pred_folds: list[np.ndarray] = []
+    for fold in range(len(g0_values)):
+        print(f"  [Fold {fold + 1}/{len(g0_values)}] Val G0={g0_values[fold]:.1f}")
+        # Inject 'xgb_pred' channel into each cube's volume dict
+        train_vols_g = [{**all_vols[i], 'xgb_pred': xgb_vols[i]}
+                        for i in range(len(all_vols)) if i != fold]
+        val_vols_g   = [{**all_vols[fold], 'xgb_pred': xgb_vols[fold]}]
+        metrics, y_true, y_pred = _train_cnn_fold(
+            train_vols_g, val_vols_g, ops, device, epochs, lr, base_ch,
+            input_cols=CNN_INPUT_COLS_GUIDED)
+        fold_metrics.append(metrics)
+        y_true_folds.append(y_true)
+        y_pred_folds.append(y_pred)
+        print(f"  {variant_name:<16}  fold={fold} (G0={g0_values[fold]:.1f})  "
+              f"R2={metrics['R2']:.4f}")
+    return fold_metrics, y_true_folds, y_pred_folds
 
 
 # ── Reporting ─────────────────────────────────────────────────────────────────
@@ -440,7 +656,7 @@ def print_comparison(all_results: dict[str, list[dict]],
                      g0_values: list[float]) -> None:
     """Print a compact R2 comparison table: variants (rows) x G0 folds (cols)."""
     col_w   = 9   # width per G0 column
-    name_w  = 16
+    name_w  = 20
     g0_hdr  = "".join(f"G0={g:<5.1f}" for g in g0_values)
     header  = f"  {'Variant':<{name_w}}  {g0_hdr}  {'MeanR2':>8}  {'Std':>6}"
     sep     = "=" * len(header)
@@ -496,14 +712,16 @@ if __name__ == '__main__':
     parser.add_argument('--skip-mlp',   action='store_true',
                         help='Skip all MLP variants')
     parser.add_argument('--skip-cnn',   action='store_true',
-                        help='Skip all CNN variants')
-    parser.add_argument('--cnn-epochs', type=int, default=50,
-                        help='CNN epochs per variant/fold '
-                             '(default 50 for quick comparison; use 150 for final runs)')
-    parser.add_argument('--mlp-epochs', type=int, default=30,
-                        help='MLP epochs per variant/fold (default 30)')
+                        help='Skip all CNN variants (including guided CNN)')
+    parser.add_argument('--cnn-epochs', type=int, default=150,
+                        help='CNN epochs per variant/fold (default 150)')
+    parser.add_argument('--mlp-epochs', type=int, default=100,
+                        help='MLP epochs per variant/fold (default 100)')
     parser.add_argument('--all-ops',    action='store_true',
                         help='Use all 48 Oh symmetry ops for CNN (default: 8 z-preserving)')
+    parser.add_argument('--spatial',    action='store_true',
+                        help='Also run XGBoost and MLP variants with local 3^3 '
+                             'neighbourhood-mean features appended (requires volumes)')
     parser.add_argument('--log',        type=str, default=None,
                         help='Output JSON path '
                              '(default: arch_comparison_TIMESTAMP.json)')
@@ -527,28 +745,14 @@ if __name__ == '__main__':
         'cnn_epochs': args.cnn_epochs,
         'mlp_epochs': args.mlp_epochs,
         'all_ops':    args.all_ops,
+        'spatial':    args.spatial,
     }
 
-    all_results: dict[str, list[dict]] = {}
-
-    # ── XGBoost variants ──────────────────────────────────────────────────────
-    if not args.skip_xgb:
-        print("\n--- XGBoost variants ---")
-        for name, cfg in XGB_VARIANTS.items():
-            print(f"\n[{name}]")
-            all_results[name] = run_xgb_cv(name, cfg, X, y, folds, g0_vals)
-
-    # ── MLP variants ──────────────────────────────────────────────────────────
-    if not args.skip_mlp:
-        print(f"\n--- MLP variants ({args.mlp_epochs} epochs) ---")
-        for name, cfg in MLP_VARIANTS.items():
-            print(f"\n[{name}]")
-            all_results[name] = run_mlp_cv(name, cfg, X, y, folds, g0_vals,
-                                           epochs=args.mlp_epochs)
-
-    # ── CNN variants ──────────────────────────────────────────────────────────
-    if not args.skip_cnn:
-        print(f"\n--- CNN variants ({args.cnn_epochs} epochs) ---")
+    # Load 128^3 volumes whenever CNN variants or spatial features are needed
+    need_vols = (not args.skip_cnn) or args.spatial
+    all_vols: list[dict] | None = None
+    ops: list | None = None
+    if need_vols:
         print("Converting cubes to 128^3 volumes...")
         vol_cols = [c for c in CNN_INPUT_COLS + [CNN_TARGET_COL]
                     if c in cubes[0].columns]
@@ -556,11 +760,92 @@ if __name__ == '__main__':
         ops      = get_symmetry_ops(safe_only=not args.all_ops)
         print(f"Symmetry ops: {len(ops)}  "
               f"({'z-preserving' if not args.all_ops else 'full Oh'})")
+
+    all_results:       dict[str, list[dict]]           = {}
+    all_preds:         dict[str, tuple[list, list]]    = {}
+    xgb_standard_vols: list[np.ndarray] | None         = None
+
+    # ── XGBoost variants ──────────────────────────────────────────────────────
+    if not args.skip_xgb:
+        print("\n--- XGBoost variants ---")
+        for name, cfg in XGB_VARIANTS.items():
+            print(f"\n[{name}]")
+            fold_metrics, yt, yp, xvols = run_xgb_cv(
+                name, cfg, X, y, folds, g0_vals, cubes)
+            all_results[name] = fold_metrics
+            all_preds[name]   = (yt, yp)
+            if name == 'xgb_standard':
+                xgb_standard_vols = xvols
+
+    # ── MLP variants ──────────────────────────────────────────────────────────
+    if not args.skip_mlp:
+        print(f"\n--- MLP variants ({args.mlp_epochs} epochs) ---")
+        for name, cfg in MLP_VARIANTS.items():
+            print(f"\n[{name}]")
+            fold_metrics, yt, yp = run_mlp_cv(
+                name, cfg, X, y, folds, g0_vals, epochs=args.mlp_epochs)
+            all_results[name] = fold_metrics
+            all_preds[name]   = (yt, yp)
+
+    # ── CNN variants ──────────────────────────────────────────────────────────
+    if not args.skip_cnn:
+        print(f"\n--- CNN variants ({args.cnn_epochs} epochs) ---")
         for name, cfg in CNN_VARIANTS.items():
             print(f"\n[{name}]")
-            all_results[name] = run_cnn_cv_variant(
+            fold_metrics, yt, yp = run_cnn_cv_variant(
                 name, cfg, all_vols, g0_vals, device, ops,
                 epochs=args.cnn_epochs)
+            all_results[name] = fold_metrics
+            all_preds[name]   = (yt, yp)
+
+    # ── Spatial-feature variants ───────────────────────────────────────────────
+    if args.spatial and need_vols:
+        print("\n--- Spatial-feature variants ---")
+        X_extra = _compute_spatial_X(cubes, all_vols, FEATURE_COLS)
+        X_sp    = np.concatenate([X, X_extra], axis=1)   # (N, 28)
+
+        if not args.skip_xgb:
+            name = 'xgb_standard_sp'
+            fold_metrics, yt, yp, _ = run_xgb_cv(
+                name, XGB_VARIANTS['xgb_standard'], X_sp, y, folds, g0_vals, cubes)
+            all_results[name] = fold_metrics
+            all_preds[name]   = (yt, yp)
+
+        if not args.skip_mlp:
+            name = 'mlp_wide_sp'
+            fold_metrics, yt, yp = run_mlp_cv(
+                name, MLP_VARIANTS['mlp_wide'], X_sp, y, folds, g0_vals,
+                epochs=args.mlp_epochs)
+            all_results[name] = fold_metrics
+            all_preds[name]   = (yt, yp)
+
+    # ── XGBoost-guided CNN ────────────────────────────────────────────────────
+    if not args.skip_cnn and xgb_standard_vols is not None:
+        print("\n--- XGBoost-guided CNN ---")
+        for name, cfg in CNN_GUIDED_VARIANTS.items():
+            print(f"\n[{name}]")
+            fold_metrics, yt, yp = run_cnn_cv_guided(
+                name, cfg, all_vols, xgb_standard_vols, g0_vals, device, ops,
+                epochs=args.cnn_epochs)
+            all_results[name] = fold_metrics
+            all_preds[name]   = (yt, yp)
+    elif not args.skip_cnn and args.skip_xgb:
+        print("\n(Skipping XGBoost-guided CNN: requires xgb_standard predictions; "
+              "re-run without --skip-xgb to enable)")
+
+    # ── Ensemble variants ──────────────────────────────────────────────────────
+    ens_groups = [
+        ('ens_xgb+mlp', ['xgb_standard', 'mlp_wide']),
+        ('ens_xgb+cnn', ['xgb_standard', 'unet_standard']),
+        ('ens_all',     ['xgb_standard', 'mlp_wide', 'unet_standard']),
+    ]
+    ens_to_run = [(n, ms) for n, ms in ens_groups if all(m in all_preds for m in ms)]
+    if ens_to_run:
+        print("\n--- Ensemble variants ---")
+        ens_preds = _normalize_preds_to_64(all_preds, cubes, g0_vals)
+        for ens_name, members in ens_to_run:
+            all_results[ens_name] = run_ensemble_cv(
+                ens_name, members, ens_preds, g0_vals)
 
     print_comparison(all_results, g0_vals)
     save_comparison_log(all_results, g0_vals, run_config, log_path)
