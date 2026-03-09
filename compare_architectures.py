@@ -83,7 +83,7 @@ Usage
   # XGBoost + MLP only with spatial features (production quality):
   python compare_architectures.py --skip-cnn
 
-  # Full comparison (default: 200 CNN epochs, spatial on, stacked ensemble):
+  # Full comparison (default: 150 CNN epochs, spatial on, stacked ensemble):
   python compare_architectures.py
 
   # Disable spatial neighbourhood features:
@@ -219,8 +219,7 @@ CNN_VARIANTS: dict[str, dict] = {
     'unet_small':    {'base_ch': 16},
     # Standard — current best (R2=0.803 mean, Run 3)
     'unet_standard': {'base_ch': 32},
-    # Large — upper bound; expected to confirm over-parameterisation hypothesis
-    'unet_large':    {'base_ch': 64},
+    # unet_large (base_ch=64, 23M params) retired: confirmed unstable across all runs
 }
 
 
@@ -442,12 +441,18 @@ def _train_cnn_fold(train_vols: list[dict],
                     lr: float,
                     base_ch: int,
                     input_cols: list[str] | None = None,
+                    seed: int = 0,
                     ) -> tuple[dict, np.ndarray, np.ndarray]:
     """Single CNN fold.  Mirrors train_cnn.train_one_fold but parametrizes
     base_ch and accepts an optional input_cols list.
 
+    seed fixes torch/numpy randomness so results are reproducible across runs.
+    Pass fold index as seed to get deterministic but fold-varied initialisation.
+
     Returns (metrics_dict, y_true_log, y_pred_log) in original log_fh2 space.
     """
+    torch.manual_seed(seed)
+    np.random.seed(seed)
     _cols    = input_cols if input_cols is not None else CNN_INPUT_COLS
     train_ds = CubeDataset(train_vols, ops, augment=True,  input_cols=_cols)
     val_ds   = CubeDataset(val_vols,   ops=None, augment=False, input_cols=_cols)
@@ -547,7 +552,7 @@ def run_cnn_cv_variant(variant_name: str,
         train_vols = [v for i, v in enumerate(all_vols) if i != fold]
         val_vols   = [all_vols[fold]]
         metrics, y_true, y_pred = _train_cnn_fold(
-            train_vols, val_vols, ops, device, epochs, lr, base_ch)
+            train_vols, val_vols, ops, device, epochs, lr, base_ch, seed=fold)
         fold_metrics.append(metrics)
         y_true_folds.append(y_true)
         y_pred_folds.append(y_pred)
@@ -684,7 +689,7 @@ def run_cnn_cv_guided(variant_name: str,
         val_vols_g   = [{**all_vols[fold], 'xgb_pred': xgb_vols[fold]}]
         metrics, y_true, y_pred = _train_cnn_fold(
             train_vols_g, val_vols_g, ops, device, epochs, lr, base_ch,
-            input_cols=CNN_INPUT_COLS_GUIDED)
+            input_cols=CNN_INPUT_COLS_GUIDED, seed=fold)
         fold_metrics.append(metrics)
         y_true_folds.append(y_true)
         y_pred_folds.append(y_pred)
@@ -756,8 +761,8 @@ if __name__ == '__main__':
                         help='Skip all MLP variants')
     parser.add_argument('--skip-cnn',   action='store_true',
                         help='Skip all CNN variants (including guided CNN)')
-    parser.add_argument('--cnn-epochs', type=int, default=200,
-                        help='CNN epochs per variant/fold (default 200)')
+    parser.add_argument('--cnn-epochs', type=int, default=150,
+                        help='CNN epochs per variant/fold (default 150)')
     parser.add_argument('--mlp-epochs', type=int, default=100,
                         help='MLP epochs per variant/fold (default 100)')
     parser.add_argument('--all-ops',    action='store_true',
@@ -879,14 +884,16 @@ if __name__ == '__main__':
 
     # ── Ensemble variants ──────────────────────────────────────────────────────
     ens_groups = [
-        ('ens_xgb+mlp',     ['xgb_standard', 'mlp_wide']),
-        ('ens_xgb+cnn',     ['xgb_standard', 'unet_standard']),
-        ('ens_all',         ['xgb_standard', 'mlp_wide', 'unet_standard']),
+        ('ens_xgb+mlp',     ['xgb_standard',    'mlp_wide']),
+        ('ens_xgb+cnn',     ['xgb_standard',    'unet_standard']),
+        ('ens_all',         ['xgb_standard',    'mlp_wide',    'unet_standard']),
+        ('ens_sp',          ['xgb_standard_sp', 'mlp_wide_sp']),
     ]
     stacked_groups = [
-        ('stacked_xgb+mlp', ['xgb_standard', 'mlp_wide']),
-        ('stacked_xgb+cnn', ['xgb_standard', 'unet_standard']),
-        ('stacked_all',     ['xgb_standard', 'mlp_wide', 'unet_standard']),
+        ('stacked_xgb+mlp', ['xgb_standard',    'mlp_wide']),
+        ('stacked_xgb+cnn', ['xgb_standard',    'unet_standard']),
+        ('stacked_all',     ['xgb_standard',    'mlp_wide',    'unet_standard']),
+        ('stacked_sp',      ['xgb_standard_sp', 'mlp_wide_sp']),
     ]
     ens_to_run     = [(n, ms) for n, ms in ens_groups     if all(m in all_preds for m in ms)]
     stacked_to_run = [(n, ms) for n, ms in stacked_groups if all(m in all_preds for m in ms)]
