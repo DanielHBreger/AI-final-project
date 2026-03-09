@@ -77,14 +77,17 @@ Extras (Paths B-E)
 
 Usage
 -----
-  # Fast smoke test (XGBoost + MLP, 5 MLP epochs, no CNN, no spatial):
-  python compare_architectures.py --skip-cnn --no-spatial --mlp-epochs 5
-
-  # XGBoost + MLP only with spatial features (production quality):
-  python compare_architectures.py --skip-cnn
-
-  # Full comparison (default: 150 CNN epochs, spatial on, stacked ensemble):
+  # Default run (XGBoost + MLP + multi-scale spatial, no CNN):
   python compare_architectures.py
+
+  # Fast smoke test (no spatial, 5 MLP epochs):
+  python compare_architectures.py --no-spatial --mlp-epochs 5
+
+  # Enable CNN variants (disabled by default):
+  python compare_architectures.py --cnn
+
+  # Single-scale spatial only (legacy 3^3):
+  python compare_architectures.py --spatial-kernels 3
 
   # Disable spatial neighbourhood features:
   python compare_architectures.py --no-spatial
@@ -288,15 +291,16 @@ def _preds_to_volume(cube_df, y_pred_log: np.ndarray) -> np.ndarray:
 def _compute_spatial_X(cubes: list,
                         all_vols: list[dict],
                         feature_cols: list[str],
-                        kernel_size: int = 3) -> np.ndarray:
-    """Local neighbourhood mean for each feature channel via scipy uniform_filter.
+                        kernel_sizes: tuple[int, ...] = (3, 5, 7)) -> np.ndarray:
+    """Multi-scale neighbourhood mean features via scipy uniform_filter.
 
-    For each cube and each feature channel, computes the 3^3 (or kernel_size^3)
-    neighbourhood mean at every grid point using scipy.ndimage.uniform_filter,
-    then indexes back to DataFrame row order using ix/iy/iz.
+    For each kernel size in kernel_sizes, computes the k^3 neighbourhood mean
+    at every grid point using scipy.ndimage.uniform_filter, then indexes back
+    to DataFrame row order using ix/iy/iz.  Results from all scales are
+    concatenated along the feature axis.
 
-    Returns (N, len(feature_cols)) float32 array of neighbourhood means.
-    These are appended to X to give pointwise models spatial context.
+    Returns (N, len(feature_cols) * len(kernel_sizes)) float32 array.
+    Default scales (3, 5, 7) give 3 x 14 = 42 spatial features.
     """
     from scipy.ndimage import uniform_filter
     parts = []
@@ -304,12 +308,15 @@ def _compute_spatial_X(cubes: list,
         ix = cube['ix'].values.astype(int) - 1
         iy = cube['iy'].values.astype(int) - 1
         iz = cube['iz'].values.astype(int) - 1
-        extra = np.stack([
-            uniform_filter(vol[col], size=kernel_size)[ix, iy, iz]
-            for col in feature_cols
-        ], axis=-1).astype(np.float32)
-        parts.append(extra)
-    return np.concatenate(parts, axis=0)   # (N, len(feature_cols))
+        scale_feats = [
+            np.stack([
+                uniform_filter(vol[col], size=ks)[ix, iy, iz]
+                for col in feature_cols
+            ], axis=-1).astype(np.float32)
+            for ks in kernel_sizes
+        ]
+        parts.append(np.concatenate(scale_feats, axis=-1))
+    return np.concatenate(parts, axis=0)   # (N, len(feature_cols)*len(kernel_sizes))
 
 
 # ── Training helpers ──────────────────────────────────────────────────────────
@@ -759,8 +766,9 @@ if __name__ == '__main__':
                         help='Skip all XGBoost variants')
     parser.add_argument('--skip-mlp',   action='store_true',
                         help='Skip all MLP variants')
-    parser.add_argument('--skip-cnn',   action='store_true',
-                        help='Skip all CNN variants (including guided CNN)')
+    parser.add_argument('--cnn',        action='store_true',
+                        help='Enable CNN variants (disabled by default; '
+                             'high variance, does not improve ens_sp)')
     parser.add_argument('--cnn-epochs', type=int, default=150,
                         help='CNN epochs per variant/fold (default 150)')
     parser.add_argument('--mlp-epochs', type=int, default=100,
@@ -768,8 +776,11 @@ if __name__ == '__main__':
     parser.add_argument('--all-ops',    action='store_true',
                         help='Use all 48 Oh symmetry ops for CNN (default: 8 z-preserving)')
     parser.add_argument('--no-spatial', action='store_false', dest='spatial',
-                        help='Disable spatial 3^3 neighbourhood-mean feature variants '
+                        help='Disable spatial neighbourhood-mean feature variants '
                              '(enabled by default when volumes are loaded)')
+    parser.add_argument('--spatial-kernels', nargs='+', type=int, default=[3, 5, 7],
+                        help='Kernel sizes for multi-scale spatial features '
+                             '(default: 3 5 7 -> 42 spatial features)')
     parser.set_defaults(spatial=True)
     parser.add_argument('--log',        type=str, default=None,
                         help='Output JSON path '
@@ -789,16 +800,18 @@ if __name__ == '__main__':
     print(f"Device: {device}")
 
     run_config = {
-        'timestamp':  datetime.datetime.now().isoformat(timespec='seconds'),
-        'device':     str(device),
-        'cnn_epochs': args.cnn_epochs,
-        'mlp_epochs': args.mlp_epochs,
-        'all_ops':    args.all_ops,
-        'spatial':    args.spatial,
+        'timestamp':       datetime.datetime.now().isoformat(timespec='seconds'),
+        'device':          str(device),
+        'cnn':             args.cnn,
+        'cnn_epochs':      args.cnn_epochs,
+        'mlp_epochs':      args.mlp_epochs,
+        'all_ops':         args.all_ops,
+        'spatial':         args.spatial,
+        'spatial_kernels': args.spatial_kernels,
     }
 
     # Load 128^3 volumes whenever CNN variants or spatial features are needed
-    need_vols = (not args.skip_cnn) or args.spatial
+    need_vols = args.cnn or args.spatial
     all_vols: list[dict] | None = None
     ops: list | None = None
     if need_vols:
@@ -837,7 +850,7 @@ if __name__ == '__main__':
             all_preds[name]   = (yt, yp)
 
     # ── CNN variants ──────────────────────────────────────────────────────────
-    if not args.skip_cnn:
+    if args.cnn:
         print(f"\n--- CNN variants ({args.cnn_epochs} epochs) ---")
         for name, cfg in CNN_VARIANTS.items():
             print(f"\n[{name}]")
@@ -850,8 +863,12 @@ if __name__ == '__main__':
     # ── Spatial-feature variants ───────────────────────────────────────────────
     if args.spatial and need_vols:
         print("\n--- Spatial-feature variants ---")
-        X_extra = _compute_spatial_X(cubes, all_vols, FEATURE_COLS)
-        X_sp    = np.concatenate([X, X_extra], axis=1)   # (N, 28)
+        X_extra = _compute_spatial_X(cubes, all_vols, FEATURE_COLS,
+                                     kernel_sizes=tuple(args.spatial_kernels))
+        n_sp    = len(FEATURE_COLS) * len(args.spatial_kernels)
+        X_sp    = np.concatenate([X, X_extra], axis=1)   # (N, 14 + n_sp)
+        print(f"  Spatial kernels: {args.spatial_kernels}  ->  {n_sp} spatial features  "
+              f"(X_sp shape: {X_sp.shape})")
 
         if not args.skip_xgb:
             name = 'xgb_standard_sp'
@@ -869,7 +886,7 @@ if __name__ == '__main__':
             all_preds[name]   = (yt, yp)
 
     # ── XGBoost-guided CNN ────────────────────────────────────────────────────
-    if not args.skip_cnn and xgb_standard_vols is not None:
+    if args.cnn and xgb_standard_vols is not None:
         print("\n--- XGBoost-guided CNN ---")
         for name, cfg in CNN_GUIDED_VARIANTS.items():
             print(f"\n[{name}]")
@@ -878,7 +895,7 @@ if __name__ == '__main__':
                 epochs=args.cnn_epochs)
             all_results[name] = fold_metrics
             all_preds[name]   = (yt, yp)
-    elif not args.skip_cnn and args.skip_xgb:
+    elif args.cnn and args.skip_xgb:
         print("\n(Skipping XGBoost-guided CNN: requires xgb_standard predictions; "
               "re-run without --skip-xgb to enable)")
 
