@@ -5,8 +5,8 @@ Train and evaluate three pointwise baseline models with leave-one-G0-out CV:
   2. XGBoost
   3. MLP (PyTorch)
 
-All models predict log10(fh2) from FEATURE_COLS and are evaluated in
-original fh2 space (inverse-transformed predictions).
+All models predict log10(nH2) from FEATURE_COLS and are evaluated in
+original nH2 space (inverse-transformed predictions).
 """
 
 import numpy as np
@@ -24,8 +24,8 @@ from data_loader import load_all_cubes, get_X_y, get_g0_values, FEATURE_COLS
 
 def compute_metrics(y_true_log: np.ndarray, y_pred_log: np.ndarray) -> dict:
     """
-    Compute R², RMSE, MAE in original fh2 space.
-    Inputs are log10(fh2) arrays.
+    Compute R², RMSE, MAE in original nH2 space.
+    Inputs are log10(nH2) arrays.
     """
     y_true = 10.0 ** y_true_log
     y_pred = 10.0 ** y_pred_log

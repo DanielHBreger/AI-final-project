@@ -53,11 +53,11 @@ def prepare_display(truth_vol: np.ndarray, pred_vol: np.ndarray,
     if log_scale:
         truth_display = truth_vol.astype(np.float32)
         pred_display  = pred_vol.astype(np.float32)
-        scale_label   = 'log10(fh2)'
+        scale_label   = 'log10(nH2)'
     else:
         truth_display = np.power(10.0, truth_vol).astype(np.float32)
         pred_display  = np.power(10.0, pred_vol).astype(np.float32)
-        scale_label   = 'fh2'
+        scale_label   = 'nH2'
 
     err_display = (pred_display - truth_display).astype(np.float32)
     return truth_display, pred_display, err_display, scale_label

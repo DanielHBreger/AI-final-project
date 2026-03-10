@@ -28,8 +28,8 @@ from classical_models import compute_metrics, print_results
 
 # ── Columns that form the CNN input channels ──────────────────────────────────
 # (same as FEATURE_COLS but expressed as volume keys, not flat-table names)
-CNN_INPUT_COLS  = FEATURE_COLS                 # 14 channels
-CNN_TARGET_COL  = LOG_TARGET_COL               # log10(fh2)
+CNN_INPUT_COLS  = FEATURE_COLS                 # 15 channels
+CNN_TARGET_COL  = LOG_TARGET_COL               # log10(nH2)
 GRID_SIZE       = 64                           # spatial resolution fed to CNN
 RAW_GRID        = 128                          # native resolution
 
@@ -101,8 +101,8 @@ def train_one_fold(train_vols: list[dict],
     train_ds.xs = [(x - ch_mean) / ch_std for x in train_ds.xs]
     val_ds.xs   = [(x - ch_mean) / ch_std for x in val_ds.xs]
 
-    # Per-fold target normalization — balances log_fh2 loss across the full dynamic
-    # range instead of letting the MSE be dominated by the near-zero-fh2 tail.
+    # Per-fold target normalization — balances log_nH2 loss across the full dynamic
+    # range instead of letting the MSE be dominated by the near-zero-nH2 tail.
     all_y  = torch.stack(train_ds.ys)                                       # (N, 1, 64, 64, 64)
     y_mean = all_y.mean()
     y_std  = all_y.std().clamp(min=1e-6)
@@ -180,7 +180,7 @@ def train_one_fold(train_vols: list[dict],
             y_pred_all.append(pred)
     y_true = np.concatenate(y_true_all)
     y_pred = np.concatenate(y_pred_all)
-    # Inverse-transform back to log_fh2 space before computing metrics
+    # Inverse-transform back to log_nH2 space before computing metrics
     y_std_np  = y_std.item()
     y_mean_np = y_mean.item()
     y_true = y_true * y_std_np + y_mean_np

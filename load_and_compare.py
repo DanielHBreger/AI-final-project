@@ -27,7 +27,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(
         description='Load a saved ens_sp prediction and compare against ground truth.')
     parser.add_argument('--log-scale', action='store_true',
-                        help='Display in log10(fh2) space (default: linear fh2)')
+                        help='Display in log10(nH2) space (default: linear nH2)')
     args = parser.parse_args()
 
     npz_path = select_prediction_file()
@@ -44,7 +44,7 @@ def main() -> None:
     # ── Load only the matching ground-truth cube ───────────────────────────────
     print(f"\nLoading ground truth for G0={g0}...")
     cube_df   = load_single_cube(g0)
-    y_va      = cube_df['log_fh2'].values.astype(np.float32)
+    y_va      = cube_df['log_nH2'].values.astype(np.float32)
     truth_vol = _preds_to_volume(cube_df, y_va)
 
     truth_display, pred_display, err_display, scale_label = prepare_display(

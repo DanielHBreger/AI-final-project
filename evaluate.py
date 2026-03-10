@@ -5,7 +5,7 @@ Run all models and produce a unified comparison table + visualizations.
 Outputs:
   - Console: per-fold and mean±std metrics for all 4 models
   - Console: XGBoost feature importance ranking
-  - PyVista window: true vs predicted fh2 slice for the CNN on one held-out cube
+  - PyVista window: true vs predicted nH2 slice for the CNN on one held-out cube
 
 Usage:
     python evaluate.py [--cnn-epochs N] [--skip-cnn]
@@ -30,7 +30,7 @@ from train_cnn      import run_cnn_cv
 def print_summary(all_results: dict[str, list[dict]], g0_values: list[float]) -> None:
     models = list(all_results.keys())
     print("\n" + "="*80)
-    print("  SUMMARY — mean ± std (leave-one-G0-out, fh2 space)")
+    print("  SUMMARY — mean +/- std (leave-one-G0-out, nH2 space)")
     print("="*80)
     print(f"  {'Model':<20} {'R²':>10} {'RMSE':>14} {'MAE':>14}")
     print(f"  {'-'*58}")
@@ -86,7 +86,7 @@ def plot_r2_comparison(all_results: dict[str, list[dict]],
         ax.bar(x + i * width, r2s, width, label=name, color=colors[i % len(colors)], alpha=0.8)
 
     ax.set_xlabel('Held-out G0 value')
-    ax.set_ylabel('R² (fh2 space)')
+    ax.set_ylabel('R² (nH2 space)')
     ax.set_title('Leave-one-G0-out R² by model')
     ax.set_xticks(x + width * (len(models) - 1) / 2)
     ax.set_xticklabels([f'{g:.1f}' for g in g0_values])
@@ -112,8 +112,8 @@ def plot_scatter(y_true_log: np.ndarray, y_pred_log: np.ndarray,
     ax.plot(lims, lims, 'r--', linewidth=1, label='y=x')
     ax.set_xscale('log')
     ax.set_yscale('log')
-    ax.set_xlabel('True fh2')
-    ax.set_ylabel('Predicted fh2')
+    ax.set_xlabel('True nH2')
+    ax.set_ylabel('Predicted nH2')
     ax.set_title(f'{model_name}  (G0={g0:.1f} held out)')
     ax.legend()
     plt.tight_layout()

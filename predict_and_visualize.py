@@ -192,10 +192,10 @@ def _to_pv_grid(vol: np.ndarray, scalar_name: str = 'values') -> pv.ImageData:
 def visualize(truth_vol: np.ndarray, pred_vol: np.ndarray,
               err_vol: np.ndarray, g0: float, r2_xgb: float,
               r2_mlp: float, r2_ens: float,
-              scale_label: str = 'fh2') -> None:
+              scale_label: str = 'nH2') -> None:
     """Three-panel interactive 3D volume rendering.
 
-    Left   – Ground truth log10(fh2)
+    Left   – Ground truth log10(nH2)
     Centre – ens_sp prediction (equal-weight XGB_sp + MLP_sp)
     Right  – Absolute prediction error |pred - truth| in log10 space
 
@@ -294,7 +294,7 @@ def _run_fold(fold: int, g0_val: float,
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description='Predict fh2 with ens_sp and compare 3D volumes against truth.')
+        description='Predict nH2 with ens_sp and compare 3D volumes against truth.')
     parser.add_argument('--g0', type=float, default=0.8,
                         help='G0 value to hold out as validation (default: 0.8). '
                              'Available: 0.1 0.2 0.4 0.8 1.6 3.2 6.4')

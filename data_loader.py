@@ -11,12 +11,14 @@ import numpy as np
 COLS = ['ix', 'iy', 'iz', 'nH', 'nH2', 'T', 'vx', 'vy', 'vz',
         'nHp', 'ext', 'fh2', 'bxl', 'bxr', 'byl', 'byr', 'bzl', 'bzr']
 
-# Features used for all models (nH2 excluded — derived from fh2, causes leakage)
-FEATURE_COLS = ['log_nH', 'log_T', 'log_nHp', 'ext', 'log_G0',
+# Features used for all models.
+# fh2 (H2 self-shielding factor) is included: it is an independent physical
+# quantity — not algebraically derived from nH2 — so it is not data leakage.
+FEATURE_COLS = ['log_nH', 'log_T', 'log_nHp', 'ext', 'log_fh2', 'log_G0',
                 'vx', 'vy', 'vz', 'bxl', 'bxr', 'byl', 'byr', 'bzl', 'bzr']
 
-TARGET_COL     = 'fh2'
-LOG_TARGET_COL = 'log_fh2'
+TARGET_COL     = 'nH2'
+LOG_TARGET_COL = 'log_nH2'
 
 # Small epsilon to guard against log(0)
 _EPS = 1e-30
@@ -33,10 +35,10 @@ def load_all_cubes(data_root: str = 'icedrive-dl-182bd/UVonly') -> list[pd.DataF
 
     Returns a list of DataFrames (one per G0 value), sorted by G0.
     Each DataFrame contains:
-      - Raw physical columns (except nH2)
-      - log_nH, log_T, log_nHp  (log10-transformed densities / temperature)
-      - log_fh2                  (log10-transformed target)
-      - G0, log_G0               (UV field strength, linear and log)
+      - Raw physical columns
+      - log_nH, log_T, log_nHp, log_fh2  (log10-transformed quantities)
+      - log_nH2                            (log10-transformed target)
+      - G0, log_G0                         (UV field strength, linear and log)
     """
     csv_paths = sorted(glob.glob(os.path.join(data_root, '*', '*.csv')))
     if not csv_paths:
@@ -50,16 +52,15 @@ def load_all_cubes(data_root: str = 'icedrive-dl-182bd/UVonly') -> list[pd.DataF
         df = pd.read_csv(csv_path, sep=r'\s+', header=None, skiprows=1)
         df.columns = COLS
 
-        # Remove data-leaking column (fh2 = 2*nH2 / (nH + 2*nH2))
-        df = df.drop(columns=['nH2'])
-
         # Log-transform skewed physical quantities
         df['log_nH']  = np.log10(df['nH']  + _EPS)
         df['log_T']   = np.log10(df['T']   + _EPS)
         df['log_nHp'] = np.log10(df['nHp'] + _EPS)
-
-        # Log-transform target (fh2 spans many orders of magnitude in practice)
+        # fh2 is the H2 self-shielding factor (independent of nH2, not leakage)
         df['log_fh2'] = np.log10(df['fh2'].clip(lower=_EPS))
+
+        # Log-transform target (nH2 spans many orders of magnitude)
+        df['log_nH2'] = np.log10(df['nH2'].clip(lower=_EPS))
 
         # UV field strength as feature
         df['G0']     = g0
@@ -67,6 +68,7 @@ def load_all_cubes(data_root: str = 'icedrive-dl-182bd/UVonly') -> list[pd.DataF
 
         cubes.append(df)
         print(f"  G0={g0:<5.1f} | rows={len(df):,} | "
+              f"nH2=[{df['nH2'].min():.2e}, {df['nH2'].max():.2e}] | "
               f"fh2=[{df['fh2'].min():.2e}, {df['fh2'].max():.2e}]")
 
     # Sort by G0 so fold index == sorted G0 index
@@ -86,7 +88,7 @@ def get_X_y(cubes: list[pd.DataFrame],
 
     Returns:
         X      : float32 array of shape (N, len(FEATURE_COLS))
-        y      : float32 array of shape (N,)  — log_fh2 or fh2
+        y      : float32 array of shape (N,)  — log_nH2 or nH2
         folds  : int array of shape (N,) — cube index for leave-one-out CV
     """
     target = LOG_TARGET_COL if use_log_target else TARGET_COL
@@ -122,7 +124,7 @@ def get_g0_values(cubes: list[pd.DataFrame]) -> list[float]:
 def load_single_cube(g0: float, data_root: str = 'icedrive-dl-182bd/UVonly') -> pd.DataFrame:
     """Load a single simulation cube for the given G0 value.
 
-    Applies the same preprocessing as load_all_cubes (drop nH2, add log_fh2)
+    Applies the same preprocessing as load_all_cubes (log_fh2, log_nH2)
     but skips columns that are only needed for training (log_nH, log_T, etc.).
     """
     dir_name = f"{g0:.1f}".replace('.', '_')
@@ -132,8 +134,8 @@ def load_single_cube(g0: float, data_root: str = 'icedrive-dl-182bd/UVonly') -> 
             f"No CSV found for G0={g0} (looked for: {data_root}/{dir_name}/*.csv)")
     df = pd.read_csv(csv_paths[0], sep=r'\s+', header=None, skiprows=1)
     df.columns = COLS
-    df = df.drop(columns=['nH2'])
     df['log_fh2'] = np.log10(df['fh2'].clip(lower=_EPS))
+    df['log_nH2'] = np.log10(df['nH2'].clip(lower=_EPS))
     return df
 
 
@@ -142,22 +144,20 @@ if __name__ == '__main__':
     print("Loading cubes...")
     cubes = load_all_cubes()
 
-    all_fh2 = np.concatenate([df['fh2'].values for df in cubes])
-    all_log_fh2 = np.concatenate([df['log_fh2'].values for df in cubes])
+    all_nH2 = np.concatenate([df['nH2'].values for df in cubes])
+    all_log_nH2 = np.concatenate([df['log_nH2'].values for df in cubes])
 
-    print("\n--- fh2 distribution (raw) ---")
-    print(f"  min    : {all_fh2.min():.4e}")
-    print(f"  max    : {all_fh2.max():.4e}")
-    print(f"  mean   : {all_fh2.mean():.4e}")
-    print(f"  median : {np.median(all_fh2):.4e}")
-    print(f"  < 0.01 : {(all_fh2 < 0.01).mean() * 100:.1f}%")
-    print(f"  > 0.99 : {(all_fh2 > 0.99).mean() * 100:.1f}%")
+    print("\n--- nH2 distribution (raw) ---")
+    print(f"  min    : {all_nH2.min():.4e}")
+    print(f"  max    : {all_nH2.max():.4e}")
+    print(f"  mean   : {all_nH2.mean():.4e}")
+    print(f"  median : {np.median(all_nH2):.4e}")
 
-    print("\n--- log10(fh2) distribution ---")
-    print(f"  min    : {all_log_fh2.min():.2f}")
-    print(f"  max    : {all_log_fh2.max():.2f}")
-    print(f"  mean   : {all_log_fh2.mean():.2f}")
-    print(f"  std    : {all_log_fh2.std():.2f}")
+    print("\n--- log10(nH2) distribution ---")
+    print(f"  min    : {all_log_nH2.min():.2f}")
+    print(f"  max    : {all_log_nH2.max():.2f}")
+    print(f"  mean   : {all_log_nH2.mean():.2f}")
+    print(f"  std    : {all_log_nH2.std():.2f}")
 
     X, y, folds = get_X_y(cubes, use_log_target=True)
     print(f"\nFeature matrix : {X.shape}  dtype={X.dtype}")

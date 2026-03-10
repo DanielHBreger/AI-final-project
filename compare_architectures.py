@@ -114,9 +114,9 @@ from augmentation import augment_cube, get_symmetry_ops
 
 # ── Shared constants ──────────────────────────────────────────────────────────
 
-CNN_INPUT_COLS        = FEATURE_COLS                    # 14 physical field channels
-CNN_TARGET_COL        = LOG_TARGET_COL                  # log10(fh2)
-CNN_INPUT_COLS_GUIDED = CNN_INPUT_COLS + ['xgb_pred']  # 15 channels (XGBoost-guided)
+CNN_INPUT_COLS        = FEATURE_COLS                    # 15 physical field channels
+CNN_TARGET_COL        = LOG_TARGET_COL                  # log10(nH2)
+CNN_INPUT_COLS_GUIDED = CNN_INPUT_COLS + ['xgb_pred']  # 16 channels (XGBoost-guided)
 
 
 # ── XGBoost variant configs ───────────────────────────────────────────────────
@@ -332,7 +332,7 @@ def run_xgb_cv(variant_name: str,
     """7-fold leave-one-G0-out CV for one XGBoost config.
 
     Returns (fold_metrics, y_true_folds, y_pred_folds, xgb_vols_128).
-    xgb_vols_128[i] is the 128^3 log_fh2 prediction volume for cube i from the
+    xgb_vols_128[i] is the 128^3 log_nH2 prediction volume for cube i from the
     fold where it was held out — fully OOB, no data leakage.
     """
     _dev = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -456,7 +456,7 @@ def _train_cnn_fold(train_vols: list[dict],
     seed fixes torch/numpy randomness so results are reproducible across runs.
     Pass fold index as seed to get deterministic but fold-varied initialisation.
 
-    Returns (metrics_dict, y_true_log, y_pred_log) in original log_fh2 space.
+    Returns (metrics_dict, y_true_log, y_pred_log) in original log_nH2 space.
     """
     torch.manual_seed(seed)
     np.random.seed(seed)
@@ -471,7 +471,7 @@ def _train_cnn_fold(train_vols: list[dict],
     train_ds.xs = [(x - ch_mean) / ch_std for x in train_ds.xs]
     val_ds.xs   = [(x - ch_mean) / ch_std for x in val_ds.xs]
 
-    # Per-fold target normalisation (balanced log_fh2 loss)
+    # Per-fold target normalisation (balanced log_nH2 loss)
     all_y  = torch.stack(train_ds.ys)
     y_mean = all_y.mean()
     y_std  = all_y.std().clamp(min=1e-6)
@@ -520,7 +520,7 @@ def _train_cnn_fold(train_vols: list[dict],
         if epoch % 10 == 0 or epoch == 1:
             print(f"    epoch {epoch:3d}/{epochs}  val_loss={val_loss:.4f}")
 
-    # Restore best checkpoint and evaluate in original log_fh2 space
+    # Restore best checkpoint and evaluate in original log_nH2 space
     model.load_state_dict(best_state)
     model.eval()
     y_true_parts, y_pred_parts = [], []
@@ -603,7 +603,7 @@ def run_ensemble_cv(ensemble_name: str,
                     g0_values: list[float]) -> list[dict]:
     """Equal-weight average ensemble of per-fold predictions from listed models.
 
-    all_preds[name] = (y_true_folds, y_pred_folds) in log_fh2 space.
+    all_preds[name] = (y_true_folds, y_pred_folds) in log_nH2 space.
     All prediction arrays must have the same length per fold (call
     _normalize_preds_to_64 first when mixing pointwise and CNN models).
     y_true is taken from the first model (all val cubes share the same target).
@@ -627,7 +627,7 @@ def run_stacked_ensemble_cv(ensemble_name: str,
 
     For each held-out fold i:
       - Meta-train: stack per-cell OOF predictions from the 6 other folds.
-        X_meta_tr shape (6 * 262_144, n_models); y_meta_tr = ground-truth log_fh2.
+        X_meta_tr shape (6 * 262_144, n_models); y_meta_tr = ground-truth log_nH2.
       - Fit Ridge(alpha=1.0) on meta-train, then predict on fold i's predictions.
       - Reported weights show which model dominates for each fold.
 
