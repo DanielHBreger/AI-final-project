@@ -119,6 +119,24 @@ def get_g0_values(cubes: list[pd.DataFrame]) -> list[float]:
     return [df['G0'].iloc[0] for df in cubes]
 
 
+def load_single_cube(g0: float, data_root: str = 'icedrive-dl-182bd/UVonly') -> pd.DataFrame:
+    """Load a single simulation cube for the given G0 value.
+
+    Applies the same preprocessing as load_all_cubes (drop nH2, add log_fh2)
+    but skips columns that are only needed for training (log_nH, log_T, etc.).
+    """
+    dir_name = f"{g0:.1f}".replace('.', '_')
+    csv_paths = sorted(glob.glob(os.path.join(data_root, dir_name, '*.csv')))
+    if not csv_paths:
+        raise FileNotFoundError(
+            f"No CSV found for G0={g0} (looked for: {data_root}/{dir_name}/*.csv)")
+    df = pd.read_csv(csv_paths[0], sep=r'\s+', header=None, skiprows=1)
+    df.columns = COLS
+    df = df.drop(columns=['nH2'])
+    df['log_fh2'] = np.log10(df['fh2'].clip(lower=_EPS))
+    return df
+
+
 # ── EDA when run directly ────────────────────────────────────────────────────
 if __name__ == '__main__':
     print("Loading cubes...")

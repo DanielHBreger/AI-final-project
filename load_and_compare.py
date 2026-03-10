@@ -13,36 +13,14 @@ Usage
 """
 
 import argparse
-import glob
 import os
 import numpy as np
 
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
-import tkinter as tk
-from tkinter import filedialog
-
 from predict_and_visualize import _preds_to_volume, visualize
-
-
-_EPS  = 1e-30
-_COLS = ['ix', 'iy', 'iz', 'nH', 'nH2', 'T', 'vx', 'vy', 'vz',
-         'nHp', 'ext', 'fh2', 'bxl', 'bxr', 'byl', 'byr', 'bzl', 'bzr']
-
-
-def _load_cube_for_g0(g0: float, data_root: str = 'icedrive-dl-182bd/UVonly'):
-    """Load a single simulation cube matching the given G0 value."""
-    import pandas as pd
-    dir_name = f"{g0:.1f}".replace('.', '_')
-    matches  = glob.glob(os.path.join(data_root, dir_name, '*.csv'))
-    if not matches:
-        raise FileNotFoundError(
-            f"No CSV found for G0={g0} (looked for: {data_root}/{dir_name}/*.csv)")
-    df = pd.read_csv(matches[0], sep=r'\s+', header=None, skiprows=1)
-    df.columns = _COLS
-    df = df.drop(columns=['nH2'])
-    df['log_fh2'] = np.log10(df['fh2'].clip(lower=_EPS))
-    return df
+from data_loader import load_single_cube
+from viz_common import select_prediction_file, load_prediction, prepare_display
 
 
 def main() -> None:
@@ -52,30 +30,12 @@ def main() -> None:
                         help='Display in log10(fh2) space (default: linear fh2)')
     args = parser.parse_args()
 
-    # ── File selection ─────────────────────────────────────────────────────────
-    root = tk.Tk()
-    root.withdraw()
-    pred_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'predictions')
-    npz_path = filedialog.askopenfilename(
-        title='Select prediction file',
-        initialdir=pred_dir if os.path.isdir(pred_dir) else '.',
-        filetypes=[('NumPy prediction files', '*.npz'), ('All files', '*.*')],
-    )
-    root.destroy()
-
+    npz_path = select_prediction_file()
     if not npz_path:
         print('No file selected. Exiting.')
         return
 
-    # ── Load prediction ────────────────────────────────────────────────────────
-    data     = np.load(npz_path)
-    pred_vol = data['pred_vol']          # log10(fh2), 128^3
-    g0       = float(data['g0'])         # float64 — exact
-    r2_xgb   = float(data['r2_xgb'])
-    r2_mlp   = float(data['r2_mlp'])
-    r2_ens   = float(data['r2_ens'])
-    kernels  = data['spatial_kernels'].tolist()
-    epochs   = int(data['mlp_epochs'])
+    pred_vol, g0, r2_xgb, r2_mlp, r2_ens, kernels, epochs = load_prediction(npz_path)
 
     print(f"Loaded: {os.path.basename(npz_path)}")
     print(f"  G0={g0}  spatial_kernels={kernels}  mlp_epochs={epochs}")
@@ -83,21 +43,12 @@ def main() -> None:
 
     # ── Load only the matching ground-truth cube ───────────────────────────────
     print(f"\nLoading ground truth for G0={g0}...")
-    cube_df   = _load_cube_for_g0(g0)
+    cube_df   = load_single_cube(g0)
     y_va      = cube_df['log_fh2'].values.astype(np.float32)
     truth_vol = _preds_to_volume(cube_df, y_va)
 
-    # ── Scale selection ────────────────────────────────────────────────────────
-    if args.log_scale:
-        truth_display = truth_vol
-        pred_display  = pred_vol
-        scale_label   = 'log10(fh2)'
-    else:
-        truth_display = np.power(10.0, truth_vol).astype(np.float32)
-        pred_display  = np.power(10.0, pred_vol).astype(np.float32)
-        scale_label   = 'fh2'
-
-    err_display = (pred_display - truth_display).astype(np.float32)
+    truth_display, pred_display, err_display, scale_label = prepare_display(
+        truth_vol, pred_vol, args.log_scale)
 
     print(f"\nLaunching 3D visualizer for G0={g0}...")
     visualize(

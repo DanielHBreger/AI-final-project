@@ -17,39 +17,18 @@ Usage
 """
 
 import argparse
-import glob
 import os
 import numpy as np
 
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
-import tkinter as tk
-from tkinter import filedialog
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 from matplotlib.widgets import Slider, TextBox
 
 from predict_and_visualize import _preds_to_volume
-
-
-_EPS  = 1e-30
-_COLS = ['ix', 'iy', 'iz', 'nH', 'nH2', 'T', 'vx', 'vy', 'vz',
-         'nHp', 'ext', 'fh2', 'bxl', 'bxr', 'byl', 'byr', 'bzl', 'bzr']
-
-
-def _load_cube_for_g0(g0: float, data_root: str = 'icedrive-dl-182bd/UVonly'):
-    """Load a single simulation cube matching the given G0 value."""
-    import pandas as pd
-    dir_name = f"{g0:.1f}".replace('.', '_')
-    matches  = glob.glob(os.path.join(data_root, dir_name, '*.csv'))
-    if not matches:
-        raise FileNotFoundError(
-            f"No CSV found for G0={g0} (looked for: {data_root}/{dir_name}/*.csv)")
-    df = pd.read_csv(matches[0], sep=r'\s+', header=None, skiprows=1)
-    df.columns = _COLS
-    df = df.drop(columns=['nH2'])
-    df['log_fh2'] = np.log10(df['fh2'].clip(lower=_EPS))
-    return df
+from data_loader import load_single_cube
+from viz_common import select_prediction_file, load_prediction, prepare_display
 
 
 def main() -> None:
@@ -59,49 +38,24 @@ def main() -> None:
                         help='Display in log10(fh2) space (default: linear fh2)')
     args = parser.parse_args()
 
-    # ── File selection ─────────────────────────────────────────────────────────
-    root = tk.Tk()
-    root.withdraw()
-    pred_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'predictions')
-    npz_path = filedialog.askopenfilename(
-        title='Select prediction file',
-        initialdir=pred_dir if os.path.isdir(pred_dir) else '.',
-        filetypes=[('NumPy prediction files', '*.npz'), ('All files', '*.*')],
-    )
-    root.destroy()
-
+    npz_path = select_prediction_file()
     if not npz_path:
         print('No file selected. Exiting.')
         return
 
-    # ── Load prediction ────────────────────────────────────────────────────────
-    data     = np.load(npz_path)
-    pred_vol = data['pred_vol']
-    g0       = float(data['g0'])
-    r2_xgb   = float(data['r2_xgb'])
-    r2_mlp   = float(data['r2_mlp'])
-    r2_ens   = float(data['r2_ens'])
+    pred_vol, g0, r2_xgb, r2_mlp, r2_ens, kernels, epochs = load_prediction(npz_path)
 
     print(f"Loaded: {os.path.basename(npz_path)}")
     print(f"  G0={g0}  XGB R2={r2_xgb:.4f}  MLP R2={r2_mlp:.4f}  ens R2={r2_ens:.4f}")
 
     # ── Load ground truth ──────────────────────────────────────────────────────
     print(f"\nLoading ground truth for G0={g0}...")
-    cube_df   = _load_cube_for_g0(g0)
+    cube_df   = load_single_cube(g0)
     y_va      = cube_df['log_fh2'].values.astype(np.float32)
     truth_vol = _preds_to_volume(cube_df, y_va)
 
-    # ── Scale ──────────────────────────────────────────────────────────────────
-    if args.log_scale:
-        truth_display = truth_vol
-        pred_display  = pred_vol.astype(np.float32)
-        scale_label   = 'log10(fh2)'
-    else:
-        truth_display = np.power(10.0, truth_vol).astype(np.float32)
-        pred_display  = np.power(10.0, pred_vol).astype(np.float32)
-        scale_label   = 'fh2'
-
-    err_display = (pred_display - truth_display).astype(np.float32)
+    truth_display, pred_display, err_display, scale_label = prepare_display(
+        truth_vol, pred_vol, args.log_scale)
 
     p1, p99 = np.percentile(truth_display, [1, 99])
     clim    = (float(p1), float(p99))
@@ -149,7 +103,7 @@ def main() -> None:
     # Axis styling
     for ax, title in [
         (ax_truth, f'Ground Truth   G0={g0}'),
-        (ax_pred,  f'ens_sp Prediction   R²={r2_ens:.4f}\nXGB={r2_xgb:.4f}  MLP={r2_mlp:.4f}'),
+        (ax_pred,  f'ens_sp Prediction   R\u00b2={r2_ens:.4f}\nXGB={r2_xgb:.4f}  MLP={r2_mlp:.4f}'),
         (ax_err,   'Prediction - Truth'),
     ]:
         ax.set_facecolor('black')
@@ -178,8 +132,7 @@ def main() -> None:
     _busy = [False]   # mutable flag to prevent mutual recursion
 
     def _update(z: int) -> None:
-        s = _slice(truth_display, z)
-        im_truth.set_data(s)
+        im_truth.set_data(_slice(truth_display, z))
         im_pred .set_data(_slice(pred_display, z))
         im_err  .set_data(_slice(err_display,  z))
         z_title.set_text(f'z slice = {z}')
