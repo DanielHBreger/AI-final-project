@@ -248,6 +248,48 @@ def visualize(truth_vol: np.ndarray, pred_vol: np.ndarray,
     print("All three panels share a linked camera.")
     plotter.show()
 
+# ── Per-fold training / saving ─────────────────────────────────────────────────
+
+def _run_fold(fold: int, g0_val: float,
+              X_sp: np.ndarray, y: np.ndarray, fold_labels: np.ndarray,
+              cubes: list, mlp_epochs: int, spatial_kernels: list) -> None:
+    """Train ens_sp on N-1 cubes, predict on the held-out fold, and save .npz."""
+    mask = fold_labels != fold
+    X_tr = X_sp[mask];   y_tr = y[mask]
+    X_va = X_sp[~mask];  y_va = y[~mask]
+
+    print(f"\n[xgb_standard_sp]  {X_tr.shape[0]:,} training samples...")
+    y_xgb = _train_xgb(X_tr, y_tr, X_va, y_va)
+    m_xgb = compute_metrics(y_va, y_xgb)
+    print(f"  XGB  R2={m_xgb['R2']:.4f}  RMSE={m_xgb['RMSE']:.6f}")
+
+    print(f"\n[mlp_wide_sp]  {mlp_epochs} epochs...")
+    y_mlp = _train_mlp(X_tr, y_tr, X_va, y_va, epochs=mlp_epochs)
+    m_mlp = compute_metrics(y_va, y_mlp)
+    print(f"  MLP  R2={m_mlp['R2']:.4f}  RMSE={m_mlp['RMSE']:.6f}")
+
+    y_ens = 0.5 * y_xgb + 0.5 * y_mlp
+    m_ens = compute_metrics(y_va, y_ens)
+    print(f"\n[ens_sp]  R2={m_ens['R2']:.4f}  RMSE={m_ens['RMSE']:.6f}")
+
+    pred_vol = _preds_to_volume(cubes[fold], y_ens)
+
+    os.makedirs('predictions', exist_ok=True)
+    timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
+    save_path = f'predictions/pred_g0_{g0_val}_{timestamp}.npz'
+    np.savez_compressed(
+        save_path,
+        pred_vol        = pred_vol,
+        g0              = np.float64(g0_val),
+        r2_xgb          = np.float32(m_xgb['R2']),
+        r2_mlp          = np.float32(m_mlp['R2']),
+        r2_ens          = np.float32(m_ens['R2']),
+        spatial_kernels = np.array(spatial_kernels, dtype=np.int32),
+        mlp_epochs      = np.int32(mlp_epochs),
+    )
+    print(f"Prediction saved -> {save_path}")
+
+
 # ── Main ───────────────────────────────────────────────────────────────────────
 
 def main() -> None:
@@ -260,21 +302,14 @@ def main() -> None:
                         help='MLP training epochs (default: 100; use 30 for a fast demo)')
     parser.add_argument('--spatial-kernels', nargs='+', type=int, default=[3, 5, 7],
                         help='Spatial filter kernel sizes (default: 3 5 7)')
+    parser.add_argument('--all', action='store_true',
+                        help='Run all 7 G0 folds and save a prediction file for each')
     args = parser.parse_args()
 
     # ── Load ──────────────────────────────────────────────────────────────────
     print("Loading cubes...")
     cubes   = load_all_cubes()
     g0_vals = get_g0_values(cubes)
-
-    if args.g0 not in g0_vals:
-        print(f"ERROR: G0={args.g0} not found. Available: {g0_vals}", file=sys.stderr)
-        sys.exit(1)
-
-    fold = g0_vals.index(args.g0)
-    print(f"Validation fold: {fold}  (G0={args.g0})")
-    print(f"Training on {len(cubes) - 1} cubes  |  "
-          f"Validating on 1 cube (G0={args.g0})")
 
     # ── Baseline features ─────────────────────────────────────────────────────
     print("\nBuilding feature matrix...")
@@ -291,45 +326,23 @@ def main() -> None:
     X_sp = np.concatenate([X, X_extra], axis=1)
     print(f"  Spatial features: {n_sp}  ->  X_sp shape: {X_sp.shape}")
 
-    # ── Train / predict ────────────────────────────────────────────────────────
-    mask  = fold_labels != fold
-    X_tr  = X_sp[mask];   y_tr = y[mask]
-    X_va  = X_sp[~mask];  y_va = y[~mask]
-
-    print(f"\n[xgb_standard_sp]  {X_tr.shape[0]:,} training samples...")
-    y_xgb = _train_xgb(X_tr, y_tr, X_va, y_va)
-    m_xgb = compute_metrics(y_va, y_xgb)
-    print(f"  XGB  R2={m_xgb['R2']:.4f}  RMSE={m_xgb['RMSE']:.6f}")
-
-    print(f"\n[mlp_wide_sp]  {args.mlp_epochs} epochs...")
-    y_mlp = _train_mlp(X_tr, y_tr, X_va, y_va, epochs=args.mlp_epochs)
-    m_mlp = compute_metrics(y_va, y_mlp)
-    print(f"  MLP  R2={m_mlp['R2']:.4f}  RMSE={m_mlp['RMSE']:.6f}")
-
-    # Equal-weight ensemble
-    y_ens = 0.5 * y_xgb + 0.5 * y_mlp
-    m_ens = compute_metrics(y_va, y_ens)
-    print(f"\n[ens_sp]  R2={m_ens['R2']:.4f}  RMSE={m_ens['RMSE']:.6f}")
-
-    # ── Build 128^3 volumes ────────────────────────────────────────────────────
-    val_cube = cubes[fold]
-    pred_vol = _preds_to_volume(val_cube, y_ens)
-
-    # ── Save prediction ────────────────────────────────────────────────────────
-    os.makedirs('predictions', exist_ok=True)
-    timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
-    save_path = f'predictions/pred_g0_{args.g0}_{timestamp}.npz'
-    np.savez_compressed(
-        save_path,
-        pred_vol        = pred_vol,
-        g0              = np.float64(args.g0),
-        r2_xgb          = np.float32(m_xgb['R2']),
-        r2_mlp          = np.float32(m_mlp['R2']),
-        r2_ens          = np.float32(m_ens['R2']),
-        spatial_kernels = np.array(args.spatial_kernels, dtype=np.int32),
-        mlp_epochs      = np.int32(args.mlp_epochs),
-    )
-    print(f"Prediction saved -> {save_path}")
+    # ── Run fold(s) ────────────────────────────────────────────────────────────
+    if args.all:
+        print(f"\nRunning all {len(g0_vals)} folds...")
+        for fold, g0_val in enumerate(g0_vals):
+            print(f"\n{'='*60}\nFold {fold+1}/{len(g0_vals)}  G0={g0_val}\n{'='*60}")
+            _run_fold(fold, g0_val, X_sp, y, fold_labels, cubes,
+                      args.mlp_epochs, args.spatial_kernels)
+    else:
+        if args.g0 not in g0_vals:
+            print(f"ERROR: G0={args.g0} not found. Available: {g0_vals}", file=sys.stderr)
+            sys.exit(1)
+        fold = g0_vals.index(args.g0)
+        print(f"\nValidation fold: {fold}  (G0={args.g0})")
+        print(f"Training on {len(cubes) - 1} cubes  |  "
+              f"Validating on 1 cube (G0={args.g0})")
+        _run_fold(fold, args.g0, X_sp, y, fold_labels, cubes,
+                  args.mlp_epochs, args.spatial_kernels)
 
 
 if __name__ == '__main__':
