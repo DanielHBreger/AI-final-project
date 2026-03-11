@@ -5,8 +5,12 @@ Train and evaluate three pointwise baseline models with leave-one-G0-out CV:
   2. XGBoost
   3. MLP (PyTorch)
 
-All models predict log10(nH2) from FEATURE_COLS and are evaluated in
-original nH2 space (inverse-transformed predictions).
+All models predict log10(nH2) from FEATURE_COLS.
+
+Primary metrics (R2, RMSE, MAE) are computed in log10(nH2) space — the
+natural evaluation space for data spanning many orders of magnitude.
+A secondary R2_lin metric is computed in original nH2 space with clipped
+predictions to prevent exponential explosion from outlier neural-net outputs.
 """
 
 import numpy as np
@@ -24,15 +28,36 @@ from data_loader import load_all_cubes, get_X_y, get_g0_values, FEATURE_COLS
 
 def compute_metrics(y_true_log: np.ndarray, y_pred_log: np.ndarray) -> dict:
     """
-    Compute R², RMSE, MAE in original nH2 space.
+    Compute metrics for nH2 prediction.
+
+    Primary metrics (R2, RMSE, MAE): computed in log10(nH2) space.
+    This is the natural evaluation space for data spanning many orders of
+    magnitude -- measures accuracy in dex (orders of magnitude).
+
+    Secondary metric (R2_lin): R2 in original nH2 space, with predictions
+    clipped to [min_true - 1 dex, max_true + 1 dex] before exponentiation
+    to prevent numerical explosion from outlier neural-net predictions.
+
     Inputs are log10(nH2) arrays.
     """
-    y_true = 10.0 ** y_true_log
-    y_pred = 10.0 ** y_pred_log
+    # Primary: log-space metrics
+    r2   = float(r2_score(y_true_log, y_pred_log))
+    rmse = float(np.sqrt(mean_squared_error(y_true_log, y_pred_log)))
+    mae  = float(mean_absolute_error(y_true_log, y_pred_log))
+
+    # Secondary: linear-space R2 with clipped predictions
+    clip_lo = float(y_true_log.min()) - 1.0
+    clip_hi = float(y_true_log.max()) + 1.0
+    y_pred_clip = np.clip(y_pred_log, clip_lo, clip_hi)
+    y_true_lin = 10.0 ** y_true_log
+    y_pred_lin = 10.0 ** y_pred_clip
+    r2_lin = float(r2_score(y_true_lin, y_pred_lin))
+
     return {
-        'R2'  : r2_score(y_true, y_pred),
-        'RMSE': np.sqrt(mean_squared_error(y_true, y_pred)),
-        'MAE' : mean_absolute_error(y_true, y_pred),
+        'R2':     r2,
+        'RMSE':   rmse,
+        'MAE':    mae,
+        'R2_lin': r2_lin,
     }
 
 
@@ -40,16 +65,17 @@ def print_results(name: str, fold_metrics: list[dict], g0_values: list[float]) -
     print(f"\n{'='*60}")
     print(f"  {name}")
     print(f"{'='*60}")
-    print(f"  {'G0':<8} {'R²':>8} {'RMSE':>12} {'MAE':>12}")
-    print(f"  {'-'*42}")
+    print(f"  {'G0':<8} {'R2_log':>8} {'R2_lin':>8} {'RMSE':>10} {'MAE':>10}")
+    print(f"  {'-'*48}")
     for g0, m in zip(g0_values, fold_metrics):
-        print(f"  {g0:<8.1f} {m['R2']:>8.4f} {m['RMSE']:>12.4e} {m['MAE']:>12.4e}")
-    r2s   = [m['R2']   for m in fold_metrics]
-    rmses = [m['RMSE'] for m in fold_metrics]
-    maes  = [m['MAE']  for m in fold_metrics]
-    print(f"  {'-'*42}")
-    print(f"  {'Mean':<8} {np.mean(r2s):>8.4f} {np.mean(rmses):>12.4e} {np.mean(maes):>12.4e}")
-    print(f"  {'Std':<8} {np.std(r2s):>8.4f} {np.std(rmses):>12.4e} {np.std(maes):>12.4e}")
+        print(f"  {g0:<8.1f} {m['R2']:>8.4f} {m['R2_lin']:>8.4f} {m['RMSE']:>10.4f} {m['MAE']:>10.4f}")
+    r2s     = [m['R2']     for m in fold_metrics]
+    r2_lins = [m['R2_lin'] for m in fold_metrics]
+    rmses   = [m['RMSE']   for m in fold_metrics]
+    maes    = [m['MAE']    for m in fold_metrics]
+    print(f"  {'-'*48}")
+    print(f"  {'Mean':<8} {np.mean(r2s):>8.4f} {np.mean(r2_lins):>8.4f} {np.mean(rmses):>10.4f} {np.mean(maes):>10.4f}")
+    print(f"  {'Std':<8} {np.std(r2s):>8.4f} {np.std(r2_lins):>8.4f} {np.std(rmses):>10.4f} {np.std(maes):>10.4f}")
 
 
 # ── Linear Regression ─────────────────────────────────────────────────────────

@@ -261,16 +261,16 @@ def _run_fold(fold: int, g0_val: float,
     print(f"\n[xgb_standard_sp]  {X_tr.shape[0]:,} training samples...")
     y_xgb = _train_xgb(X_tr, y_tr, X_va, y_va)
     m_xgb = compute_metrics(y_va, y_xgb)
-    print(f"  XGB  R2={m_xgb['R2']:.4f}  RMSE={m_xgb['RMSE']:.6f}")
+    print(f"  XGB  R2={m_xgb['R2']:.4f}  R2_lin={m_xgb['R2_lin']:.4f}  RMSE={m_xgb['RMSE']:.4f}")
 
     print(f"\n[mlp_wide_sp]  {mlp_epochs} epochs...")
     y_mlp = _train_mlp(X_tr, y_tr, X_va, y_va, epochs=mlp_epochs)
     m_mlp = compute_metrics(y_va, y_mlp)
-    print(f"  MLP  R2={m_mlp['R2']:.4f}  RMSE={m_mlp['RMSE']:.6f}")
+    print(f"  MLP  R2={m_mlp['R2']:.4f}  R2_lin={m_mlp['R2_lin']:.4f}  RMSE={m_mlp['RMSE']:.4f}")
 
     y_ens = 0.5 * y_xgb + 0.5 * y_mlp
     m_ens = compute_metrics(y_va, y_ens)
-    print(f"\n[ens_sp]  R2={m_ens['R2']:.4f}  RMSE={m_ens['RMSE']:.6f}")
+    print(f"\n[ens_sp]  R2={m_ens['R2']:.4f}  R2_lin={m_ens['R2_lin']:.4f}  RMSE={m_ens['RMSE']:.4f}")
 
     pred_vol = _preds_to_volume(cubes[fold], y_ens)
 

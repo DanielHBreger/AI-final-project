@@ -261,7 +261,7 @@ def run_cnn_cv(safe_only:    bool = True,
         log_path = f'cnn_training_{ts}.json'
 
     summary = {}
-    for metric in ('R2', 'RMSE', 'MAE'):
+    for metric in ('R2', 'R2_lin', 'RMSE', 'MAE'):
         vals = [m[metric] for m in fold_metrics]
         summary[metric] = {'mean': float(np.mean(vals)), 'std': float(np.std(vals))}
 

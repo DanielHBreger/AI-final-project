@@ -30,19 +30,21 @@ from train_cnn      import run_cnn_cv
 def print_summary(all_results: dict[str, list[dict]], g0_values: list[float]) -> None:
     models = list(all_results.keys())
     print("\n" + "="*80)
-    print("  SUMMARY — mean +/- std (leave-one-G0-out, nH2 space)")
+    print("  SUMMARY — mean +/- std (leave-one-G0-out)")
     print("="*80)
-    print(f"  {'Model':<20} {'R²':>10} {'RMSE':>14} {'MAE':>14}")
-    print(f"  {'-'*58}")
+    print(f"  {'Model':<20} {'R2_log':>12} {'R2_lin':>12} {'RMSE(dex)':>12} {'MAE(dex)':>12}")
+    print(f"  {'-'*68}")
     for name in models:
         metrics = all_results[name]
-        r2s   = [m['R2']   for m in metrics]
-        rmses = [m['RMSE'] for m in metrics]
-        maes  = [m['MAE']  for m in metrics]
+        r2s     = [m['R2']     for m in metrics]
+        r2_lins = [m['R2_lin'] for m in metrics]
+        rmses   = [m['RMSE']   for m in metrics]
+        maes    = [m['MAE']    for m in metrics]
         print(f"  {name:<20} "
-              f"{np.mean(r2s):>6.4f}±{np.std(r2s):.4f}  "
-              f"{np.mean(rmses):>10.3e}±{np.std(rmses):.3e}  "
-              f"{np.mean(maes):>10.3e}±{np.std(maes):.3e}")
+              f"{np.mean(r2s):>6.4f}+/-{np.std(r2s):.3f}  "
+              f"{np.mean(r2_lins):>6.4f}+/-{np.std(r2_lins):.3f}  "
+              f"{np.mean(rmses):>6.4f}+/-{np.std(rmses):.3f}  "
+              f"{np.mean(maes):>6.4f}+/-{np.std(maes):.3f}")
     print("="*80)
 
 
@@ -59,7 +61,7 @@ def save_results_log(all_results: dict[str, list[dict]],
             for i, (g0, m) in enumerate(zip(g0_values, fold_metrics))
         ]
         summary = {}
-        for metric in ('R2', 'RMSE', 'MAE'):
+        for metric in ('R2', 'R2_lin', 'RMSE', 'MAE'):
             vals = [m[metric] for m in fold_metrics]
             summary[metric] = {'mean': float(np.mean(vals)), 'std': float(np.std(vals))}
         models_log[name] = {'folds': fold_entries, 'summary': summary}
@@ -86,8 +88,8 @@ def plot_r2_comparison(all_results: dict[str, list[dict]],
         ax.bar(x + i * width, r2s, width, label=name, color=colors[i % len(colors)], alpha=0.8)
 
     ax.set_xlabel('Held-out G0 value')
-    ax.set_ylabel('R² (nH2 space)')
-    ax.set_title('Leave-one-G0-out R² by model')
+    ax.set_ylabel('R² (log10 nH2 space)')
+    ax.set_title('Leave-one-G0-out R² by model (log-space)')
     ax.set_xticks(x + width * (len(models) - 1) / 2)
     ax.set_xticklabels([f'{g:.1f}' for g in g0_values])
     ax.legend()
@@ -103,8 +105,10 @@ def plot_r2_comparison(all_results: dict[str, list[dict]],
 def plot_scatter(y_true_log: np.ndarray, y_pred_log: np.ndarray,
                  model_name: str, g0: float,
                  save_path: str | None = None) -> None:
+    clip_lo = float(y_true_log.min()) - 1.0
+    clip_hi = float(y_true_log.max()) + 1.0
     y_true = 10.0 ** y_true_log
-    y_pred = 10.0 ** y_pred_log
+    y_pred = 10.0 ** np.clip(y_pred_log, clip_lo, clip_hi)
 
     fig, ax = plt.subplots(figsize=(6, 6))
     ax.scatter(y_true, y_pred, s=0.5, alpha=0.3, color='steelblue', rasterized=True)

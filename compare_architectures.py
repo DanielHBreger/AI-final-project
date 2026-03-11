@@ -696,22 +696,23 @@ def run_cnn_cv_guided(variant_name: str,
 def print_comparison(all_results: dict[str, list[dict]],
                      g0_values: list[float]) -> None:
     """Print a compact R2 comparison table: variants (rows) x G0 folds (cols)."""
-    col_w   = 9   # width per G0 column
     name_w  = 20
     g0_hdr  = "".join(f"G0={g:<5.1f}" for g in g0_values)
-    header  = f"  {'Variant':<{name_w}}  {g0_hdr}  {'MeanR2':>8}  {'Std':>6}"
+    header  = f"  {'Variant':<{name_w}}  {g0_hdr}  {'MeanR2':>8}  {'R2_lin':>8}  {'Std':>6}"
     sep     = "=" * len(header)
 
     print(f"\n{sep}")
-    print("  Architecture Comparison  (R2 per fold)")
+    print("  Architecture Comparison  (R2 log-space per fold)")
     print(sep)
     print(header)
     print("-" * len(header))
 
     for name, fms in all_results.items():
-        r2s = [m['R2'] for m in fms]
+        r2s     = [m['R2']     for m in fms]
+        r2_lins = [m['R2_lin'] for m in fms]
         r2_cols = "".join(f"{r2:>+8.4f} " for r2 in r2s)
-        print(f"  {name:<{name_w}}  {r2_cols}  {np.mean(r2s):>+8.4f}  {np.std(r2s):>6.4f}")
+        print(f"  {name:<{name_w}}  {r2_cols}  {np.mean(r2s):>+8.4f}  "
+              f"{np.mean(r2_lins):>+8.4f}  {np.std(r2s):>6.4f}")
 
     print(sep)
 
@@ -722,9 +723,10 @@ def save_comparison_log(all_results: dict[str, list[dict]],
                         log_path: str) -> None:
     out: dict = {'run_config': run_config, 'g0_values': g0_values, 'variants': {}}
     for name, fms in all_results.items():
-        r2s  = [m['R2']   for m in fms]
-        rmse = [m['RMSE'] for m in fms]
-        mae  = [m['MAE']  for m in fms]
+        r2s     = [m['R2']     for m in fms]
+        r2_lins = [m['R2_lin'] for m in fms]
+        rmse    = [m['RMSE']   for m in fms]
+        mae     = [m['MAE']    for m in fms]
         out['variants'][name] = {
             'folds': [
                 {'fold': i, 'g0': g0_values[i],
@@ -732,9 +734,10 @@ def save_comparison_log(all_results: dict[str, list[dict]],
                 for i, m in enumerate(fms)
             ],
             'summary': {
-                'R2':   {'mean': float(np.mean(r2s)),  'std': float(np.std(r2s))},
-                'RMSE': {'mean': float(np.mean(rmse)), 'std': float(np.std(rmse))},
-                'MAE':  {'mean': float(np.mean(mae)),  'std': float(np.std(mae))},
+                'R2':     {'mean': float(np.mean(r2s)),     'std': float(np.std(r2s))},
+                'R2_lin': {'mean': float(np.mean(r2_lins)), 'std': float(np.std(r2_lins))},
+                'RMSE':   {'mean': float(np.mean(rmse)),    'std': float(np.std(rmse))},
+                'MAE':    {'mean': float(np.mean(mae)),     'std': float(np.std(mae))},
             },
         }
     with open(log_path, 'w') as f:
