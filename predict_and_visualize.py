@@ -84,7 +84,7 @@ def _compute_spatial_X(cubes: list, all_vols: list[dict], feature_cols: list[str
     Results from all scales are concatenated along the feature axis.
 
     Returns (N, len(feature_cols) * len(kernel_sizes)) float32 array.
-    Default scales (3, 5, 7) give 3 x 14 = 42 spatial features.
+    Default scales (3, 5, 7) give 3 x 15 = 45 spatial features.
     """
     parts = []
     for cube, vol in zip(cubes, all_vols):

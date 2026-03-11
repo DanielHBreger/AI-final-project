@@ -21,9 +21,6 @@ XGBoost (3 variants)
     Tests whether 4th/5th-order feature interactions (e.g. nH x T x G0 x ext)
     improve prediction.  Risk: may memorise training G0 values.
 
-  Rejected: DART (dropout on trees) — analogous to neural dropout which was
-  shown experimentally (CNN Run 2) to hurt OOD extrapolation.
-
 MLP (3 variants)
   With ~15 M training rows per fold the MLP is data-rich; underfitting is the
   primary concern, not overfitting.
@@ -40,16 +37,8 @@ MLP (3 variants)
     non-linear remapping.  Constant width preserves information flow.
     Prevents gradient vanishing in deeper networks.
 
-  Rejected: SELU (sensitive to init), LayerNorm (slower than BN at batch_size
-  262144), Dropout (hurts OOD extrapolation per CNN experiment).
-
 CNN (3 variants)
   The only spatial model.  The main architectural axis is base channel count.
-
-  A 4th encoder level is explicitly rejected: it would compress 64^3 -> 4^3
-  (16x per axis), destroying the fine-grained field gradients needed for
-  dense prediction.  The 3-level encoder giving an 8^3 bottleneck is correct
-  for 64^3 inputs.
 
   unet_small   base_ch=16  ~1.5 M params
     Tests whether reduced capacity closes the train/val gap (training loss
@@ -58,8 +47,7 @@ CNN (3 variants)
   unet_standard  base_ch=32  ~5.8 M params  [BASELINE — current best, R2=0.803]
 
   unet_large  base_ch=64  ~23 M params
-    Upper bound.  Predicted to NOT improve: 480 000 : 1 param-to-sample ratio.
-    Included to confirm the over-parameterisation hypothesis.
+    Upper bound on CNN capacity.
 
 Extras (Paths B-E)
   ens_xgb+mlp / ens_xgb+cnn / ens_all
@@ -77,14 +65,14 @@ Extras (Paths B-E)
 
 Usage
 -----
-  # Default run (XGBoost + MLP + multi-scale spatial, no CNN):
+  # Full run (XGBoost + MLP + CNN + multi-scale spatial):
   python compare_architectures.py
 
-  # Fast smoke test (no spatial, 5 MLP epochs):
-  python compare_architectures.py --no-spatial --mlp-epochs 5
+  # Fast smoke test (no CNN, no spatial, 5 MLP epochs):
+  python compare_architectures.py --skip-cnn --no-spatial --mlp-epochs 5
 
-  # Enable CNN variants (disabled by default):
-  python compare_architectures.py --cnn
+  # XGBoost + MLP only (no CNN):
+  python compare_architectures.py --skip-cnn
 
   # Single-scale spatial only (legacy 3^3):
   python compare_architectures.py --spatial-kernels 3
@@ -218,11 +206,9 @@ MLP_VARIANTS: dict[str, dict] = {
 # ── CNN variant configs ───────────────────────────────────────────────────────
 
 CNN_VARIANTS: dict[str, dict] = {
-    # Small — tests whether reduced capacity closes the train/val gap
     'unet_small':    {'base_ch': 16},
-    # Standard — current best (R2=0.803 mean, Run 3)
     'unet_standard': {'base_ch': 32},
-    # unet_large (base_ch=64, 23M params) retired: confirmed unstable across all runs
+    'unet_large':    {'base_ch': 64},
 }
 
 
@@ -300,7 +286,7 @@ def _compute_spatial_X(cubes: list,
     concatenated along the feature axis.
 
     Returns (N, len(feature_cols) * len(kernel_sizes)) float32 array.
-    Default scales (3, 5, 7) give 3 x 14 = 42 spatial features.
+    Default scales (3, 5, 7) give 3 x 15 = 45 spatial features.
     """
     from scipy.ndimage import uniform_filter
     parts = []
@@ -684,7 +670,7 @@ def run_cnn_cv_guided(variant_name: str,
     """
     base_ch  = config['base_ch']
     n_params = count_parameters(UNet3D(n_channels=len(CNN_INPUT_COLS_GUIDED), base_ch=base_ch))
-    print(f"  {variant_name}  base_ch={base_ch}  n_channels=15  params={n_params:,}")
+    print(f"  {variant_name}  base_ch={base_ch}  n_channels={len(CNN_INPUT_COLS_GUIDED)}  params={n_params:,}")
     fold_metrics: list[dict]       = []
     y_true_folds: list[np.ndarray] = []
     y_pred_folds: list[np.ndarray] = []
@@ -766,9 +752,8 @@ if __name__ == '__main__':
                         help='Skip all XGBoost variants')
     parser.add_argument('--skip-mlp',   action='store_true',
                         help='Skip all MLP variants')
-    parser.add_argument('--cnn',        action='store_true',
-                        help='Enable CNN variants (disabled by default; '
-                             'high variance, does not improve ens_sp)')
+    parser.add_argument('--skip-cnn',   action='store_true',
+                        help='Skip all CNN variants')
     parser.add_argument('--cnn-epochs', type=int, default=150,
                         help='CNN epochs per variant/fold (default 150)')
     parser.add_argument('--mlp-epochs', type=int, default=100,
@@ -802,7 +787,7 @@ if __name__ == '__main__':
     run_config = {
         'timestamp':       datetime.datetime.now().isoformat(timespec='seconds'),
         'device':          str(device),
-        'cnn':             args.cnn,
+        'skip_cnn':        args.skip_cnn,
         'cnn_epochs':      args.cnn_epochs,
         'mlp_epochs':      args.mlp_epochs,
         'all_ops':         args.all_ops,
@@ -811,7 +796,7 @@ if __name__ == '__main__':
     }
 
     # Load 128^3 volumes whenever CNN variants or spatial features are needed
-    need_vols = args.cnn or args.spatial
+    need_vols = (not args.skip_cnn) or args.spatial
     all_vols: list[dict] | None = None
     ops: list | None = None
     if need_vols:
@@ -850,7 +835,7 @@ if __name__ == '__main__':
             all_preds[name]   = (yt, yp)
 
     # ── CNN variants ──────────────────────────────────────────────────────────
-    if args.cnn:
+    if not args.skip_cnn:
         print(f"\n--- CNN variants ({args.cnn_epochs} epochs) ---")
         for name, cfg in CNN_VARIANTS.items():
             print(f"\n[{name}]")
@@ -886,7 +871,7 @@ if __name__ == '__main__':
             all_preds[name]   = (yt, yp)
 
     # ── XGBoost-guided CNN ────────────────────────────────────────────────────
-    if args.cnn and xgb_standard_vols is not None:
+    if not args.skip_cnn and xgb_standard_vols is not None:
         print("\n--- XGBoost-guided CNN ---")
         for name, cfg in CNN_GUIDED_VARIANTS.items():
             print(f"\n[{name}]")
@@ -895,7 +880,7 @@ if __name__ == '__main__':
                 epochs=args.cnn_epochs)
             all_results[name] = fold_metrics
             all_preds[name]   = (yt, yp)
-    elif args.cnn and args.skip_xgb:
+    elif not args.skip_cnn and args.skip_xgb:
         print("\n(Skipping XGBoost-guided CNN: requires xgb_standard predictions; "
               "re-run without --skip-xgb to enable)")
 
