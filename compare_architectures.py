@@ -128,13 +128,6 @@ XGB_VARIANTS: dict[str, dict] = {
         subsample=0.3, colsample_bytree=0.8, tree_method='hist',
         random_state=42, verbosity=0,
     ),
-    # Dense ensemble — optimal depth=6 with many more low-LR trees.
-    # Run 125636 showed depth>6 overfits; more trees at depth=6 should outperform.
-    'xgb_tuned': dict(
-        max_depth=6, n_estimators=2000, learning_rate=0.02,
-        subsample=0.3, colsample_bytree=0.8, tree_method='hist',
-        random_state=42, verbosity=0,
-    ),
 }
 
 
@@ -424,9 +417,10 @@ def run_mlp_cv(variant_name: str,
         with torch.no_grad(), torch.amp.autocast('cuda', enabled=use_amp):
             y_pred = model(torch.from_numpy(X_va_s).to(device)).float().cpu().numpy()
 
-        # Clamp to training range ±2 dex — prevents linear-space explosion from
+        # Clamp to training range ±1 dex — prevents linear-space explosion from
         # the few voxels where the unbounded MLP extrapolates wildly.
-        y_pred = np.clip(y_pred, float(y_tr.min()) - 2.0, float(y_tr.max()) + 2.0)
+        # Matches the ±1 dex margin used in compute_metrics for R2_lin.
+        y_pred = np.clip(y_pred, float(y_tr.min()) - 1.0, float(y_tr.max()) + 1.0)
 
         fold_metrics.append(compute_metrics(y_va, y_pred))
         y_true_folds.append(y_va.astype(np.float32))
@@ -870,12 +864,11 @@ if __name__ == '__main__':
               f"(X_sp shape: {X_sp.shape})")
 
         if not args.skip_xgb:
-            for key in ('xgb_standard', 'xgb_tuned'):
-                name = f'{key}_sp'
-                fold_metrics, yt, yp, _ = run_xgb_cv(
-                    name, XGB_VARIANTS[key], X_sp, y, folds, g0_vals, cubes)
-                all_results[name] = fold_metrics
-                all_preds[name]   = (yt, yp)
+            name = 'xgb_standard_sp'
+            fold_metrics, yt, yp, _ = run_xgb_cv(
+                name, XGB_VARIANTS['xgb_standard'], X_sp, y, folds, g0_vals, cubes)
+            all_results[name] = fold_metrics
+            all_preds[name]   = (yt, yp)
 
         if not args.skip_mlp:
             name = 'mlp_wide_sp'
@@ -905,16 +898,12 @@ if __name__ == '__main__':
         ('ens_xgb+cnn',     ['xgb_standard',    'unet_standard']),
         ('ens_all',         ['xgb_standard',    'mlp_wide',    'unet_standard']),
         ('ens_sp',          ['xgb_standard_sp', 'mlp_wide_sp']),
-        ('ens_tuned+mlp',   ['xgb_tuned',       'mlp_wide']),
-        ('ens_tuned_sp',    ['xgb_tuned_sp',    'mlp_wide_sp']),
     ]
     stacked_groups = [
-        ('stacked_xgb+mlp',  ['xgb_standard',    'mlp_wide']),
-        ('stacked_xgb+cnn',  ['xgb_standard',    'unet_standard']),
-        ('stacked_all',      ['xgb_standard',    'mlp_wide',    'unet_standard']),
-        ('stacked_sp',       ['xgb_standard_sp', 'mlp_wide_sp']),
-        ('stacked_tuned+mlp',['xgb_tuned',       'mlp_wide']),
-        ('stacked_tuned_sp', ['xgb_tuned_sp',    'mlp_wide_sp']),
+        ('stacked_xgb+mlp', ['xgb_standard',    'mlp_wide']),
+        ('stacked_xgb+cnn', ['xgb_standard',    'unet_standard']),
+        ('stacked_all',     ['xgb_standard',    'mlp_wide',    'unet_standard']),
+        ('stacked_sp',      ['xgb_standard_sp', 'mlp_wide_sp']),
     ]
     ens_to_run     = [(n, ms) for n, ms in ens_groups     if all(m in all_preds for m in ms)]
     stacked_to_run = [(n, ms) for n, ms in stacked_groups if all(m in all_preds for m in ms)]

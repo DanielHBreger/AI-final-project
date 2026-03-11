@@ -226,8 +226,9 @@ def run_mlp(X: np.ndarray, y: np.ndarray,
             X_va_t  = torch.from_numpy(X_va_s).to(device)
             y_pred  = model(X_va_t).float().cpu().numpy()
 
-        # Clamp to training range ±2 dex — prevents linear-space explosion.
-        y_pred = np.clip(y_pred, float(y_tr.min()) - 2.0, float(y_tr.max()) + 2.0)
+        # Clamp to training range ±1 dex — prevents linear-space explosion.
+        # Matches the ±1 dex margin used in compute_metrics for R2_lin.
+        y_pred = np.clip(y_pred, float(y_tr.min()) - 1.0, float(y_tr.max()) + 1.0)
 
         fold_metrics.append(compute_metrics(y_va, y_pred))
         print(f"  MLP     fold={fold} (G0={g0_values[fold]:.1f})  "
