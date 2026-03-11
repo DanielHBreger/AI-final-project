@@ -65,14 +65,14 @@ Extras (Paths B-E)
 
 Usage
 -----
-  # Full run (XGBoost + MLP + CNN + multi-scale spatial):
+  # Default run (XGBoost + MLP + multi-scale spatial, no CNN):
   python compare_architectures.py
 
-  # Fast smoke test (no CNN, no spatial, 5 MLP epochs):
-  python compare_architectures.py --skip-cnn --no-spatial --mlp-epochs 5
+  # Fast smoke test (no spatial, 5 MLP epochs):
+  python compare_architectures.py --no-spatial --mlp-epochs 5
 
-  # XGBoost + MLP only (no CNN):
-  python compare_architectures.py --skip-cnn
+  # Include CNN variants (slow — adds ~2x runtime):
+  python compare_architectures.py --cnn
 
   # Single-scale spatial only (legacy 3^3):
   python compare_architectures.py --spatial-kernels 3
@@ -125,6 +125,13 @@ XGB_VARIANTS: dict[str, dict] = {
     # Deep trees — captures higher-order feature interactions up to depth-8 paths
     'xgb_deep': dict(
         max_depth=8, n_estimators=300, learning_rate=0.10,
+        subsample=0.3, colsample_bytree=0.8, tree_method='hist',
+        random_state=42, verbosity=0,
+    ),
+    # Dense ensemble — optimal depth=6 with many more low-LR trees.
+    # Run 125636 showed depth>6 overfits; more trees at depth=6 should outperform.
+    'xgb_tuned': dict(
+        max_depth=6, n_estimators=2000, learning_rate=0.02,
         subsample=0.3, colsample_bytree=0.8, tree_method='hist',
         random_state=42, verbosity=0,
     ),
@@ -416,6 +423,10 @@ def run_mlp_cv(variant_name: str,
         model.eval()
         with torch.no_grad(), torch.amp.autocast('cuda', enabled=use_amp):
             y_pred = model(torch.from_numpy(X_va_s).to(device)).float().cpu().numpy()
+
+        # Clamp to training range ±2 dex — prevents linear-space explosion from
+        # the few voxels where the unbounded MLP extrapolates wildly.
+        y_pred = np.clip(y_pred, float(y_tr.min()) - 2.0, float(y_tr.max()) + 2.0)
 
         fold_metrics.append(compute_metrics(y_va, y_pred))
         y_true_folds.append(y_va.astype(np.float32))
@@ -755,8 +766,8 @@ if __name__ == '__main__':
                         help='Skip all XGBoost variants')
     parser.add_argument('--skip-mlp',   action='store_true',
                         help='Skip all MLP variants')
-    parser.add_argument('--skip-cnn',   action='store_true',
-                        help='Skip all CNN variants')
+    parser.add_argument('--cnn',        action='store_true',
+                        help='Include CNN variants (slow; off by default)')
     parser.add_argument('--cnn-epochs', type=int, default=150,
                         help='CNN epochs per variant/fold (default 150)')
     parser.add_argument('--mlp-epochs', type=int, default=100,
@@ -766,9 +777,9 @@ if __name__ == '__main__':
     parser.add_argument('--no-spatial', action='store_false', dest='spatial',
                         help='Disable spatial neighbourhood-mean feature variants '
                              '(enabled by default when volumes are loaded)')
-    parser.add_argument('--spatial-kernels', nargs='+', type=int, default=[3, 5, 7],
+    parser.add_argument('--spatial-kernels', nargs='+', type=int, default=[3, 5, 7, 15],
                         help='Kernel sizes for multi-scale spatial features '
-                             '(default: 3 5 7 -> 42 spatial features)')
+                             '(default: 3 5 7 15 -> 60 spatial features)')
     parser.set_defaults(spatial=True)
     parser.add_argument('--log',        type=str, default=None,
                         help='Output JSON path '
@@ -790,7 +801,7 @@ if __name__ == '__main__':
     run_config = {
         'timestamp':       datetime.datetime.now().isoformat(timespec='seconds'),
         'device':          str(device),
-        'skip_cnn':        args.skip_cnn,
+        'run_cnn':         args.cnn,
         'cnn_epochs':      args.cnn_epochs,
         'mlp_epochs':      args.mlp_epochs,
         'all_ops':         args.all_ops,
@@ -799,7 +810,7 @@ if __name__ == '__main__':
     }
 
     # Load 128^3 volumes whenever CNN variants or spatial features are needed
-    need_vols = (not args.skip_cnn) or args.spatial
+    need_vols = args.cnn or args.spatial
     all_vols: list[dict] | None = None
     ops: list | None = None
     if need_vols:
@@ -838,7 +849,7 @@ if __name__ == '__main__':
             all_preds[name]   = (yt, yp)
 
     # ── CNN variants ──────────────────────────────────────────────────────────
-    if not args.skip_cnn:
+    if args.cnn:
         print(f"\n--- CNN variants ({args.cnn_epochs} epochs) ---")
         for name, cfg in CNN_VARIANTS.items():
             print(f"\n[{name}]")
@@ -854,16 +865,17 @@ if __name__ == '__main__':
         X_extra = _compute_spatial_X(cubes, all_vols, FEATURE_COLS,
                                      kernel_sizes=tuple(args.spatial_kernels))
         n_sp    = len(FEATURE_COLS) * len(args.spatial_kernels)
-        X_sp    = np.concatenate([X, X_extra], axis=1)   # (N, 14 + n_sp)
+        X_sp    = np.concatenate([X, X_extra], axis=1)   # (N, 15 + n_sp)
         print(f"  Spatial kernels: {args.spatial_kernels}  ->  {n_sp} spatial features  "
               f"(X_sp shape: {X_sp.shape})")
 
         if not args.skip_xgb:
-            name = 'xgb_standard_sp'
-            fold_metrics, yt, yp, _ = run_xgb_cv(
-                name, XGB_VARIANTS['xgb_standard'], X_sp, y, folds, g0_vals, cubes)
-            all_results[name] = fold_metrics
-            all_preds[name]   = (yt, yp)
+            for key in ('xgb_standard', 'xgb_tuned'):
+                name = f'{key}_sp'
+                fold_metrics, yt, yp, _ = run_xgb_cv(
+                    name, XGB_VARIANTS[key], X_sp, y, folds, g0_vals, cubes)
+                all_results[name] = fold_metrics
+                all_preds[name]   = (yt, yp)
 
         if not args.skip_mlp:
             name = 'mlp_wide_sp'
@@ -874,7 +886,7 @@ if __name__ == '__main__':
             all_preds[name]   = (yt, yp)
 
     # ── XGBoost-guided CNN ────────────────────────────────────────────────────
-    if not args.skip_cnn and xgb_standard_vols is not None:
+    if args.cnn and xgb_standard_vols is not None:
         print("\n--- XGBoost-guided CNN ---")
         for name, cfg in CNN_GUIDED_VARIANTS.items():
             print(f"\n[{name}]")
@@ -883,7 +895,7 @@ if __name__ == '__main__':
                 epochs=args.cnn_epochs)
             all_results[name] = fold_metrics
             all_preds[name]   = (yt, yp)
-    elif not args.skip_cnn and args.skip_xgb:
+    elif args.cnn and args.skip_xgb:
         print("\n(Skipping XGBoost-guided CNN: requires xgb_standard predictions; "
               "re-run without --skip-xgb to enable)")
 
@@ -893,12 +905,16 @@ if __name__ == '__main__':
         ('ens_xgb+cnn',     ['xgb_standard',    'unet_standard']),
         ('ens_all',         ['xgb_standard',    'mlp_wide',    'unet_standard']),
         ('ens_sp',          ['xgb_standard_sp', 'mlp_wide_sp']),
+        ('ens_tuned+mlp',   ['xgb_tuned',       'mlp_wide']),
+        ('ens_tuned_sp',    ['xgb_tuned_sp',    'mlp_wide_sp']),
     ]
     stacked_groups = [
-        ('stacked_xgb+mlp', ['xgb_standard',    'mlp_wide']),
-        ('stacked_xgb+cnn', ['xgb_standard',    'unet_standard']),
-        ('stacked_all',     ['xgb_standard',    'mlp_wide',    'unet_standard']),
-        ('stacked_sp',      ['xgb_standard_sp', 'mlp_wide_sp']),
+        ('stacked_xgb+mlp',  ['xgb_standard',    'mlp_wide']),
+        ('stacked_xgb+cnn',  ['xgb_standard',    'unet_standard']),
+        ('stacked_all',      ['xgb_standard',    'mlp_wide',    'unet_standard']),
+        ('stacked_sp',       ['xgb_standard_sp', 'mlp_wide_sp']),
+        ('stacked_tuned+mlp',['xgb_tuned',       'mlp_wide']),
+        ('stacked_tuned_sp', ['xgb_tuned_sp',    'mlp_wide_sp']),
     ]
     ens_to_run     = [(n, ms) for n, ms in ens_groups     if all(m in all_preds for m in ms)]
     stacked_to_run = [(n, ms) for n, ms in stacked_groups if all(m in all_preds for m in ms)]
