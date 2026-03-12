@@ -49,8 +49,10 @@ def visualize(truth_vol: np.ndarray, pred_vol: np.ndarray,
 
     All three panels share a linked camera so rotating one rotates all.
     """
-    p1, p99 = np.percentile(truth_vol, [1, 99])
-    clim    = (float(p1), float(p99))
+    abs_err_vol = np.abs(err_vol)
+    p1   = float(np.percentile(truth_vol, 1))
+    pmax = float(max(np.percentile(truth_vol, 99), np.percentile(abs_err_vol, 99)))
+    clim = (p1, pmax)
 
     plotter = pv.Plotter(shape=(1, 3), window_size=(1920, 700))
     plotter.background_color = 'black'
@@ -77,16 +79,10 @@ def visualize(truth_vol: np.ndarray, pred_vol: np.ndarray,
     plotter.add_axes(color='white')
     plotter.view_isometric()
 
-    # ── Right: Absolute error — 0 transparent, errors bright orange/red ────────
-    abs_err_vol = np.abs(err_vol)
-    err_max     = float(np.percentile(abs_err_vol, 85))
-    err_clim    = (0.0, err_max)
-    t           = np.linspace(0.0, 1.0, 256)
-    err_opacity = np.power(t, 0.1).tolist()   # very aggressive: t^0.1 is near-step
-    err_opacity[0] = 0.0                       # ensure pure zero is fully transparent
+    # ── Right: Absolute error — same scale as truth/prediction ──────────────────
     plotter.subplot(0, 2)
     plotter.add_volume(_to_pv_grid(abs_err_vol), scalars='values',
-                       cmap='plasma', opacity=err_opacity, clim=err_clim,
+                       cmap='magma', opacity='linear', clim=clim,
                        scalar_bar_args={'title': f'|error| ({scale_label})', 'color': 'white'})
     plotter.add_text("|Prediction - Truth|", position='upper_edge',
                      font_size=12, color='white')
