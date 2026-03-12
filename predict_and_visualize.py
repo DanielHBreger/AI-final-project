@@ -102,6 +102,21 @@ def _compute_spatial_X(cubes: list, all_vols: list[dict], feature_cols: list[str
     return np.concatenate(parts, axis=0)
 
 
+def _compute_weights(y_tr: np.ndarray,
+                     alpha: float = 100.0,
+                     lo_pct: float = 99.0,
+                     hi_pct: float = 99.99) -> np.ndarray:
+    """Smooth exponential weight: 1x at p99, alpha x at p99.99, flat outside.
+    Mean-normalized so the effective learning rate is unchanged."""
+    p_lo = float(np.percentile(y_tr, lo_pct))
+    p_hi = float(np.percentile(y_tr, hi_pct))
+    if p_hi <= p_lo:
+        return np.ones(len(y_tr), dtype=np.float32)
+    t = np.clip((y_tr - p_lo) / (p_hi - p_lo), 0.0, 1.0).astype(np.float64)
+    w = np.exp(np.log(alpha) * t).astype(np.float32)
+    return (w / w.mean()).astype(np.float32)
+
+
 def _preds_to_volume(cube_df, y_pred_log: np.ndarray) -> np.ndarray:
     """Reshape flat per-cell predictions to a 128^3 float32 volume."""
     vol = np.zeros((128, 128, 128), dtype=np.float32)
@@ -120,6 +135,7 @@ def _train_xgb(X_tr: np.ndarray, y_tr: np.ndarray,
     sc    = StandardScaler()
     model = xgb.XGBRegressor(**_XGB_CFG, device=device)
     model.fit(sc.fit_transform(X_tr), y_tr,
+              sample_weight=_compute_weights(y_tr),
               eval_set=[(sc.transform(X_va), y_va)], verbose=False)
     return model.predict(sc.transform(X_va)).astype(np.float32)
 
@@ -142,10 +158,11 @@ def _train_mlp(X_tr: np.ndarray, y_tr: np.ndarray,
     torch.manual_seed(0)
     np.random.seed(0)
 
+    w_tr_t = torch.from_numpy(_compute_weights(y_tr)).to(device)
+
     model      = _FlexMLP(X_tr_s.shape[1]).to(device)
     opt        = torch.optim.Adam(model.parameters(), lr=1e-3, weight_decay=1e-5)
     sched      = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=epochs)
-    loss_fn    = nn.MSELoss()
     scaler_amp = torch.amp.GradScaler('cuda', enabled=use_amp)
     batch_size = 262_144
 
@@ -155,9 +172,10 @@ def _train_mlp(X_tr: np.ndarray, y_tr: np.ndarray,
         for i in range(0, n_tr, batch_size):
             xb = X_tr_t[perm[i : i + batch_size]]
             yb = y_tr_t[perm[i : i + batch_size]]
+            wb = w_tr_t[perm[i : i + batch_size]]
             opt.zero_grad(set_to_none=True)
             with torch.amp.autocast('cuda', enabled=use_amp):
-                loss = loss_fn(model(xb), yb)
+                loss = (wb * (model(xb) - yb) ** 2).mean()
             scaler_amp.scale(loss).backward()
             scaler_amp.step(opt)
             scaler_amp.update()

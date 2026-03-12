@@ -238,6 +238,21 @@ def _compute_spatial_X(cubes: list,
 
 # ── Training helpers ──────────────────────────────────────────────────────────
 
+def _compute_weights(y_tr: np.ndarray,
+                     alpha: float = 100.0,
+                     lo_pct: float = 99.0,
+                     hi_pct: float = 99.99) -> np.ndarray:
+    """Smooth exponential weight: 1x at p99, alpha x at p99.99, flat outside.
+    Mean-normalized so the effective learning rate is unchanged."""
+    p_lo = float(np.percentile(y_tr, lo_pct))
+    p_hi = float(np.percentile(y_tr, hi_pct))
+    if p_hi <= p_lo:
+        return np.ones(len(y_tr), dtype=np.float32)
+    t = np.clip((y_tr - p_lo) / (p_hi - p_lo), 0.0, 1.0).astype(np.float64)
+    w = np.exp(np.log(alpha) * t).astype(np.float32)
+    return (w / w.mean()).astype(np.float32)
+
+
 def run_xgb_cv(variant_name: str,
                config: dict,
                X: np.ndarray,
@@ -245,6 +260,7 @@ def run_xgb_cv(variant_name: str,
                fold_labels: np.ndarray,
                g0_values: list[float],
                cubes: list,
+               weighted: bool = False,
                ) -> tuple[list[dict], list[np.ndarray], list[np.ndarray], list[np.ndarray]]:
     """7-fold leave-one-G0-out CV for one XGBoost config.
 
@@ -266,7 +282,9 @@ def run_xgb_cv(variant_name: str,
         X_tr_s = sc.fit_transform(X_tr)
         X_va_s = sc.transform(X_va)
         model = xgb.XGBRegressor(**cfg)
-        model.fit(X_tr_s, y_tr, eval_set=[(X_va_s, y_va)], verbose=False)
+        sw = _compute_weights(y_tr) if weighted else None
+        model.fit(X_tr_s, y_tr, sample_weight=sw,
+                  eval_set=[(X_va_s, y_va)], verbose=False)
         y_pred = model.predict(X_va_s).astype(np.float32)
         fold_metrics.append(compute_metrics(y_va, y_pred))
         y_true_folds.append(y_va.astype(np.float32))
@@ -293,6 +311,7 @@ def run_mlp_cv(variant_name: str,
                epochs: int = 60,
                batch_size: int = 262144,
                lr: float = 1e-3,
+               weighted: bool = False,
                ) -> tuple[list[dict], list[np.ndarray], list[np.ndarray]]:
     """7-fold CV for one MLP config.
 
@@ -322,6 +341,9 @@ def run_mlp_cv(variant_name: str,
         y_tr_t = torch.from_numpy(y_tr.astype(np.float32)).to(device)
         n_tr   = len(X_tr_t)
 
+        w_tr_t = (torch.from_numpy(_compute_weights(y_tr.astype(np.float32))).to(device)
+                  if weighted else None)
+
         model      = _build_mlp(config, X.shape[1]).to(device)
         opt        = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=1e-5)
         sched      = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=epochs)
@@ -336,7 +358,11 @@ def run_mlp_cv(variant_name: str,
                 yb = y_tr_t[perm[i : i + batch_size]]
                 opt.zero_grad(set_to_none=True)
                 with torch.amp.autocast('cuda', enabled=use_amp):
-                    loss = loss_fn(model(xb), yb)
+                    if weighted:
+                        wb   = w_tr_t[perm[i : i + batch_size]]
+                        loss = (wb * (model(xb) - yb) ** 2).mean()
+                    else:
+                        loss = loss_fn(model(xb), yb)
                 scaler_amp.scale(loss).backward()
                 scaler_amp.step(opt)
                 scaler_amp.update()
@@ -806,6 +832,22 @@ if __name__ == '__main__':
             all_results[name] = fold_metrics
             all_preds[name]   = (yt, yp)
 
+        if not args.skip_xgb and not args.skip_mlp:
+            print("\n  [weighted variants]")
+            name = 'xgb_standard_sp_w'
+            fold_metrics, yt, yp, _ = run_xgb_cv(
+                name, XGB_VARIANTS['xgb_standard'], X_sp, y, folds, g0_vals,
+                cubes, weighted=True)
+            all_results[name] = fold_metrics
+            all_preds[name]   = (yt, yp)
+
+            name = 'mlp_wide_sp_w'
+            fold_metrics, yt, yp = run_mlp_cv(
+                name, MLP_VARIANTS['mlp_wide'], X_sp, y, folds, g0_vals,
+                epochs=args.mlp_epochs, weighted=True)
+            all_results[name] = fold_metrics
+            all_preds[name]   = (yt, yp)
+
     # ── XGBoost-guided CNN ────────────────────────────────────────────────────
     if args.cnn and xgb_standard_vols is not None:
         print("\n--- XGBoost-guided CNN ---")
@@ -828,10 +870,11 @@ if __name__ == '__main__':
         ('ens_sp',          ['xgb_standard_sp', 'mlp_wide_sp']),
     ]
     stacked_groups = [
-        ('stacked_xgb+mlp', ['xgb_standard',    'mlp_wide']),
-        ('stacked_xgb+cnn', ['xgb_standard',    'unet_standard']),
-        ('stacked_all',     ['xgb_standard',    'mlp_wide',    'unet_standard']),
-        ('stacked_sp',      ['xgb_standard_sp', 'mlp_wide_sp']),
+        ('stacked_xgb+mlp', ['xgb_standard',      'mlp_wide']),
+        ('stacked_xgb+cnn', ['xgb_standard',      'unet_standard']),
+        ('stacked_all',     ['xgb_standard',      'mlp_wide',    'unet_standard']),
+        ('stacked_sp',      ['xgb_standard_sp',   'mlp_wide_sp']),
+        ('stacked_weighted',['xgb_standard_sp_w', 'mlp_wide_sp_w']),
     ]
     ens_to_run     = [(n, ms) for n, ms in ens_groups     if all(m in all_preds for m in ms)]
     stacked_to_run = [(n, ms) for n, ms in stacked_groups if all(m in all_preds for m in ms)]
