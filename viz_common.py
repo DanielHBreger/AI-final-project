@@ -31,17 +31,17 @@ def select_prediction_file() -> str | None:
 def load_prediction(npz_path: str) -> tuple:
     """Load a saved prediction .npz and return its contents.
 
-    Returns (pred_vol, g0, r2_xgb, r2_mlp, r2_ens, kernels, epochs).
+    Returns (pred_vol, g0, r2_xgb, r2_mlp, r2_stacked, kernels, epochs).
     """
-    data     = np.load(npz_path)
-    pred_vol = data['pred_vol']
-    g0       = float(data['g0'])
-    r2_xgb   = float(data['r2_xgb'])
-    r2_mlp   = float(data['r2_mlp'])
-    r2_ens   = float(data['r2_ens'])
-    kernels  = data['spatial_kernels'].tolist()
-    epochs   = int(data['mlp_epochs'])
-    return pred_vol, g0, r2_xgb, r2_mlp, r2_ens, kernels, epochs
+    data       = np.load(npz_path)
+    pred_vol   = data['pred_vol']
+    g0         = float(data['g0'])
+    r2_xgb     = float(data['r2_xgb'])
+    r2_mlp     = float(data['r2_mlp'])
+    r2_stacked = float(data['r2_stacked'])
+    kernels    = data['spatial_kernels'].tolist()
+    epochs     = int(data['mlp_epochs'])
+    return pred_vol, g0, r2_xgb, r2_mlp, r2_stacked, kernels, epochs
 
 
 def prepare_display(truth_vol: np.ndarray, pred_vol: np.ndarray,

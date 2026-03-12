@@ -5,37 +5,16 @@ leave-one-G0-out cross-validation (7 folds, one held-out cube per fold).
 
 Architecture selection rationale
 ---------------------------------
-XGBoost (3 variants)
-  The structural knobs are tree depth (controls feature-interaction order) and
-  ensemble density (n_estimators x learning_rate).  All other hyperparameters
-  are fixed to isolate these two axes.
+XGBoost (1 variant)
+  xgb_standard  depth=6, 400 trees, lr=0.10
+    Confirmed optimal across 3 runs.  depth=4 and depth=8 were both tested
+    and retired (depth=4 slightly underfit; depth=8 overfits).
 
-  xgb_shallow  depth=4, 600 trees, lr=0.05
-    Bias-variance shift toward variance reduction.  More, weaker trees reduce
-    memorisation.  Tests whether low-order feature splits suffice.
-
-  xgb_standard  depth=6, 400 trees, lr=0.10  [BASELINE — matches run_xgboost]
-    Standard XGBoost sweet spot for tabular physics data.
-
-  xgb_deep  depth=8, 300 trees, lr=0.10
-    Tests whether 4th/5th-order feature interactions (e.g. nH x T x G0 x ext)
-    improve prediction.  Risk: may memorise training G0 values.
-
-MLP (3 variants)
-  With ~15 M training rows per fold the MLP is data-rich; underfitting is the
-  primary concern, not overfitting.
-
-  mlp_standard  [256, 256, 128, 64]  [BASELINE — matches run_mlp]
-    Tapering width forces progressive abstraction.
-
+MLP (1 variant)
   mlp_wide  [512, 512, 256, 128]
-    Double width throughout.  Tests raw capacity gain.
-
-  mlp_residual  256 x 4 residual blocks
-    Principled for smooth physics regression: residuals let the network learn
-    corrections delta(x) on top of a linear projection rather than a full
-    non-linear remapping.  Constant width preserves information flow.
-    Prevents gradient vanishing in deeper networks.
+    Confirmed best for ensemble/stacking.  mlp_standard and mlp_residual
+    variants were tested across 3 runs and retired (similar standalone R2
+    but never improve ensemble performance).
 
 CNN (3 variants)
   The only spatial model.  The main architectural axis is base channel count.
@@ -110,21 +89,9 @@ CNN_INPUT_COLS_GUIDED = CNN_INPUT_COLS + ['xgb_pred']  # 16 channels (XGBoost-gu
 # ── XGBoost variant configs ───────────────────────────────────────────────────
 
 XGB_VARIANTS: dict[str, dict] = {
-    # Shallow trees — more diverse ensemble, lower-order interactions
-    'xgb_shallow': dict(
-        max_depth=4, n_estimators=600, learning_rate=0.05,
-        subsample=0.3, colsample_bytree=0.8, tree_method='hist',
-        random_state=42, verbosity=0,
-    ),
-    # Standard depth — baseline matching run_xgboost in classical_models.py
+    # Standard depth=6 — confirmed optimal across 3 runs (depth=4 and depth=8 both worse)
     'xgb_standard': dict(
         max_depth=6, n_estimators=400, learning_rate=0.10,
-        subsample=0.3, colsample_bytree=0.8, tree_method='hist',
-        random_state=42, verbosity=0,
-    ),
-    # Deep trees — captures higher-order feature interactions up to depth-8 paths
-    'xgb_deep': dict(
-        max_depth=8, n_estimators=300, learning_rate=0.10,
         subsample=0.3, colsample_bytree=0.8, tree_method='hist',
         random_state=42, verbosity=0,
     ),
@@ -158,48 +125,12 @@ class FlexMLP(nn.Module):
         return self.net(x).squeeze(-1)
 
 
-class _ResidualBlock(nn.Module):
-    """Pre-activation residual block: BN->ReLU->Linear->BN->ReLU->Linear + skip.
-    Constant-width only (no projection required for the identity shortcut).
-    """
-    def __init__(self, dim: int):
-        super().__init__()
-        self.net = nn.Sequential(
-            nn.BatchNorm1d(dim), nn.ReLU(),
-            nn.Linear(dim, dim),
-            nn.BatchNorm1d(dim), nn.ReLU(),
-            nn.Linear(dim, dim),
-        )
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return x + self.net(x)
-
-
-class ResidualMLP(nn.Module):
-    """Residual MLP: input projection -> N residual blocks -> Linear(1).
-    Constant internal width (hidden_dim) preserves information throughout.
-    Learns corrections on top of a linear projection rather than a full
-    non-linear remapping — well-suited for smooth physics-based regression.
-    """
-    def __init__(self, in_dim: int, hidden_dim: int = 256, n_blocks: int = 4):
-        super().__init__()
-        self.proj   = nn.Linear(in_dim, hidden_dim)
-        self.blocks = nn.Sequential(*[_ResidualBlock(hidden_dim) for _ in range(n_blocks)])
-        self.out    = nn.Linear(hidden_dim, 1)
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return self.out(self.blocks(self.proj(x))).squeeze(-1)
-
 
 # ── MLP variant configs ───────────────────────────────────────────────────────
 
 MLP_VARIANTS: dict[str, dict] = {
-    # Standard tapering MLP — matches run_mlp baseline
-    'mlp_standard': {'arch': 'flex',     'hidden_dims': [256, 256, 128, 64]},
-    # Wider MLP — double capacity at each layer
-    'mlp_wide':     {'arch': 'flex',     'hidden_dims': [512, 512, 256, 128]},
-    # Residual MLP — principled for smooth physics regression
-    'mlp_residual': {'arch': 'residual', 'hidden_dim': 256, 'n_blocks': 4},
+    # Wide MLP — confirmed best for ensemble/stacking (narrower and residual variants retired)
+    'mlp_wide': {'arch': 'flex', 'hidden_dims': [512, 512, 256, 128]},
 }
 
 
@@ -350,8 +281,6 @@ def _build_mlp(config: dict, in_dim: int) -> nn.Module:
     """Dispatch to the appropriate MLP class based on config['arch']."""
     if config['arch'] == 'flex':
         return FlexMLP(in_dim, config['hidden_dims'])
-    if config['arch'] == 'residual':
-        return ResidualMLP(in_dim, config['hidden_dim'], config['n_blocks'])
     raise ValueError(f"Unknown arch: {config['arch']!r}")
 
 
@@ -417,10 +346,9 @@ def run_mlp_cv(variant_name: str,
         with torch.no_grad(), torch.amp.autocast('cuda', enabled=use_amp):
             y_pred = model(torch.from_numpy(X_va_s).to(device)).float().cpu().numpy()
 
-        # Clamp to training range ±1 dex — prevents linear-space explosion from
+        # Clamp to training range ±2 dex — prevents linear-space explosion from
         # the few voxels where the unbounded MLP extrapolates wildly.
-        # Matches the ±1 dex margin used in compute_metrics for R2_lin.
-        y_pred = np.clip(y_pred, float(y_tr.min()) - 1.0, float(y_tr.max()) + 1.0)
+        y_pred = np.clip(y_pred, float(y_tr.min()) - 2.0, float(y_tr.max()) + 2.0)
 
         fold_metrics.append(compute_metrics(y_va, y_pred))
         y_true_folds.append(y_va.astype(np.float32))
@@ -771,9 +699,9 @@ if __name__ == '__main__':
     parser.add_argument('--no-spatial', action='store_false', dest='spatial',
                         help='Disable spatial neighbourhood-mean feature variants '
                              '(enabled by default when volumes are loaded)')
-    parser.add_argument('--spatial-kernels', nargs='+', type=int, default=[3, 5, 7, 15],
+    parser.add_argument('--spatial-kernels', nargs='+', type=int, default=[3, 5, 7],
                         help='Kernel sizes for multi-scale spatial features '
-                             '(default: 3 5 7 15 -> 60 spatial features)')
+                             '(default: 3 5 7 -> 42 spatial features)')
     parser.set_defaults(spatial=True)
     parser.add_argument('--log',        type=str, default=None,
                         help='Output JSON path '
@@ -822,7 +750,7 @@ if __name__ == '__main__':
 
     # ── XGBoost variants ──────────────────────────────────────────────────────
     if not args.skip_xgb:
-        print("\n--- XGBoost variants ---")
+        print("\n--- XGBoost ---")
         for name, cfg in XGB_VARIANTS.items():
             print(f"\n[{name}]")
             fold_metrics, yt, yp, xvols = run_xgb_cv(
@@ -834,7 +762,7 @@ if __name__ == '__main__':
 
     # ── MLP variants ──────────────────────────────────────────────────────────
     if not args.skip_mlp:
-        print(f"\n--- MLP variants ({args.mlp_epochs} epochs) ---")
+        print(f"\n--- MLP ({args.mlp_epochs} epochs) ---")
         for name, cfg in MLP_VARIANTS.items():
             print(f"\n[{name}]")
             fold_metrics, yt, yp = run_mlp_cv(
