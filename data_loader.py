@@ -20,6 +20,13 @@ FEATURE_COLS = ['log_nH', 'log_T', 'log_nHp', 'ext', 'log_fh2', 'log_G0',
 TARGET_COL     = 'nH2'
 LOG_TARGET_COL = 'log_nH2'
 
+
+def get_feature_cols(exclude_fh2: bool = False) -> list[str]:
+    """Return FEATURE_COLS, optionally excluding log_fh2."""
+    if exclude_fh2:
+        return [c for c in FEATURE_COLS if c != 'log_fh2']
+    return FEATURE_COLS
+
 # Small epsilon to guard against log(0)
 _EPS = 1e-30
 
@@ -82,18 +89,21 @@ def get_fold_labels(cubes: list[pd.DataFrame]) -> np.ndarray:
 
 
 def get_X_y(cubes: list[pd.DataFrame],
-            use_log_target: bool = True) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+            use_log_target: bool = True,
+            feature_cols: list[str] | None = None) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
     Stack all cubes into flat (N, F) feature and (N,) target arrays.
 
     Returns:
-        X      : float32 array of shape (N, len(FEATURE_COLS))
+        X      : float32 array of shape (N, len(feature_cols))
         y      : float32 array of shape (N,)  — log_nH2 or nH2
         folds  : int array of shape (N,) — cube index for leave-one-out CV
     """
+    if feature_cols is None:
+        feature_cols = FEATURE_COLS
     target = LOG_TARGET_COL if use_log_target else TARGET_COL
-    X      = np.concatenate([df[FEATURE_COLS].values for df in cubes], axis=0).astype(np.float32)
-    y      = np.concatenate([df[target].values        for df in cubes], axis=0).astype(np.float32)
+    X      = np.concatenate([df[feature_cols].values for df in cubes], axis=0).astype(np.float32)
+    y      = np.concatenate([df[target].values       for df in cubes], axis=0).astype(np.float32)
     folds  = get_fold_labels(cubes)
     return X, y, folds
 

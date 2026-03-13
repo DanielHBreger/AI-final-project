@@ -28,6 +28,16 @@ Split strategies
   rand_25  random 25% train, 75% test              (25% / 75%)
   rand_50  random 50% train, 50% test              (50% / 50%)
   rand_75  random 75% train, 25% test              (75% / 25%)
+  box_1    random cubic sub-region ~1% volume       ( 1% / 99%)
+  box_5    random cubic sub-region ~5% volume       ( 5% / 95%)
+  box_10   random cubic sub-region ~10% volume     (10% / 90%)
+  box_25   random cubic sub-region ~25% volume     (25% / 75%)
+  box_50   random cubic sub-region ~50% volume     (50% / 50%)
+
+Box splits place a single axis-aligned cubic training region of the requested
+volume at a random position; the remainder is held out for testing.  This
+contrasts with random-voxel splits (scattered interpolation) and half-space
+splits (planar extrapolation), sitting between the two in spatial locality.
 
 Architecture: stacked_sp (xgb_standard_sp + mlp_wide_sp + Ridge meta-learner).
 Ridge is fit on in-sample base-model predictions of the training section.
@@ -62,7 +72,7 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 
 from data_loader import (
-    load_all_cubes, cube_to_volumes, get_g0_values, FEATURE_COLS, LOG_TARGET_COL,
+    load_all_cubes, cube_to_volumes, get_g0_values, get_feature_cols, FEATURE_COLS, LOG_TARGET_COL,
 )
 from classical_models import compute_metrics
 from model_helpers import (
@@ -76,17 +86,28 @@ SPLITS = [
     ('x_half',  lambda df: df['ix'].values < 64),
     ('y_half',  lambda df: df['iy'].values < 64),
     ('z_half',  lambda df: df['iz'].values < 64),
-    ('rand_1',  None),   # handled specially below (fraction-based)
+    ('rand_1',  None),   # fraction-based: scattered random voxels
     ('rand_5',  None),
     ('rand_10', None),
     ('rand_25', None),
     ('rand_50', None),
     ('rand_75', None),
+    ('box_1',   None),   # contiguous cubic sub-region
+    ('box_5',   None),
+    ('box_10',  None),
+    ('box_25',  None),
+    ('box_50',  None),
 ]
 
 RAND_FRACTIONS = {
     'rand_1': 0.01, 'rand_5': 0.05, 'rand_10': 0.10,
     'rand_25': 0.25, 'rand_50': 0.50, 'rand_75': 0.75,
+}
+
+# Target volume fraction -> cubic side length (rounds to nearest integer, clamped to [1,128])
+BOX_FRACTIONS = {
+    'box_1': 0.01, 'box_5': 0.05, 'box_10': 0.10,
+    'box_25': 0.25, 'box_50': 0.50,
 }
 
 
@@ -96,13 +117,27 @@ def _make_mask(split_name: str, df, rng: np.random.Generator) -> np.ndarray:
         if name == split_name:
             if fn is not None:
                 return fn(df)
-            # Random fraction
-            frac = RAND_FRACTIONS[split_name]
-            n = len(df)
-            idx = rng.choice(n, size=int(n * frac), replace=False)
-            mask = np.zeros(n, dtype=bool)
-            mask[idx] = True
-            return mask
+            # Scattered random voxels
+            if split_name in RAND_FRACTIONS:
+                frac = RAND_FRACTIONS[split_name]
+                n    = len(df)
+                idx  = rng.choice(n, size=int(n * frac), replace=False)
+                mask = np.zeros(n, dtype=bool)
+                mask[idx] = True
+                return mask
+            # Contiguous cubic sub-region
+            elif split_name in BOX_FRACTIONS:
+                frac = BOX_FRACTIONS[split_name]
+                side = max(1, min(128, round((frac * 128 ** 3) ** (1 / 3))))
+                x0   = int(rng.integers(0, 128 - side + 1))
+                y0   = int(rng.integers(0, 128 - side + 1))
+                z0   = int(rng.integers(0, 128 - side + 1))
+                ix   = df['ix'].values.astype(int) - 1
+                iy   = df['iy'].values.astype(int) - 1
+                iz   = df['iz'].values.astype(int) - 1
+                return ((ix >= x0) & (ix < x0 + side) &
+                        (iy >= y0) & (iy < y0 + side) &
+                        (iz >= z0) & (iz < z0 + side))
     raise ValueError(f"Unknown split: {split_name}")
 
 
@@ -129,7 +164,8 @@ def _make_masked_vols(cube, vols: dict, mask_tr: np.ndarray) -> dict:
 
 def run_cube_split(cube, g0: float, split_name: str,
                    mlp_epochs: int, quiet: bool,
-                   rng: np.random.Generator) -> dict:
+                   rng: np.random.Generator,
+                   feat_cols: list = FEATURE_COLS) -> dict:
     """Train stacked_sp on one spatial section, evaluate on held-out section.
 
     Returns a dict with g0, split, n_train, n_test, and R2 for both sections
@@ -140,10 +176,10 @@ def run_cube_split(cube, g0: float, split_name: str,
     mask_te = ~mask_tr
 
     # ── Build feature matrix (spatial features from training section only) ────
-    vols    = cube_to_volumes(cube, FEATURE_COLS)
+    vols    = cube_to_volumes(cube, feat_cols)
     vols_tr = _make_masked_vols(cube, vols, mask_tr)
-    X_sp    = _compute_spatial_X([cube], [vols_tr], FEATURE_COLS)    # (N, 45)
-    X_flat  = cube[FEATURE_COLS].values.astype(np.float32)            # (N, 15)
+    X_sp    = _compute_spatial_X([cube], [vols_tr], feat_cols)
+    X_flat  = cube[feat_cols].values.astype(np.float32)
     X       = np.concatenate([X_flat, X_sp], axis=1)                  # (N, 60)
     y       = cube[LOG_TARGET_COL].values.astype(np.float32)
 
@@ -242,7 +278,7 @@ def plot_heatmaps(results: list[dict], g0_vals: list[float],
         ('stacked_test_r2', 'Stacked test R2'),
     ]
 
-    fig, axes = plt.subplots(1, 3, figsize=(18, 4.5))
+    fig, axes = plt.subplots(1, 3, figsize=(22, 4.5))
     fig.suptitle('Intra-cube section experiment: held-out test R2', fontsize=12)
 
     for ax, (key, title) in zip(axes, panels):
@@ -281,7 +317,11 @@ def main() -> None:
                         help='Run only for this G0 value (default: all)')
     parser.add_argument('--quiet', action='store_true',
                         help='Suppress per-epoch MLP output')
+    parser.add_argument('--no-fh2', action='store_true',
+                        help='Exclude log_fh2 from input features')
     args = parser.parse_args()
+
+    feat_cols = get_feature_cols(args.no_fh2)
 
     # ── Load data ─────────────────────────────────────────────────────────────
     print("Loading cubes...")
@@ -311,7 +351,8 @@ def main() -> None:
             rec = run_cube_split(cube, g0, split_name,
                                  mlp_epochs=args.mlp_epochs,
                                  quiet=args.quiet,
-                                 rng=rng)
+                                 rng=rng,
+                                 feat_cols=feat_cols)
             results.append(rec)
             print(f"  -> xgb_test={rec['xgb_test_r2']:.4f}  "
                   f"mlp_test={rec['mlp_test_r2']:.4f}  "

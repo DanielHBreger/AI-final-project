@@ -42,7 +42,7 @@ from sklearn.preprocessing import StandardScaler
 
 from data_loader import (
     load_all_cubes, cube_to_volumes, get_X_y,
-    get_g0_values, FEATURE_COLS, LOG_TARGET_COL,
+    get_g0_values, get_feature_cols,
 )
 from classical_models import compute_metrics
 from model_helpers import (
@@ -211,7 +211,11 @@ def main() -> None:
                         help='Spatial filter kernel sizes (default: 3 5 7)')
     parser.add_argument('--all', action='store_true',
                         help='Run all 7 G0 folds and save a prediction file for each')
+    parser.add_argument('--no-fh2', action='store_true',
+                        help='Exclude log_fh2 from input features')
     args = parser.parse_args()
+
+    feat_cols = get_feature_cols(args.no_fh2)
 
     # ── Load ──────────────────────────────────────────────────────────────────
     print("Loading cubes...")
@@ -220,16 +224,16 @@ def main() -> None:
 
     # ── Baseline features ─────────────────────────────────────────────────────
     print("\nBuilding feature matrix...")
-    X, y, fold_labels = get_X_y(cubes, use_log_target=True)
+    X, y, fold_labels = get_X_y(cubes, use_log_target=True, feature_cols=feat_cols)
     print(f"  Base X shape: {X.shape}   y shape: {y.shape}")
 
     # ── Spatial features (needs volumes) ──────────────────────────────────────
     print(f"\nBuilding volumes and spatial features "
           f"(kernels={args.spatial_kernels})...")
-    all_vols = [cube_to_volumes(df, FEATURE_COLS) for df in cubes]
-    X_extra  = _compute_spatial_X(cubes, all_vols, FEATURE_COLS,
+    all_vols = [cube_to_volumes(df, feat_cols) for df in cubes]
+    X_extra  = _compute_spatial_X(cubes, all_vols, feat_cols,
                                    kernel_sizes=tuple(args.spatial_kernels))
-    n_sp = len(FEATURE_COLS) * len(args.spatial_kernels)
+    n_sp = len(feat_cols) * len(args.spatial_kernels)
     X_sp = np.concatenate([X, X_extra], axis=1)
     print(f"  Spatial features: {n_sp}  ->  X_sp shape: {X_sp.shape}")
 

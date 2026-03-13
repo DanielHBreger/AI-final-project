@@ -73,7 +73,7 @@ from sklearn.linear_model import Ridge
 import xgboost as xgb
 
 from data_loader import (load_all_cubes, cube_to_volumes, get_X_y,
-                          get_g0_values, FEATURE_COLS, LOG_TARGET_COL)
+                          get_g0_values, get_feature_cols, FEATURE_COLS, LOG_TARGET_COL)
 from classical_models import compute_metrics
 from cnn_model import UNet3D, count_parameters
 from augmentation import augment_cube, get_symmetry_ops
@@ -406,12 +406,14 @@ def run_cnn_cv_variant(variant_name: str,
                        ops: list[np.ndarray],
                        epochs: int = 150,
                        lr: float = 1e-3,
+                       input_cols: list[str] | None = None,
                        ) -> tuple[list[dict], list[np.ndarray], list[np.ndarray]]:
     """7-fold CV for one CNN config variant.
     Returns (fold_metrics, y_true_folds, y_pred_folds).
     """
+    _cols    = input_cols if input_cols is not None else CNN_INPUT_COLS
     base_ch  = config['base_ch']
-    n_params = count_parameters(UNet3D(n_channels=len(CNN_INPUT_COLS), base_ch=base_ch))
+    n_params = count_parameters(UNet3D(n_channels=len(_cols), base_ch=base_ch))
     print(f"  {variant_name}  base_ch={base_ch}  params={n_params:,}")
     fold_metrics: list[dict]       = []
     y_true_folds: list[np.ndarray] = []
@@ -421,7 +423,8 @@ def run_cnn_cv_variant(variant_name: str,
         train_vols = [v for i, v in enumerate(all_vols) if i != fold]
         val_vols   = [all_vols[fold]]
         metrics, y_true, y_pred = _train_cnn_fold(
-            train_vols, val_vols, ops, device, epochs, lr, base_ch, seed=fold)
+            train_vols, val_vols, ops, device, epochs, lr, base_ch,
+            input_cols=_cols, seed=fold)
         fold_metrics.append(metrics)
         y_true_folds.append(y_true)
         y_pred_folds.append(y_pred)
@@ -535,6 +538,7 @@ def run_cnn_cv_guided(variant_name: str,
                       ops: list[np.ndarray],
                       epochs: int = 150,
                       lr: float = 1e-3,
+                      input_cols_base: list[str] | None = None,
                       ) -> tuple[list[dict], list[np.ndarray], list[np.ndarray]]:
     """CNN fold training where XGBoost's OOB predictions are the 15th input channel.
 
@@ -544,9 +548,11 @@ def run_cnn_cv_guided(variant_name: str,
 
     Returns (fold_metrics, y_true_folds, y_pred_folds).
     """
+    _base_cols  = input_cols_base if input_cols_base is not None else CNN_INPUT_COLS
+    _guided_cols = _base_cols + ['xgb_pred']
     base_ch  = config['base_ch']
-    n_params = count_parameters(UNet3D(n_channels=len(CNN_INPUT_COLS_GUIDED), base_ch=base_ch))
-    print(f"  {variant_name}  base_ch={base_ch}  n_channels={len(CNN_INPUT_COLS_GUIDED)}  params={n_params:,}")
+    n_params = count_parameters(UNet3D(n_channels=len(_guided_cols), base_ch=base_ch))
+    print(f"  {variant_name}  base_ch={base_ch}  n_channels={len(_guided_cols)}  params={n_params:,}")
     fold_metrics: list[dict]       = []
     y_true_folds: list[np.ndarray] = []
     y_pred_folds: list[np.ndarray] = []
@@ -558,7 +564,7 @@ def run_cnn_cv_guided(variant_name: str,
         val_vols_g   = [{**all_vols[fold], 'xgb_pred': xgb_vols[fold]}]
         metrics, y_true, y_pred = _train_cnn_fold(
             train_vols_g, val_vols_g, ops, device, epochs, lr, base_ch,
-            input_cols=CNN_INPUT_COLS_GUIDED, seed=fold)
+            input_cols=_guided_cols, seed=fold)
         fold_metrics.append(metrics)
         y_true_folds.append(y_true)
         y_pred_folds.append(y_pred)
@@ -649,7 +655,11 @@ if __name__ == '__main__':
     parser.add_argument('--log',        type=str, default=None,
                         help='Output JSON path '
                              '(default: arch_comparison_TIMESTAMP.json)')
+    parser.add_argument('--no-fh2', action='store_true',
+                        help='Exclude log_fh2 from input features')
     args = parser.parse_args()
+
+    feat_cols = get_feature_cols(args.no_fh2)
 
     ts       = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
     log_path = args.log or f'arch_comparison_{ts}.json'
@@ -657,7 +667,7 @@ if __name__ == '__main__':
     print("Loading data...")
     cubes         = load_all_cubes()
     g0_vals       = get_g0_values(cubes)
-    X, y, folds   = get_X_y(cubes, use_log_target=True)
+    X, y, folds   = get_X_y(cubes, use_log_target=True, feature_cols=feat_cols)
     print(f"Total samples: {len(X):,}  |  Features: {X.shape[1]}")
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -672,6 +682,7 @@ if __name__ == '__main__':
         'all_ops':         args.all_ops,
         'spatial':         args.spatial,
         'spatial_kernels': args.spatial_kernels,
+        'no_fh2':          args.no_fh2,
     }
 
     # Load 128^3 volumes whenever CNN variants or spatial features are needed
@@ -680,7 +691,7 @@ if __name__ == '__main__':
     ops: list | None = None
     if need_vols:
         print("Converting cubes to 128^3 volumes...")
-        vol_cols = [c for c in CNN_INPUT_COLS + [CNN_TARGET_COL]
+        vol_cols = [c for c in feat_cols + [CNN_TARGET_COL]
                     if c in cubes[0].columns]
         all_vols = [cube_to_volumes(df, vol_cols) for df in cubes]
         ops      = get_symmetry_ops(safe_only=not args.all_ops)
@@ -720,16 +731,16 @@ if __name__ == '__main__':
             print(f"\n[{name}]")
             fold_metrics, yt, yp = run_cnn_cv_variant(
                 name, cfg, all_vols, g0_vals, device, ops,
-                epochs=args.cnn_epochs)
+                epochs=args.cnn_epochs, input_cols=feat_cols)
             all_results[name] = fold_metrics
             all_preds[name]   = (yt, yp)
 
     # ── Spatial-feature variants ───────────────────────────────────────────────
     if args.spatial and need_vols:
         print("\n--- Spatial-feature variants ---")
-        X_extra = _compute_spatial_X(cubes, all_vols, FEATURE_COLS,
+        X_extra = _compute_spatial_X(cubes, all_vols, feat_cols,
                                      kernel_sizes=tuple(args.spatial_kernels))
-        n_sp    = len(FEATURE_COLS) * len(args.spatial_kernels)
+        n_sp    = len(feat_cols) * len(args.spatial_kernels)
         X_sp    = np.concatenate([X, X_extra], axis=1)   # (N, 15 + n_sp)
         print(f"  Spatial kernels: {args.spatial_kernels}  ->  {n_sp} spatial features  "
               f"(X_sp shape: {X_sp.shape})")
@@ -772,7 +783,7 @@ if __name__ == '__main__':
             print(f"\n[{name}]")
             fold_metrics, yt, yp = run_cnn_cv_guided(
                 name, cfg, all_vols, xgb_standard_vols, g0_vals, device, ops,
-                epochs=args.cnn_epochs)
+                epochs=args.cnn_epochs, input_cols_base=feat_cols)
             all_results[name] = fold_metrics
             all_preds[name]   = (yt, yp)
     elif args.cnn and args.skip_xgb:
