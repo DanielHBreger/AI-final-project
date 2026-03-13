@@ -77,6 +77,9 @@ from data_loader import (load_all_cubes, cube_to_volumes, get_X_y,
 from classical_models import compute_metrics
 from cnn_model import UNet3D, count_parameters
 from augmentation import augment_cube, get_symmetry_ops
+from model_helpers import (
+    _XGB_CFG, FlexMLP, _compute_spatial_X, _compute_weights, _preds_to_volume,
+)
 
 
 # ── Shared constants ──────────────────────────────────────────────────────────
@@ -90,11 +93,7 @@ CNN_INPUT_COLS_GUIDED = CNN_INPUT_COLS + ['xgb_pred']  # 16 channels (XGBoost-gu
 
 XGB_VARIANTS: dict[str, dict] = {
     # Standard depth=6 — confirmed optimal across 3 runs (depth=4 and depth=8 both worse)
-    'xgb_standard': dict(
-        max_depth=6, n_estimators=400, learning_rate=0.10,
-        subsample=0.3, colsample_bytree=0.8, tree_method='hist',
-        random_state=42, verbosity=0,
-    ),
+    'xgb_standard': _XGB_CFG,
 }
 
 
@@ -103,27 +102,6 @@ XGB_VARIANTS: dict[str, dict] = {
 CNN_GUIDED_VARIANTS: dict[str, dict] = {
     'unet_xgb_guided': {'base_ch': 32},
 }
-
-
-# ── MLP architecture classes ──────────────────────────────────────────────────
-
-class FlexMLP(nn.Module):
-    """Standard MLP with configurable hidden layer widths.
-    Architecture: Linear -> BN -> ReLU -> ... -> Linear(1).
-    """
-    def __init__(self, in_dim: int, hidden_dims: list[int]):
-        super().__init__()
-        layers: list[nn.Module] = []
-        prev = in_dim
-        for h in hidden_dims:
-            layers += [nn.Linear(prev, h), nn.BatchNorm1d(h), nn.ReLU()]
-            prev = h
-        layers.append(nn.Linear(prev, 1))
-        self.net = nn.Sequential(*layers)
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return self.net(x).squeeze(-1)
-
 
 
 # ── MLP variant configs ───────────────────────────────────────────────────────
@@ -190,68 +168,7 @@ class CubeDataset(Dataset):
         return self.xs[idx], self.ys[idx]
 
 
-# ── Volume helpers ────────────────────────────────────────────────────────────
-
-def _preds_to_volume(cube_df, y_pred_log: np.ndarray) -> np.ndarray:
-    """Reshape flat per-cell predictions back to a 128^3 numpy volume.
-
-    cube_df must have integer 1-indexed columns ix, iy, iz.
-    """
-    vol = np.zeros((128, 128, 128), dtype=np.float32)
-    ix  = cube_df['ix'].values.astype(int) - 1
-    iy  = cube_df['iy'].values.astype(int) - 1
-    iz  = cube_df['iz'].values.astype(int) - 1
-    vol[ix, iy, iz] = y_pred_log.astype(np.float32)
-    return np.nan_to_num(vol)
-
-
-def _compute_spatial_X(cubes: list,
-                        all_vols: list[dict],
-                        feature_cols: list[str],
-                        kernel_sizes: tuple[int, ...] = (3, 5, 7)) -> np.ndarray:
-    """Multi-scale neighbourhood mean features via scipy uniform_filter.
-
-    For each kernel size in kernel_sizes, computes the k^3 neighbourhood mean
-    at every grid point using scipy.ndimage.uniform_filter, then indexes back
-    to DataFrame row order using ix/iy/iz.  Results from all scales are
-    concatenated along the feature axis.
-
-    Returns (N, len(feature_cols) * len(kernel_sizes)) float32 array.
-    Default scales (3, 5, 7) give 3 x 15 = 45 spatial features.
-    """
-    from scipy.ndimage import uniform_filter
-    parts = []
-    for cube, vol in zip(cubes, all_vols):
-        ix = cube['ix'].values.astype(int) - 1
-        iy = cube['iy'].values.astype(int) - 1
-        iz = cube['iz'].values.astype(int) - 1
-        scale_feats = [
-            np.stack([
-                uniform_filter(vol[col], size=ks)[ix, iy, iz]
-                for col in feature_cols
-            ], axis=-1).astype(np.float32)
-            for ks in kernel_sizes
-        ]
-        parts.append(np.concatenate(scale_feats, axis=-1))
-    return np.concatenate(parts, axis=0)   # (N, len(feature_cols)*len(kernel_sizes))
-
-
 # ── Training helpers ──────────────────────────────────────────────────────────
-
-def _compute_weights(y_tr: np.ndarray,
-                     alpha: float = 100.0,
-                     lo_pct: float = 99.0,
-                     hi_pct: float = 99.99) -> np.ndarray:
-    """Smooth exponential weight: 1x at p99, alpha x at p99.99, flat outside.
-    Mean-normalized so the effective learning rate is unchanged."""
-    p_lo = float(np.percentile(y_tr, lo_pct))
-    p_hi = float(np.percentile(y_tr, hi_pct))
-    if p_hi <= p_lo:
-        return np.ones(len(y_tr), dtype=np.float32)
-    t = np.clip((y_tr - p_lo) / (p_hi - p_lo), 0.0, 1.0).astype(np.float64)
-    w = np.exp(np.log(alpha) * t).astype(np.float32)
-    return (w / w.mean()).astype(np.float32)
-
 
 def run_xgb_cv(variant_name: str,
                config: dict,

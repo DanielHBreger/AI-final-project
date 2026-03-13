@@ -36,95 +36,18 @@ import numpy as np
 # regardless of which directory Code Runner / the shell launches from.
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 import torch
-import torch.nn as nn
 import xgboost as xgb
 from sklearn.linear_model import Ridge
 from sklearn.preprocessing import StandardScaler
-from scipy.ndimage import uniform_filter
 
 from data_loader import (
     load_all_cubes, cube_to_volumes, get_X_y,
     get_g0_values, FEATURE_COLS, LOG_TARGET_COL,
 )
 from classical_models import compute_metrics
-
-# ── XGBoost config (xgb_standard — matches compare_architectures.py) ──────────
-
-_XGB_CFG = dict(
-    max_depth=6, n_estimators=400, learning_rate=0.10,
-    subsample=0.3, colsample_bytree=0.8, tree_method='hist',
-    random_state=42, verbosity=0,
+from model_helpers import (
+    _XGB_CFG, FlexMLP, _compute_spatial_X, _compute_weights, _preds_to_volume,
 )
-
-# ── MLP model (mlp_wide) ───────────────────────────────────────────────────────
-
-class _FlexMLP(nn.Module):
-    """Feed-forward MLP with configurable hidden dimensions and BatchNorm."""
-    def __init__(self, in_dim: int, hidden_dims: list[int] = (512, 512, 256, 128)):
-        super().__init__()
-        layers: list[nn.Module] = []
-        prev = in_dim
-        for h in hidden_dims:
-            layers += [nn.Linear(prev, h), nn.BatchNorm1d(h), nn.ReLU(inplace=True)]
-            prev = h
-        layers.append(nn.Linear(prev, 1))
-        self.net = nn.Sequential(*layers)
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return self.net(x).squeeze(-1)
-
-# ── Spatial feature helper ─────────────────────────────────────────────────────
-
-def _compute_spatial_X(cubes: list, all_vols: list[dict], feature_cols: list[str],
-                        kernel_sizes: tuple[int, ...] = (3, 5, 7)) -> np.ndarray:
-    """Multi-scale neighbourhood mean features via scipy.ndimage.uniform_filter.
-
-    For each kernel size in kernel_sizes, computes the k^3 neighbourhood mean at
-    every grid point, then indexes back to DataFrame row order using ix/iy/iz.
-    Results from all scales are concatenated along the feature axis.
-
-    Returns (N, len(feature_cols) * len(kernel_sizes)) float32 array.
-    Default scales (3, 5, 7) give 3 x 15 = 45 spatial features.
-    """
-    parts = []
-    for cube, vol in zip(cubes, all_vols):
-        ix = cube['ix'].values.astype(int) - 1
-        iy = cube['iy'].values.astype(int) - 1
-        iz = cube['iz'].values.astype(int) - 1
-        scale_feats = [
-            np.stack([
-                uniform_filter(vol[col], size=ks)[ix, iy, iz]
-                for col in feature_cols
-            ], axis=-1).astype(np.float32)
-            for ks in kernel_sizes
-        ]
-        parts.append(np.concatenate(scale_feats, axis=-1))
-    return np.concatenate(parts, axis=0)
-
-
-def _compute_weights(y_tr: np.ndarray,
-                     alpha: float = 100.0,
-                     lo_pct: float = 99.0,
-                     hi_pct: float = 99.99) -> np.ndarray:
-    """Smooth exponential weight: 1x at p99, alpha x at p99.99, flat outside.
-    Mean-normalized so the effective learning rate is unchanged."""
-    p_lo = float(np.percentile(y_tr, lo_pct))
-    p_hi = float(np.percentile(y_tr, hi_pct))
-    if p_hi <= p_lo:
-        return np.ones(len(y_tr), dtype=np.float32)
-    t = np.clip((y_tr - p_lo) / (p_hi - p_lo), 0.0, 1.0).astype(np.float64)
-    w = np.exp(np.log(alpha) * t).astype(np.float32)
-    return (w / w.mean()).astype(np.float32)
-
-
-def _preds_to_volume(cube_df, y_pred_log: np.ndarray) -> np.ndarray:
-    """Reshape flat per-cell predictions to a 128^3 float32 volume."""
-    vol = np.zeros((128, 128, 128), dtype=np.float32)
-    ix  = cube_df['ix'].values.astype(int) - 1
-    iy  = cube_df['iy'].values.astype(int) - 1
-    iz  = cube_df['iz'].values.astype(int) - 1
-    vol[ix, iy, iz] = y_pred_log.astype(np.float32)
-    return np.nan_to_num(vol)
 
 # ── Training functions ─────────────────────────────────────────────────────────
 
@@ -160,7 +83,7 @@ def _train_mlp(X_tr: np.ndarray, y_tr: np.ndarray,
 
     w_tr_t = torch.from_numpy(_compute_weights(y_tr)).to(device)
 
-    model      = _FlexMLP(X_tr_s.shape[1]).to(device)
+    model      = FlexMLP(X_tr_s.shape[1]).to(device)
     opt        = torch.optim.Adam(model.parameters(), lr=1e-3, weight_decay=1e-5)
     sched      = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=epochs)
     scaler_amp = torch.amp.GradScaler('cuda', enabled=use_amp)

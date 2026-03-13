@@ -41,7 +41,7 @@ warnings.filterwarnings('ignore')
 
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
-from predict_and_visualize import _preds_to_volume
+from model_helpers import _preds_to_volume
 from data_loader import load_single_cube
 from viz_common import load_prediction
 

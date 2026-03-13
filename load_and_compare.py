@@ -21,7 +21,7 @@ import pyvista as pv
 
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
-from predict_and_visualize import _preds_to_volume
+from model_helpers import _preds_to_volume
 from data_loader import load_single_cube
 from viz_common import select_prediction_file, load_prediction, prepare_display
 
