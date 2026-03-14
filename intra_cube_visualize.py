@@ -13,8 +13,9 @@ one G0 cube, then shows an interactive slice viewer with four panels:
 "Train Mask" displays ground truth only for training cells; test cells appear
 black (missing), making the training coverage visible at each z slice.
 
-"Test Error" shows |pred - truth| in dex for held-out test cells only; training
-cells are masked black so you can see where the model was uncertain.
+"Test Error" shows |nH2_pred - nH2_truth| in linear units (cm^-3) for held-out
+test cells only; training cells are masked black so you can see where the model
+was uncertain.
 
 Two split types are supported via --split-type:
 
@@ -50,6 +51,7 @@ import sys
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
+import matplotlib.colors as mcolors
 from matplotlib.widgets import Slider, TextBox
 from sklearn.linear_model import Ridge
 
@@ -214,10 +216,26 @@ def launch_viewer(truth_vol, masked_truth_vol, pred_vol, err_vol,
                   g0: float, pct: float, split_type: str,
                   r2_xgb: float, r2_mlp: float, r2_stacked: float,
                   n_train: int, n_test: int, split_info: dict) -> None:
-    """Display an interactive 4-panel z-slice viewer."""
-    # Colour limits from ground truth
-    valid   = truth_vol[np.isfinite(truth_vol)]
-    p1, p99 = float(np.percentile(valid, 1)), float(np.percentile(valid, 99))
+    """Display an interactive 4-panel z-slice viewer (linear nH2 scale)."""
+    # Convert log10 volumes to linear nH2
+    truth_lin = np.power(10.0, truth_vol)
+    mask_lin  = np.power(10.0, masked_truth_vol)
+    pred_lin  = np.power(10.0, pred_vol)
+    # Linear error: |nH2_pred - nH2_truth|, NaN where err_vol is NaN (train cells)
+    err_lin = np.abs(pred_lin - truth_lin)
+    err_lin[~np.isfinite(err_vol)] = np.nan
+
+    # Colour limits from ground truth (linear)
+    valid   = truth_lin[np.isfinite(truth_lin)]
+    p1, p99 = float(np.nanpercentile(valid, 1)), float(np.nanpercentile(valid, 99))
+    p1      = max(p1, 1e-10)   # guard against zero for LogNorm
+
+    valid_err = err_lin[np.isfinite(err_lin)]
+    if len(valid_err) > 0:
+        e1  = max(float(np.nanpercentile(valid_err,  1)), 1e-10)
+        e99 = float(np.nanpercentile(valid_err, 99))
+    else:
+        e1, e99 = p1, p99
 
     cmap_main = plt.cm.magma.copy()
     cmap_main.set_bad('black')
@@ -245,19 +263,24 @@ def launch_viewer(truth_vol, masked_truth_vol, pred_vol, err_vol,
     def _sl(vol, z):
         return vol[:, :, z].T   # x horizontal, y vertical
 
-    kw_main = dict(cmap=cmap_main, vmin=p1, vmax=p99,
+    norm_main = mcolors.LogNorm(vmin=p1, vmax=p99)
+    norm_err  = mcolors.LogNorm(vmin=e1, vmax=e99)
+
+    kw_main = dict(cmap=cmap_main, norm=norm_main,
+                   origin='lower', aspect='equal', interpolation='nearest')
+    kw_err  = dict(cmap=cmap_main, norm=norm_err,
                    origin='lower', aspect='equal', interpolation='nearest')
 
-    im_truth = ax_truth.imshow(_sl(truth_vol,        init_z), **kw_main)
-    im_mask  = ax_mask .imshow(_sl(masked_truth_vol, init_z), **kw_main)
-    im_pred  = ax_pred .imshow(_sl(pred_vol,         init_z), **kw_main)
-    im_err   = ax_err  .imshow(_sl(err_vol,          init_z), **kw_main)
+    im_truth = ax_truth.imshow(_sl(truth_lin, init_z), **kw_main)
+    im_mask  = ax_mask .imshow(_sl(mask_lin,  init_z), **kw_main)
+    im_pred  = ax_pred .imshow(_sl(pred_lin,  init_z), **kw_main)
+    im_err   = ax_err  .imshow(_sl(err_lin,   init_z), **kw_err)
 
     for im, ax, lbl in [
-        (im_truth, ax_truth, 'log10(nH2)'),
-        (im_mask,  ax_mask,  'log10(nH2)'),
-        (im_pred,  ax_pred,  'log10(nH2)'),
-        (im_err,   ax_err,   'error (dex)'),
+        (im_truth, ax_truth, 'nH2 (cm$^{-3}$)'),
+        (im_mask,  ax_mask,  'nH2 (cm$^{-3}$)'),
+        (im_pred,  ax_pred,  'nH2 (cm$^{-3}$)'),
+        (im_err,   ax_err,   r'|$\Delta$nH2| (cm$^{-3}$)'),
     ]:
         cb = fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
         cb.set_label(lbl, color='white')
@@ -276,7 +299,7 @@ def launch_viewer(truth_vol, masked_truth_vol, pred_vol, err_vol,
         mask_title,
         (f'Stacked Prediction (all cells)\n'
          f'R\u00b2={r2_stacked:.4f}   XGB={r2_xgb:.4f}   MLP={r2_mlp:.4f}'),
-        f'|Pred - Truth|  test cells only\n({n_test:,} test cells)',
+        f'|nH2 Pred - Truth|  test cells only\n({n_test:,} test cells)',
     ]
     for ax, title in zip([ax_truth, ax_mask, ax_pred, ax_err], titles):
         ax.set_facecolor('black')
@@ -304,10 +327,10 @@ def launch_viewer(truth_vol, masked_truth_vol, pred_vol, err_vol,
     _busy = [False]
 
     def _update(z: int) -> None:
-        im_truth.set_data(_sl(truth_vol,        z))
-        im_mask .set_data(_sl(masked_truth_vol, z))
-        im_pred .set_data(_sl(pred_vol,         z))
-        im_err  .set_data(_sl(err_vol,          z))
+        im_truth.set_data(_sl(truth_lin, z))
+        im_mask .set_data(_sl(mask_lin,  z))
+        im_pred .set_data(_sl(pred_lin,  z))
+        im_err  .set_data(_sl(err_lin,   z))
         z_title.set_text(f'z slice = {z}')
         fig.canvas.draw_idle()
 

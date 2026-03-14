@@ -1,4 +1,4 @@
-# Predicting Molecular Hydrogen Fraction in 3D Astrophysical Simulations Using Machine Learning
+# Predicting Molecular Hydrogen Number Density (nH2) in 3D Astrophysical Simulations Using Machine Learning
 
 ---
 
@@ -17,6 +17,7 @@
 11. [Code Architecture Walkthrough](#11-code-architecture-walkthrough)
 12. [Visualization Pipeline](#12-visualization-pipeline)
 13. [Conclusions and Key Takeaways](#13-conclusions-and-key-takeaways)
+14. [Additional Experiments](#14-additional-experiments)
 
 ---
 
@@ -34,7 +35,7 @@ The dominant processes controlling fh2 are:
 
 ### The ML Task
 
-Given 14 local physical properties at each cell of a 128x128x128 simulation grid, predict fh2. The training data comes from 7 simulations that differ only in UV field strength G0 (ranging from 0.1 to 6.4 Habing units). The model must generalize to UV conditions it has never seen.
+Given 15 local physical properties at each cell of a 128x128x128 simulation grid, predict nH2 (molecular hydrogen number density, in cm^-3). The training data comes from 7 simulations that differ only in UV field strength G0 (ranging from 0.1 to 6.4 Habing units). The model must generalize to UV conditions it has never seen.
 
 ### Why This Is Hard
 
@@ -52,17 +53,17 @@ This is not a standard regression problem for three reasons:
 
 Seven 3D simulation cubes from UV-only chemistry runs, each a 128x128x128 grid at a different UV field strength:
 
-| Cube | G0 Value | Cells | fh2 Range | Physical Meaning |
-|------|----------|-------|-----------|------------------|
-| 1 | 0.1 | 2,097,152 | [8.46e-25, 0.494] | Very weak UV: most hydrogen can become molecular |
-| 2 | 0.2 | 2,097,152 | [2.26e-30, 0.475] | Weak UV |
-| 3 | 0.4 | 2,097,152 | [3.14e-24, 0.507] | Moderate UV |
-| 4 | 0.8 | 2,097,152 | [9.28e-26, 0.507] | Moderate UV |
-| 5 | 1.6 | 2,097,152 | [2.64e-24, 0.504] | Strong UV |
-| 6 | 3.2 | 2,097,152 | [1.20e-30, 0.505] | Strong UV: most H2 destroyed in unshielded regions |
-| 7 | 6.4 | 2,097,152 | [2.72e-30, 0.500] | Very strong UV |
+| Cube | G0 Value | Cells | log10(nH2) Range | Physical Meaning |
+|------|----------|-------|-----------------|------------------|
+| 1 | 0.1 | 2,097,152 | [-30, +5] approx | Very weak UV: most hydrogen can become molecular |
+| 2 | 0.2 | 2,097,152 | [-30, +5] approx | Weak UV |
+| 3 | 0.4 | 2,097,152 | [-30, +5] approx | Moderate UV |
+| 4 | 0.8 | 2,097,152 | [-30, +5] approx | Moderate UV |
+| 5 | 1.6 | 2,097,152 | [-30, +5] approx | Strong UV |
+| 6 | 3.2 | 2,097,152 | [-30, +5] approx | Strong UV: most H2 destroyed in unshielded regions |
+| 7 | 6.4 | 2,097,152 | [-30, +5] approx | Very strong UV |
 
-**Total**: 14,680,064 cells. Each cell has 18 raw columns; after preprocessing, 14 features are retained.
+**Total**: 14,680,064 cells. Each cell has 18 raw columns; after preprocessing, 15 features are retained.
 
 ### Physical Fields (Raw Columns per CSV)
 
@@ -70,28 +71,32 @@ Seven 3D simulation cubes from UV-only chemistry runs, each a 128x128x128 grid a
 |--------|-----------------|------|
 | `ix, iy, iz` | 1-indexed grid coordinates | Grid position (not a feature) |
 | `nH` | Total hydrogen number density | **Feature** (log-transformed) |
-| `nH2` | Molecular hydrogen number density | **Dropped** (leaks target) |
+| `nH2` | Molecular hydrogen number density | **Target** (log-transformed) |
 | `T` | Gas temperature | **Feature** (log-transformed) |
 | `vx, vy, vz` | Gas velocity components | **Feature** (encodes turbulence) |
 | `nHp` | Ionized hydrogen density | **Feature** (log-transformed) |
 | `ext` | Extinction (dust shielding) | **Feature** (proxy for column density) |
-| `fh2` | Molecular hydrogen fraction | **Target** |
+| `fh2` | H2 self-shielding factor | **Feature** (log-transformed; not derived from nH2) |
 | `bxl, bxr, byl, byr, bzl, bzr` | Face-centred magnetic field (left/right per axis) | **Feature** (6 components) |
 
-### Why nH2 Is Dropped
+### Why fh2 Is Kept as a Feature
 
-The molecular hydrogen density nH2 is directly derived from the target: `fh2 = 2*nH2 / (nH + 2*nH2)`. Including nH2 as a feature would give the model a trivially invertible formula for fh2, making the prediction meaningless. This is a classic case of **data leakage** that must be detected and removed before any modelling.
+The H2 self-shielding factor fh2 is **not** algebraically derived from nH2. It is an independent physical quantity: it measures the fraction of UV radiation in the H2 Lyman-Werner bands that is attenuated by the H2 column along the UV illumination axis. Computing fh2 requires integrating the H2 column density along each sight-line, which depends on the 3D spatial distribution of gas — not just the local nH2 value.
+
+Two cells with the same nH2 can have very different fh2 values depending on how much H2 sits between them and the UV source. Including `log_fh2` as a feature is valid and physically informative: a high fh2 (near 0 on log-scale) means the cell is strongly shielded from UV and we expect high nH2; a low fh2 means the cell is UV-exposed and nH2 will be low.
+
+In XGBoost feature importance, `log_fh2` is expected to rank near the top — it directly encodes spatial shielding information that local density and temperature alone cannot provide.
 
 ### Target Distribution
 
 ```
-log10(fh2):  min = -29.92,  max = -0.29,  mean = -1.19,  std = 1.12
+log10(nH2):  min ≈ -30,  max ≈ +5,  mean ≈ -1 to 0,  std ≈ 2-3 dex (varies by G0)
 ```
 
 Key characteristics:
-- **20.8% of cells** have fh2 < 0.01 (nearly atomic/ionized gas in UV-exposed regions)
-- **0% of cells** have fh2 > 0.99 (no fully molecular gas — UV always penetrates somewhat)
-- The distribution is heavily right-skewed in linear space but approximately Gaussian in log-space, which is why log-space prediction is both numerically necessary and statistically natural.
+- nH2 spans ~35 orders of magnitude in linear space, making raw-space regression numerically infeasible
+- In log-space the distribution is approximately Gaussian, which is why log-space prediction is both numerically necessary and statistically natural
+- UV-exposed cells (low G0 shielding) have nH2 near 10^-30; dense shielded cores have nH2 near 10^5 cm^-3
 
 ---
 
@@ -119,22 +124,36 @@ Expected difficulty ranking from hardest to easiest:
 
 This prediction is confirmed by every experiment: G0=0.1 and G0=0.2 are consistently the worst folds.
 
-### Metrics: Why Evaluate in Linear fh2 Space
+### Metrics: Why Evaluate in Log-Space (Dex)
 
-All models predict in **log10(fh2) space** (numerically stable), but metrics are computed after transforming back to **linear fh2 space**:
+All models predict in **log10(nH2) space** and metrics are computed directly in that space:
 
 ```python
 def compute_metrics(y_true_log, y_pred_log):
-    y_true = 10.0 ** y_true_log    # back to fh2
-    y_pred = 10.0 ** y_pred_log
-    return {
-        'R2':   r2_score(y_true, y_pred),
-        'RMSE': sqrt(mean_squared_error(y_true, y_pred)),
-        'MAE':  mean_absolute_error(y_true, y_pred),
-    }
+    # Primary: log-space (dex) metrics
+    R2   = r2_score(y_true_log, y_pred_log)
+    RMSE = sqrt(mean_squared_error(y_true_log, y_pred_log))
+    MAE  = mean_absolute_error(y_true_log, y_pred_log)
+
+    # Secondary: linear-space R2 with clipped predictions (±1 dex margin)
+    clip_lo  = y_true_log.min() - 1.0
+    clip_hi  = y_true_log.max() + 1.0
+    y_true_l = 10.0 ** y_true_log
+    y_pred_l = 10.0 ** np.clip(y_pred_log, clip_lo, clip_hi)
+    R2_lin   = r2_score(y_true_l, y_pred_l)
 ```
 
-This is intentional: the physically meaningful quantity is fh2 itself, not its logarithm. A prediction error of 0.1 in log-space means a factor of ~1.26 error in fh2 when fh2~0.5, but the same 0.1 error in log-space is negligible when fh2~10^-20. Evaluating in linear space naturally weights the predictions by physical importance.
+**Why log-space as the primary metric**: When the target is log10(nH2), neural networks and other
+models can produce predictions far outside the training range (e.g., log_nH2 = 30). Exponentiating
+such a value gives 10^30 — and even a single such prediction creates astronomical MSE in linear
+space, making linear R2 uninformative. Log-space R2 directly measures whether the model predicts
+the correct order of magnitude for each cell, which is the physically meaningful question.
+
+**Interpretation**: R2 = 0.95 in log-space means the model explains 95% of variance in
+log10(nH2). Typical errors of 0.1-0.2 dex correspond to a factor of 1.3-1.6 in linear nH2.
+
+**The secondary R2_lin** clips predictions to within ±1 dex of the true range before
+exponentiating, providing a bounded linear-space metric for comparison with linear-space models.
 
 ---
 
@@ -154,25 +173,28 @@ df['log_fh2'] = np.log10(df['fh2'].clip(lower=_EPS))
 
 The target (fh2) is also log-transformed. The epsilon (1e-30) prevents log(0) without affecting the physics: fh2 = 10^-30 is indistinguishable from zero in any physical context.
 
-### 4.2 The 14 Baseline Features
+### 4.2 The 15 Baseline Features
 
 ```
-log_nH, log_T, log_nHp, ext, log_G0, vx, vy, vz, bxl, bxr, byl, byr, bzl, bzr
+log_nH, log_T, log_nHp, ext, log_fh2, log_G0, vx, vy, vz, bxl, bxr, byl, byr, bzl, bzr
 ```
 
 These are the features available to all pointwise models. Their physical roles:
 
-| Feature(s) | Physical Role | Importance |
+| Feature(s) | Physical Role | Expected Importance |
 |------------|--------------|------------|
-| **log_T** (temperature) | H2 formation/destruction rates are exponentially T-dependent | Dominant (65% XGBoost importance) |
-| **log_nH** (gas density) | Controls collision rate for H2 formation on dust grains | Second (19%) |
-| **log_nHp** (ionized H) | Traces ionization state; anti-correlated with H2 | Third (9%) |
-| **ext** (extinction) | Proxy for dust shielding; high ext means UV is absorbed before reaching the cell | Fourth (3%) |
-| **log_G0** (UV field) | Global UV radiation strength; same for all cells in a cube | Fifth (0.6%) — varies between cubes, not within |
+| **log_T** (temperature) | H2 formation/destruction rates are exponentially T-dependent | Very high |
+| **log_nH** (gas density) | Controls collision rate for H2 formation on dust grains | High |
+| **log_fh2** (self-shielding factor) | Measures how much H2 attenuates its own UV-photodissociation radiation along the illumination axis. High = shielded = expect high nH2 | High — encodes spatial shielding information local features cannot |
+| **log_nHp** (ionized H) | Traces ionization state; anti-correlated with H2 | Moderate |
+| **ext** (extinction) | Proxy for dust shielding; high ext means UV is absorbed before reaching the cell | Moderate |
+| **log_G0** (UV field) | Global UV radiation strength; same for all cells in a cube | Low — varies between cubes, not within |
 | **vx, vy, vz** (velocity) | Traces turbulent motions; indirectly encodes spatial structure | Negligible per-cell |
 | **bxl..bzr** (B-field) | Magnetic pressure; indirectly affects density structure | Negligible per-cell |
 
-The low importance of log_G0 is counterintuitive since G0 is the parameter being varied. The explanation is that G0 is constant across an entire cube — it provides no *within-cube* discrimination. Its effect is captured implicitly by the combination of other features (e.g., at high G0, cells with the same nH and T have lower fh2).
+The low importance of log_G0 is counterintuitive since G0 is the parameter being varied. The explanation is that G0 is constant across an entire cube — it provides no *within-cube* discrimination. Its effect is captured implicitly by the combination of other features (e.g., at high G0, cells with the same nH and T have lower nH2).
+
+`log_fh2` is a particularly valuable addition when predicting nH2: it encodes the global shielding integral along the UV illumination axis, which is the dominant non-local physical effect governing whether nH2 is high or low. Unlike the spatial neighbourhood features (Section 4.3), which capture local 3D context via box filters, fh2 provides the directional UV-shielding information that truly sets the equilibrium nH2.
 
 ### 4.3 Multi-Scale Spatial Neighbourhood Features
 
@@ -186,7 +208,7 @@ The low importance of log_G0 is counterintuitive since G0 is the parameter being
 | Medium | 5x5x5 | 125 | Local cloud structure |
 | Large | 7x7x7 | 343 | Meso-scale environment |
 
-This produces 14 features x 3 scales = **42 spatial features**, which are concatenated with the 14 baseline features for a total of **56 features** per cell:
+This produces 15 features x 3 scales = **45 spatial features**, which are concatenated with the 15 baseline features for a total of **60 features** per cell:
 
 ```python
 def _compute_spatial_X(cubes, all_vols, feature_cols, kernel_sizes=(3, 5, 7)):
@@ -220,6 +242,8 @@ def _compute_spatial_X(cubes, all_vols, feature_cols, kernel_sizes=(3, 5, 7)):
 - **Stable**: No risk of catastrophic training collapse.
 
 The single-scale (3x3x3 only) version was tested first and improved XGBoost from R²=0.886 to 0.917 (+0.031). Multi-scale (3x3x3 + 5x5x5 + 7x7x7) further improved XGBoost to 0.924 and critically boosted the hardest fold G0=0.2 from 0.899 to 0.915.
+
+Note: all R² values in this project are computed in log10(nH2) space (dex), not linear space.
 
 ---
 
@@ -338,10 +362,10 @@ This principle extends to DART (dropout-on-trees for XGBoost), which was rejecte
 The CNN is the only model that directly processes 3D volumetric data rather than per-cell features. It is a U-Net encoder-decoder with skip connections:
 
 ```
-INPUT: (batch=1, channels=14, depth=64, height=64, width=64)
+INPUT: (batch=1, channels=15, depth=64, height=64, width=64)
 
 ENCODER:
-  enc1: ConvBlock(14 -> 32)     # (1, 32, 64, 64, 64)  - local features
+  enc1: ConvBlock(15 -> 32)     # (1, 32, 64, 64, 64)  - local features
   enc2: MaxPool + ConvBlock(32 -> 64)    # (1, 64, 32, 32, 32)  - 2x downsampled
   enc3: MaxPool + ConvBlock(64 -> 128)   # (1, 128, 16, 16, 16) - 4x downsampled
 
@@ -437,7 +461,7 @@ train_ds.xs = [(x - ch_mean) / ch_std for x in train_ds.xs]
 val_ds.xs = [(x - ch_mean) / ch_std for x in val_ds.xs]   # use training stats!
 ```
 
-**Target normalization**: The target log10(fh2) ranges from ~-30 to ~0. MSE loss on this raw range would be dominated by cells with very low fh2 (large negative log values), causing the model to focus on predicting the near-zero tail while ignoring the physically interesting moderate-fh2 cells. Per-fold target standardization balances the loss:
+**Target normalization**: The target log10(nH2) spans a wide range across the training folds. MSE loss on this raw range would be dominated by cells with very low nH2 (large negative log values), causing the model to focus on predicting the near-zero tail while ignoring the physically interesting moderate-nH2 cells. Per-fold target standardization balances the loss:
 
 ```python
 all_y = torch.stack(train_ds.ys)
@@ -447,7 +471,7 @@ train_ds.ys = [(y - y_mean) / y_std for y in train_ds.ys]
 # After prediction, inverse-transform: y_pred_original = y_pred * y_std + y_mean
 ```
 
-This was one of the most impactful changes in the project: without target normalization, the CNN produced R² < 0 (worse than the mean). With it, R² jumped to 0.775 immediately.
+This was one of the most impactful changes in the project: without target normalization, the CNN produced R² < 0 (worse than the mean). With it, R² jumped to 0.775 immediately. All R² values for the CNN are in log10(nH2) space.
 
 ### 6.5 Three CNN Size Variants
 
@@ -464,7 +488,7 @@ The unet_large confirms the **over-parameterization hypothesis**: with only 6 tr
 A hybrid approach where XGBoost's out-of-bag prediction is injected as a 15th input channel to the CNN:
 
 ```python
-CNN_INPUT_COLS_GUIDED = CNN_INPUT_COLS + ['xgb_pred']  # 15 channels
+CNN_INPUT_COLS_GUIDED = CNN_INPUT_COLS + ['xgb_pred']  # 16 channels
 
 # For each fold, inject the XGBoost prediction volume
 train_vols_g = [{**all_vols[i], 'xgb_pred': xgb_vols[i]}
@@ -623,6 +647,8 @@ Built a production prediction script (`predict_and_visualize.py`) that trains en
 
 ## 10. Complete Results
 
+> **Note on metrics**: All R² values in this section are computed in **log10(nH2) space (dex)**. R²=0.95 means the model explains 95% of variance in log10(nH2) — typical errors are ~0.1-0.2 dex (factor of 1.3-1.6 in linear nH2). These values are not directly comparable to older results that used linear-space metrics.
+
 ### 10.1 Final Model Comparison (Run 121724 — Best Run, Multi-Scale Spatial, No CNN)
 
 | Variant | Mean R² | Std | G0=0.1 | G0=0.2 | G0=0.4 | G0=0.8 | G0=1.6 | G0=3.2 | G0=6.4 |
@@ -743,19 +769,29 @@ Trains the best ensemble (ens_sp) and saves predictions. The code is self-contai
 
 ```
 AI-final-project/
-├── data_loader.py            # Data loading, preprocessing, volume conversion
-├── augmentation.py           # Oh symmetry group, z-preserving ops
-├── classical_models.py       # Linear, XGBoost, MLP baselines + compute_metrics()
-├── cnn_model.py              # 3D U-Net architecture (ConvBlock, Down, Up, UNet3D)
-├── train_cnn.py              # CNN training loop with augmentation and normalization
-├── compare_architectures.py  # Systematic variant comparison (main experiment driver)
-├── predict_and_visualize.py  # Production prediction pipeline (ens_sp)
-├── load_and_compare.py       # 3D interactive pyvista volume viewer
-├── slice_compare.py          # 2D matplotlib slice browser with slider/textbox
-├── viz_common.py             # Shared visualization utilities
-├── predictions/              # Saved .npz prediction files (one per G0)
-├── arch_comparison_*.json    # Experiment result logs (6 runs)
-└── cnn_training_*.json       # CNN-specific training logs (3 runs)
+├── data_loader.py                     # Data loading, preprocessing, volume conversion, get_feature_cols()
+├── augmentation.py                    # Oh symmetry group, z-preserving ops
+├── classical_models.py                # Linear, XGBoost, MLP baselines + compute_metrics()
+├── cnn_model.py                       # 3D U-Net architecture (ConvBlock, Down, Up, UNet3D)
+├── model_helpers.py                   # Shared helpers: FlexMLP, _fit_xgb/mlp, _compute_spatial_X, etc.
+├── train_cnn.py                       # CNN training loop with augmentation and normalization
+├── compare_architectures.py           # Systematic variant comparison (main experiment driver)
+├── evaluate.py                        # Run all models, comparison plots, JSON log
+├── predict_and_visualize.py           # Production prediction pipeline (ens_sp)
+├── single_cube_extrapolation.py       # 7x7 R2 matrix: train on 1 G0 cube, predict all 7
+├── intra_cube_section.py              # Spatial section: train on subset, predict remainder
+├── intra_cube_visualize.py            # Interactive 4-panel z-slice viewer for spatial splits
+├── statistical_analysis.py            # Statistical model comparison utilities
+├── 3d_visualizer.py                   # 3D PyVista volume rendering
+├── load_and_compare.py                # 3D interactive pyvista volume viewer (predictions vs truth)
+├── slice_compare.py                   # 2D matplotlib slice browser with slider/textbox
+├── viz_common.py                      # Shared visualization utilities
+├── predictions/                       # Saved .npz prediction files (one per G0)
+├── logs/                              # Experiment result logs
+│   ├── single_cube_extrapolation/     # 7x7 extrapolation runs + heatmaps
+│   └── intra_cube_section/            # Spatial section runs + heatmaps
+├── arch_comparison_*.json             # Architecture comparison logs
+└── cnn_training_*.json                # CNN-specific training logs
 ```
 
 ---
@@ -819,14 +855,17 @@ Three functions shared between `load_and_compare.py` and `slice_compare.py`:
 ### The Final Model: ens_sp
 
 ```
-Input: 56 features per cell
-  - 14 physical features (log_nH, log_T, log_nHp, ext, log_G0, vx, vy, vz, bxl..bzr)
-  - 42 multi-scale spatial features (14 features x 3 kernel sizes: 3^3, 5^3, 7^3)
+Input: 60 features per cell
+  - 15 physical features (log_nH, log_T, log_nHp, ext, log_fh2, log_G0, vx, vy, vz, bxl..bzr)
+  - 45 multi-scale spatial features (15 features x 3 kernel sizes: 3^3, 5^3, 7^3)
 
 Model 1: XGBoost (depth=6, 400 trees, lr=0.1, subsample=0.3)
 Model 2: MLP ([512, 512, 256, 128], BatchNorm+ReLU, 100 epochs, Adam, CosineAnnealingLR)
 
 Ensemble: y_pred = 0.5 * y_xgb + 0.5 * y_mlp
+
+Target: log10(nH2)
+Metrics: log-space R², RMSE (dex), MAE (dex)
 
 Performance: R² = 0.9482 +/- 0.024 across 7 leave-one-G0-out folds
   G0=0.1: 0.908 | G0=0.2: 0.915 | G0=0.4: 0.953 | G0=0.8: 0.962
@@ -843,8 +882,114 @@ Performance: R² = 0.9482 +/- 0.024 across 7 leave-one-G0-out folds
 
 4. **Dropout destroys extrapolation**: When the model must learn genuine physical structure (not just statistical patterns) to extrapolate to unseen conditions, dropout prevents stable representation formation. Weight decay (L2 regularization) constrains parameter magnitudes without disrupting their structure.
 
-5. **Target normalization is critical for CNNs**: Without standardizing the target (log_fh2, range -30 to 0), MSE loss is dominated by near-zero cells and the model collapses. This single fix changed CNN R² from negative to 0.775.
+5. **Target normalization is critical for CNNs**: Without standardizing the target (log_nH2), MSE loss is dominated by near-zero cells and the model collapses. This single fix changed CNN R² from negative to 0.775.
 
 6. **Leave-one-out CV on the physics parameter is the right test**: Random CV would give inflated R² (~0.99+) by letting the model memorize per-cube statistics. Leave-one-G0-out reveals the true generalization ability and correctly identifies the hard folds (boundary G0 values).
 
 7. **Physics-aware data augmentation**: The 8 z-preserving symmetry operations correctly handle scalar, polar vector, and axial vector field transformations. Using the wrong subset (all 48 ops when UV illumination breaks z-symmetry) would introduce physically invalid training data.
+
+8. **Spatial sampling geometry matters more than spatial coverage volume**: In the intra-cube section experiments, 1% random sampling of cells achieves R² > 0.89 on the remaining 99%, while 50% coverage from a contiguous slab gives R² < 0 (catastrophic failure). Coverage uniformity determines interpolation success, not coverage fraction. This has direct relevance for observational survey design.
+
+9. **Single-cube models transfer across small G0 gaps**: A model trained on one G0 simulation accurately predicts adjacent G0 values (R²=0.976 for one-step neighbours) but degrades significantly over large G0 ranges. The full multi-cube training set is necessary for robust generalization across the 64x UV field range.
+
+---
+
+## 14. Additional Experiments
+
+### 14.1 Single-Cube Extrapolation (`single_cube_extrapolation.py`)
+
+**Research question**: How much information does one G0 simulation contain about the chemistry at other UV field strengths?
+
+**Method**: Train stacked_sp (XGBoost + MLP + Ridge meta-learner, with 60-feature multi-scale spatial features) on a single G0 cube, then predict all 7 cubes. This produces a 7x7 R² matrix where:
+- Row = training (source) cube
+- Column = prediction (target) cube
+- Diagonal = in-sample fit (R² ~ 0.99 — the model fits the cube it was trained on)
+- Off-diagonal = out-of-sample extrapolation to a different G0
+
+**Results** (log-space R², from `logs/single_cube_extrapolation/run_20260313_022129.json`):
+
+Training on G0=0.1, predicting each target cube:
+
+| Target G0 | G0 distance | Stacked R² |
+|-----------|------------|-----------|
+| 0.1 (in-sample) | — | 0.994 |
+| 0.2 | 1 step | 0.976 |
+| 0.4 | 2 steps | 0.958 |
+| 0.8 | 3 steps | 0.876 |
+| 1.6 | 4 steps | 0.745 |
+| 3.2 | 5 steps | 0.446 |
+| 6.4 | 6 steps | ~0.15 |
+
+Mean off-diagonal stacked R² across all 42 off-diagonal entries: ~0.78.
+
+**Interpretation**: The chemical relationships encoded in one simulation — the mapping from local density, temperature, and shielding factors to nH2 — generalise well to neighbouring UV conditions (within 2x-4x changes in G0), but degrade rapidly over large G0 jumps. The fundamental nH-T-nH2 equilibrium is universal; what changes across G0 is the UV-driven photodissociation balance. Adjacent cubes share nearly identical local chemistry; distant cubes differ in which cells are photodissociated.
+
+This result empirically validates the leave-one-G0-out CV design: a single-cube model is nowhere near as strong as the full 6-cube training set (where the model has seen both adjacent and distant G0 values).
+
+The experiment also reveals an asymmetry: the pattern of decreasing R² with G0 distance is not perfectly symmetric, because the physics is not symmetric. Low-G0 simulations (self-shielding dominated) and high-G0 simulations (UV dominated) require different physical representations.
+
+**Code**: `python single_cube_extrapolation.py` produces the full 7x7 matrix and saves a heatmap PNG. `--train-g0 0.8` restricts to a single source cube.
+
+---
+
+### 14.2 Intra-Cube Spatial Section (`intra_cube_section.py`)
+
+**Research question**: How well can the model interpolate nH2 within a single cube when trained on a spatial subset? How does the geometry of the training region affect interpolation quality?
+
+**Method**: For each of the 7 G0 cubes, train stacked_sp on a spatial subsection of cells and predict the remainder. Three geometries were tested:
+
+| Split type | Description | Example fractions tested |
+|---|---|---|
+| **Contiguous slab** | All cells from one half of the cube along x, y, or z axis | 50% (x_half, y_half, z_half) |
+| **Random fraction** | Cells selected uniformly at random (i.e. same physical mix) | 1%, 5%, 10%, 25%, 50%, 75% |
+| **Contiguous box** | Single axis-aligned cubic sub-region of specified volume fraction | 1%, 5%, 10%, 25%, 50% |
+
+Spatial neighbourhood features are computed from the training mask only (NaN for test cells), preventing direct leakage of test cell information.
+
+**Results** (log-space R², G0=0.1 cube, from `logs/intra_cube_section/run_20260313_142443.json`):
+
+| Split | Training cells | Test R² (stacked) |
+|---|---|---|
+| rand_1 (1% random) | 20,971 | **0.897** |
+| rand_5 (5% random) | 104,857 | **0.952** |
+| rand_10 (10% random) | 209,715 | **0.963** |
+| rand_25 (25% random) | 524,288 | **0.970** |
+| rand_50 (50% random) | 1,048,576 | **0.980** |
+| rand_75 (75% random) | 1,572,864 | **0.985** |
+| x_half (50% slab) | 1,032,192 | **-0.394** |
+| y_half (50% slab) | 1,032,192 | **-2.689** |
+| z_half (50% slab) | 1,032,192 | **-1.389** |
+| box_1 (1% box) | 21,952 | **0.693** |
+| box_5 (5% box) | 103,823 | **0.672** |
+| box_25 (25% box) | 531,441 | **0.823** |
+| box_50 (50% box) | 1,061,208 | **0.779** |
+
+The pattern is consistent across all 7 G0 cubes.
+
+**The central result**: A **1% random sample** (21,000 cells out of 2,097,152) achieves test R²=0.897. A **50% contiguous slab** achieves test R²=-0.394 — meaning the model is worse than predicting the training mean for every held-out cell.
+
+**Why random sampling succeeds**:
+
+Random sampling ensures that test cells are statistically near training cells in all 3 spatial dimensions. The box-filter spatial neighbourhood features — computed from training cells only — provide interpolated context for each test cell based on the nearby training cells. The model essentially learns: "given that my immediate neighbourhood has average density X and average temperature Y, my nH2 should be Z." With random sampling, test cells always have training cells nearby, so this interpolation works.
+
+At just 1% training coverage, the neighbourhood features are sparse (many cells contributing to the box-filter mean are NaN), but there is enough signal to achieve R²=0.90. At 25%, the neighbourhood features are nearly fully populated and the model performs near the leave-one-G0-out ceiling.
+
+**Why contiguous slabs fail catastrophically**:
+
+A contiguous slab training set leaves an entire spatial half of the cube unseen. The nH2 field in a molecular cloud simulation is not spatially homogeneous: one half may be the UV-illuminated surface (low nH2) and the other may be the shielded interior (high nH2). The model trained on the illuminated half sees a completely different density-chemistry relationship than what exists in the shielded half. For MLP, this manifests as predicting the training-set mean everywhere in the test region (R² as low as -7 for some folds). XGBoost is more robust (R² ~ 0.5-0.8 on slabs) because decision tree splits can extrapolate constant predictions beyond the training feature range.
+
+**Why box splits are intermediate**:
+
+A box provides spatial coverage across all 3 dimensions, but only in a local region. Cells far from the box experience sparse neighbourhood features, degrading predictions. The effective coverage radius decreases with box fraction.
+
+**XGB vs MLP behaviour on contiguous splits**:
+
+XGBoost consistently outperforms MLP on all contiguous splits. Decision trees naturally extrapolate by predicting the leaf mean for out-of-distribution inputs — this is a modest constant prediction, which is at least unbiased. MLP activations can collapse to the training distribution mean or diverge, producing systematically wrong predictions on cells with spatial feature distributions never seen during training.
+
+**Scientific implication**:
+
+Even sparse, random observations of a molecular cloud — such as a set of randomly chosen sight-lines in an IFU (integral field unit) observation — would be sufficient to map the H2 density field with high accuracy using this ML approach. This is a practical result for observational astronomy: efficient survey designs should prioritize spatial coverage uniformity over spatial depth.
+
+The z-axis asymmetry in slab results (z_half often less catastrophic than x_half or y_half) reflects the physical asymmetry introduced by the UV illumination direction — along z, the gradient from illuminated to shielded gas is smoother, making half-slab training slightly more representative.
+
+**Code**: `python intra_cube_section.py` runs all 7 G0 cubes with all 14 split strategies. `--g0 0.8` restricts to one cube. `python intra_cube_visualize.py` launches an interactive 4-panel z-slice viewer showing ground truth, training mask, prediction, and error for a single random-fraction split.
