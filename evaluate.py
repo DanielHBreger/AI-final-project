@@ -19,7 +19,7 @@ import matplotlib
 matplotlib.use('Agg')   # non-interactive backend for figure saving
 import matplotlib.pyplot as plt
 
-from data_loader    import load_all_cubes, get_X_y, get_g0_values, get_feature_cols, FEATURE_COLS, LOG_TARGET_COL
+from data_loader    import load_all_cubes, get_X_y, get_g0_values, get_feature_cols, add_drop_args, build_drop_set, FEATURE_COLS, LOG_TARGET_COL
 from classical_models import (run_linear, run_xgboost, run_mlp,
                                print_feature_importance, compute_metrics)
 from train_cnn      import run_cnn_cv
@@ -138,11 +138,10 @@ if __name__ == '__main__':
                         help='Use all 48 Oh ops for CNN augmentation')
     parser.add_argument('--log',         type=str, default=None,
                         help='Path for JSON results log (default: evaluation_TIMESTAMP.json)')
-    parser.add_argument('--no-fh2', action='store_true',
-                        help='Exclude log_fh2 from input features')
+    add_drop_args(parser)
     args = parser.parse_args()
 
-    feat_cols = get_feature_cols(args.no_fh2)
+    feat_cols = get_feature_cols(build_drop_set(args))
 
     _ts = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
     _run_config = {

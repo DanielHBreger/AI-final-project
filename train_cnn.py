@@ -21,7 +21,8 @@ from torch.utils.data import Dataset, DataLoader
 import torch.nn.functional as F
 
 from data_loader import (load_all_cubes, cube_to_volumes,
-                         get_g0_values, get_feature_cols, FEATURE_COLS, LOG_TARGET_COL)
+                         get_g0_values, get_feature_cols, add_drop_args, build_drop_set,
+                         FEATURE_COLS, LOG_TARGET_COL)
 from augmentation import augment_cube, get_symmetry_ops
 from cnn_model import UNet3D, count_parameters
 from classical_models import compute_metrics, print_results
@@ -291,11 +292,10 @@ if __name__ == '__main__':
                         help='Save best model weights per fold')
     parser.add_argument('--log',    type=str, default=None,
                         help='Path for JSON training log (default: cnn_training_TIMESTAMP.json)')
-    parser.add_argument('--no-fh2', action='store_true',
-                        help='Exclude log_fh2 from input features')
+    add_drop_args(parser)
     args = parser.parse_args()
 
-    feat_cols = get_feature_cols(args.no_fh2)
+    feat_cols = get_feature_cols(build_drop_set(args))
     run_cnn_cv(safe_only=not args.all_ops,
                epochs=args.epochs,
                save_models=args.save,

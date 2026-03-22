@@ -7,7 +7,7 @@ against its ground-truth cube, compute statistics, and save six PNG figures.
 
 Figures produced
 ----------------
-  fig1_summary.png         -- R2, R2_lin, MAE, RMSE, Bias, fraction-within bars
+  fig1_summary.png         -- R2, R2_lin, RMSE, fraction-within bars (single row)
   fig2_scatter.png         -- 2-D density scatter (truth vs prediction) per G0
   fig3_error_dist.png      -- signed-error histograms with Gaussian fits per G0
   fig4_stratified.png      -- density-stratified R2 curves + error-threshold lines
@@ -248,9 +248,9 @@ def _density_stratified_r2(y_t: np.ndarray,
 
 def fig1_summary(recs: list[dict], save_dir: str) -> None:
     """
-    Six bar charts in a 2x3 grid: R2, R2_lin, MAE, RMSE, Bias, and
-    fraction of cells within 0.1 dex.  Bars are coloured by G0 value
-    using the viridis palette (dark = low G0, bright = high G0).
+    Three bar charts in a single row: R2, R2_lin, and fraction of cells
+    within 0.1 dex.  Bars are coloured by G0 value using the viridis
+    palette (dark = low G0, bright = high G0).
     """
     g0s    = [r['g0']  for r in recs]
     x      = np.arange(len(recs))
@@ -258,20 +258,15 @@ def fig1_summary(recs: list[dict], save_dir: str) -> None:
     xlbls  = [rf'$G_0={g:.1f}$' for g in g0s]
 
     metric_defs = [
-        ('r2',     r'$R^2$  (log-space)',              r'$R^2$',  None,  '.4f'),
-        ('r2_lin', r'$R^2$  linear $n_{\rm H_2}$ (clipped)',
-                                                        r'$R^2$',  None,  '.4f'),
-        ('mae',    r'MAE',                              r'MAE (dex)',  None, '.4f'),
-        ('rmse',   r'RMSE',                             r'RMSE (dex)', None, '.4f'),
-        ('bias',   r'Bias $\langle\hat{y}-y\rangle$',  r'Bias (dex)', 0.0,  '+.4f'),
+        ('r2',     r'$R^2$  (log-space)',                      r'$R^2$', None, '.4f'),
+        ('r2_lin', r'$R^2$  linear $n_{\rm H_2}$ (clipped)', r'$R^2$', None, '.4f'),
     ]
     frac_01 = [r['frac'][0.1] * 100 for r in recs]
 
-    fig, axes = plt.subplots(2, 3, figsize=(7.1, 6.8))
-    axes_flat = axes.flatten()
+    fig, axes = plt.subplots(1, 3, figsize=(13.0, 3.6))
 
     for idx, (ax, (key, title, ylabel, ref, fmt)) in enumerate(
-            zip(axes_flat, metric_defs)):
+            zip(axes, metric_defs)):
         vals  = [r[key] for r in recs]
         bars  = ax.bar(x, vals, color=colors, edgecolor='k',
                        linewidth=0.4, width=0.65, zorder=3)
@@ -297,10 +292,10 @@ def fig1_summary(recs: list[dict], save_dir: str) -> None:
         ax.set_ylim(ylo, yhi + (yhi - ylo) * 0.20)
         _panel(ax, idx)
 
-    # Sixth panel: fraction within 0.1 dex
-    ax   = axes_flat[5]
+    # Fourth panel: fraction within 0.1 dex
+    ax   = axes[2]
     bars = ax.bar(x, frac_01, color=colors, edgecolor='k',
-                  linewidth=0.4, width=0.65, zorder=3)
+                  linewidth=0.4, width=0.65, zorder=2)
     mean_f = np.mean(frac_01)
     ax.axhline(mean_f, color='k', ls=':', lw=0.9, zorder=4,
                label=f'mean = {mean_f:.1f}%')
@@ -315,7 +310,7 @@ def fig1_summary(recs: list[dict], save_dir: str) -> None:
     ax.legend(handlelength=1.2)
     ylo, yhi = ax.get_ylim()
     ax.set_ylim(ylo, yhi + (yhi - ylo) * 0.20)
-    _panel(ax, 5)
+    _panel(ax, 2)
 
     fig.tight_layout(rect=[0, 0, 1, 0.97])
     _save_fig(fig, os.path.join(save_dir, 'fig1_summary.png'))

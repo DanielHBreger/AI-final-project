@@ -73,7 +73,8 @@ from sklearn.linear_model import Ridge
 import xgboost as xgb
 
 from data_loader import (load_all_cubes, cube_to_volumes, get_X_y,
-                          get_g0_values, get_feature_cols, FEATURE_COLS, LOG_TARGET_COL)
+                          get_g0_values, get_feature_cols, add_drop_args, build_drop_set,
+                          FEATURE_COLS, LOG_TARGET_COL)
 from classical_models import compute_metrics
 from cnn_model import UNet3D, count_parameters
 from augmentation import augment_cube, get_symmetry_ops
@@ -655,11 +656,11 @@ if __name__ == '__main__':
     parser.add_argument('--log',        type=str, default=None,
                         help='Output JSON path '
                              '(default: arch_comparison_TIMESTAMP.json)')
-    parser.add_argument('--no-fh2', action='store_true',
-                        help='Exclude log_fh2 from input features')
+    add_drop_args(parser)
     args = parser.parse_args()
 
-    feat_cols = get_feature_cols(args.no_fh2)
+    _drop = build_drop_set(args)
+    feat_cols = get_feature_cols(_drop)
 
     ts       = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
     log_path = args.log or f'arch_comparison_{ts}.json'
@@ -682,7 +683,7 @@ if __name__ == '__main__':
         'all_ops':         args.all_ops,
         'spatial':         args.spatial,
         'spatial_kernels': args.spatial_kernels,
-        'no_fh2':          args.no_fh2,
+        'dropped_features': sorted(_drop),
     }
 
     # Load 128^3 volumes whenever CNN variants or spatial features are needed

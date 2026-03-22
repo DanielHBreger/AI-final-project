@@ -3,6 +3,7 @@ data_loader.py
 Load, preprocess, and expose all 7 simulation cubes for ML training.
 """
 
+import argparse
 import os
 import glob
 import pandas as pd
@@ -21,11 +22,37 @@ TARGET_COL     = 'nH2'
 LOG_TARGET_COL = 'log_nH2'
 
 
-def get_feature_cols(exclude_fh2: bool = False) -> list[str]:
-    """Return FEATURE_COLS, optionally excluding log_fh2."""
-    if exclude_fh2:
-        return [c for c in FEATURE_COLS if c != 'log_fh2']
-    return FEATURE_COLS
+def get_feature_cols(drop: set[str] | None = None) -> list[str]:
+    """Return FEATURE_COLS, optionally excluding the named columns."""
+    if not drop:
+        return FEATURE_COLS
+    return [c for c in FEATURE_COLS if c not in drop]
+
+
+def add_drop_args(parser: argparse.ArgumentParser) -> None:
+    """Add all --no-X feature-exclusion flags to an ArgumentParser."""
+    parser.add_argument('--no-fh2', action='store_true', help='Exclude log_fh2 from features.')
+    parser.add_argument('--no-nH',  action='store_true', help='Exclude log_nH from features.')
+    parser.add_argument('--no-T',   action='store_true', help='Exclude log_T from features.')
+    parser.add_argument('--no-nHp', action='store_true', help='Exclude log_nHp from features.')
+    parser.add_argument('--no-ext', action='store_true', help='Exclude ext from features.')
+    parser.add_argument('--no-G0',  action='store_true', help='Exclude log_G0 from features.')
+    parser.add_argument('--no-vel', action='store_true', help='Exclude vx/vy/vz from features.')
+    parser.add_argument('--no-B',   action='store_true', help='Exclude magnetic field components.')
+
+
+def build_drop_set(args: argparse.Namespace) -> set[str]:
+    """Build the feature drop set from parsed --no-X arguments."""
+    drop: set[str] = set()
+    if args.no_fh2: drop.add('log_fh2')
+    if args.no_nH:  drop.add('log_nH')
+    if args.no_T:   drop.add('log_T')
+    if args.no_nHp: drop.add('log_nHp')
+    if args.no_ext: drop.add('ext')
+    if args.no_G0:  drop.add('log_G0')
+    if args.no_vel: drop.update(['vx', 'vy', 'vz'])
+    if args.no_B:   drop.update(['bxl', 'bxr', 'byl', 'byr', 'bzl', 'bzr'])
+    return drop
 
 # Small epsilon to guard against log(0)
 _EPS = 1e-30

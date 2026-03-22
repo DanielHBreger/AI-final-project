@@ -59,7 +59,7 @@ os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
 from data_loader import (
     load_all_cubes, cube_to_volumes, get_g0_values,
-    get_feature_cols, FEATURE_COLS, LOG_TARGET_COL,
+    get_feature_cols, add_drop_args, build_drop_set, FEATURE_COLS, LOG_TARGET_COL,
 )
 from classical_models import compute_metrics
 from model_helpers import (
@@ -379,11 +379,10 @@ def main() -> None:
                         help='Random seed for the split (default: 42).')
     parser.add_argument('--quiet', action='store_true',
                         help='Suppress per-epoch MLP output.')
-    parser.add_argument('--no-fh2', action='store_true',
-                        help='Exclude log_fh2 from input features.')
+    add_drop_args(parser)
     args = parser.parse_args()
 
-    feat_cols = get_feature_cols(args.no_fh2)
+    feat_cols = get_feature_cols(build_drop_set(args))
 
     if not (0.1 <= args.pct <= 99.0):
         print(f"ERROR: --pct must be between 0.1 and 99. Got {args.pct}",

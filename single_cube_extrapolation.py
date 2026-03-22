@@ -47,7 +47,7 @@ import matplotlib.ticker as ticker
 
 from data_loader import (
     load_all_cubes, cube_to_volumes, get_X_y,
-    get_g0_values, get_feature_cols, FEATURE_COLS, LOG_TARGET_COL,
+    get_g0_values, get_feature_cols, add_drop_args, build_drop_set, FEATURE_COLS, LOG_TARGET_COL,
 )
 from classical_models import compute_metrics
 from model_helpers import (
@@ -232,11 +232,10 @@ def main() -> None:
                         help='Spatial filter kernel sizes (default: 3 5 7)')
     parser.add_argument('--quiet', action='store_true',
                         help='Suppress per-epoch MLP training messages')
-    parser.add_argument('--no-fh2', action='store_true',
-                        help='Exclude log_fh2 from input features')
+    add_drop_args(parser)
     args = parser.parse_args()
 
-    feat_cols = get_feature_cols(args.no_fh2)
+    feat_cols = get_feature_cols(build_drop_set(args))
 
     # ── Load ──────────────────────────────────────────────────────────────────
     print("Loading cubes...")
