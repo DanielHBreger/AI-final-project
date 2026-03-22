@@ -4,11 +4,14 @@ Small 3D U-Net that maps (B, C, D, H, W) input field volumes to a
 (B, 1, D, H, W) predicted log10(nH2) field.
 
 Architecture (encoder-decoder with skip connections):
-  Encoder:    conv(C→32) → conv(32→64) → pool
-              conv(64→128) → pool
-  Bottleneck: conv(128→256)
-  Decoder:    up + conv(256+128→128) → conv(128→64)
-              up + conv(64+32→32)    → conv(32→1)
+  Encoder:    ResConvBlock(C→b)   → Down(b→b*2)
+              Down(b*2→b*4)
+  Bottleneck: Down(b*4→b*8)
+  Decoder:    Up(b*8+b*4→b*4) → Up(b*4+b*2→b*2) → Up(b*2+b→b)
+  Output:     Conv1x1(b→1)
+
+Each ResConvBlock has a residual skip connection (with 1×1 projection when
+channel counts differ) for stable gradient flow.
 
 Input grid is expected to be 64×64×64 (downsampled from 128×128×128).
 """
@@ -40,22 +43,50 @@ class ConvBlock(nn.Module):
         return self.block(x)
 
 
+class ResConvBlock(nn.Module):
+    """Two Conv3d layers with InstanceNorm + residual skip connection.
+
+    The skip uses a 1×1 conv to project when in_ch != out_ch.
+    Dropout3d (if > 0) is applied after the residual addition.
+    """
+    def __init__(self, in_ch: int, out_ch: int, dropout: float = 0.0):
+        super().__init__()
+        self.conv1 = nn.Sequential(
+            nn.Conv3d(in_ch, out_ch, kernel_size=3, padding=1, bias=False),
+            nn.InstanceNorm3d(out_ch, affine=True),
+            nn.ReLU(inplace=True),
+        )
+        self.conv2 = nn.Sequential(
+            nn.Conv3d(out_ch, out_ch, kernel_size=3, padding=1, bias=False),
+            nn.InstanceNorm3d(out_ch, affine=True),
+        )
+        self.skip = (nn.Conv3d(in_ch, out_ch, kernel_size=1, bias=False)
+                     if in_ch != out_ch else nn.Identity())
+        self.relu = nn.ReLU(inplace=True)
+        self.drop = nn.Dropout3d(dropout) if dropout > 0.0 else nn.Identity()
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        out = self.conv2(self.conv1(x))
+        out = self.relu(out + self.skip(x))
+        return self.drop(out)
+
+
 class Down(nn.Module):
-    """MaxPool then ConvBlock."""
+    """MaxPool then ResConvBlock."""
     def __init__(self, in_ch: int, out_ch: int, dropout: float = 0.0):
         super().__init__()
         self.pool = nn.MaxPool3d(2)
-        self.conv = ConvBlock(in_ch, out_ch, dropout=dropout)
+        self.conv = ResConvBlock(in_ch, out_ch, dropout=dropout)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return self.conv(self.pool(x))
 
 
 class Up(nn.Module):
-    """Trilinear upsample, concatenate skip, then ConvBlock."""
+    """Trilinear upsample, concatenate skip, then ResConvBlock."""
     def __init__(self, in_ch: int, skip_ch: int, out_ch: int, dropout: float = 0.0):
         super().__init__()
-        self.conv = ConvBlock(in_ch + skip_ch, out_ch, dropout=dropout)
+        self.conv = ResConvBlock(in_ch + skip_ch, out_ch, dropout=dropout)
 
     def forward(self, x: torch.Tensor, skip: torch.Tensor) -> torch.Tensor:
         x = F.interpolate(x, scale_factor=2, mode='trilinear', align_corners=False)
@@ -72,27 +103,27 @@ class UNet3D(nn.Module):
     3D U-Net predicting log10(nH2) from multi-channel physical field volumes.
 
     Args:
-        n_channels : number of input feature channels (default 14)
-        base_ch    : base number of feature maps (default 32)
-        dropout    : Dropout3d rate applied after each ConvBlock (default 0.0 = disabled);
+        n_channels : number of input feature channels (default 15)
+        base_ch    : base number of feature maps (default 16)
+        dropout    : Dropout3d rate applied after each ResConvBlock (default 0.1);
                      the bottleneck uses 2× this rate for stronger regularisation
     """
 
-    def __init__(self, n_channels: int = 14, base_ch: int = 32, dropout: float = 0.0):
+    def __init__(self, n_channels: int = 15, base_ch: int = 16, dropout: float = 0.1):
         super().__init__()
         b = base_ch
         # Encoder
-        self.enc1 = ConvBlock(n_channels, b,   dropout=dropout)    # (B, b,   D, H, W)
-        self.enc2 = Down(b,   b*2,             dropout=dropout)    # (B, b*2, D/2, ...)
-        self.enc3 = Down(b*2, b*4,             dropout=dropout)    # (B, b*4, D/4, ...)
+        self.enc1 = ResConvBlock(n_channels, b,   dropout=dropout)    # (B, b,   D, H, W)
+        self.enc2 = Down(b,   b*2,               dropout=dropout)    # (B, b*2, D/2, ...)
+        self.enc3 = Down(b*2, b*4,               dropout=dropout)    # (B, b*4, D/4, ...)
         # Bottleneck — stronger dropout to regularise the most compressed representation
-        self.bot  = Down(b*4, b*8,             dropout=dropout*2)  # (B, b*8, D/8, ...)
+        self.bot  = Down(b*4, b*8,               dropout=min(dropout*2, 0.5))  # (B, b*8, D/8, ...)
         # Decoder
-        self.dec3 = Up(b*8, b*4, b*4,          dropout=dropout)    # (B, b*4, D/4, ...)
-        self.dec2 = Up(b*4, b*2, b*2,          dropout=dropout)    # (B, b*2, D/2, ...)
-        self.dec1 = Up(b*2, b,   b,            dropout=dropout)    # (B, b,   D,   ...)
+        self.dec3 = Up(b*8, b*4, b*4,            dropout=dropout)    # (B, b*4, D/4, ...)
+        self.dec2 = Up(b*4, b*2, b*2,            dropout=dropout)    # (B, b*2, D/2, ...)
+        self.dec1 = Up(b*2, b,   b,              dropout=dropout)    # (B, b,   D,   ...)
         # Output
-        self.out  = nn.Conv3d(b, 1, kernel_size=1)                 # (B, 1,   D, H, W)
+        self.out  = nn.Conv3d(b, 1, kernel_size=1)                   # (B, 1,   D, H, W)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         s1 = self.enc1(x)
@@ -114,10 +145,10 @@ def count_parameters(model: nn.Module) -> int:
 # ── Quick smoke test ───────────────────────────────────────────────────────────
 
 if __name__ == '__main__':
-    model = UNet3D(n_channels=14, base_ch=32)
+    model = UNet3D(n_channels=15, base_ch=16)
     print(f"UNet3D parameters: {count_parameters(model):,}")
 
-    x = torch.randn(1, 14, 64, 64, 64)
+    x = torch.randn(1, 15, 64, 64, 64)
     with torch.no_grad():
         y = model(x)
     print(f"Input : {tuple(x.shape)}")

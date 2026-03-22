@@ -14,6 +14,7 @@ Usage:
 import argparse
 import json
 import datetime
+import math
 import numpy as np
 import torch
 import torch.nn as nn
@@ -88,7 +89,8 @@ def train_one_fold(train_vols: list[dict],
                    ops:        list[np.ndarray],
                    device:     torch.device,
                    epochs:     int = 50,
-                   lr:         float = 1e-3) -> tuple[UNet3D, dict, list[dict]]:
+                   lr:         float = 5e-4,
+                   warmup_epochs: int = 10) -> tuple[UNet3D, dict, list[dict]]:
 
     train_ds = CubeDataset(train_vols, ops, augment=True)
     val_ds   = CubeDataset(val_vols,   ops=None, augment=False)
@@ -117,9 +119,15 @@ def train_one_fold(train_vols: list[dict],
     val_dl   = DataLoader(val_ds,   batch_size=1, shuffle=False,
                           num_workers=0, pin_memory=pin_mem)
 
-    model      = UNet3D(n_channels=len(CNN_INPUT_COLS), base_ch=32).to(device)
+    model      = UNet3D(n_channels=len(CNN_INPUT_COLS), base_ch=16, dropout=0.1).to(device)
     opt        = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=1e-5)
-    sched      = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=epochs)
+    # Linear warmup for `warmup_epochs`, then cosine decay to 0
+    def _lr_lambda(ep: int) -> float:
+        if ep < warmup_epochs:
+            return (ep + 1) / warmup_epochs
+        progress = (ep - warmup_epochs) / max(1, epochs - warmup_epochs)
+        return 0.5 * (1.0 + math.cos(math.pi * progress))
+    sched      = torch.optim.lr_scheduler.LambdaLR(opt, _lr_lambda)
     loss_fn    = nn.MSELoss()
     scaler_amp = torch.amp.GradScaler('cuda', enabled=use_amp)
 
@@ -279,7 +287,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--all-ops', action='store_true',
                         help='Use all 48 Oh operations (default: 8 safe z-preserving)')
-    parser.add_argument('--epochs', type=int, default=150)
+    parser.add_argument('--epochs', type=int, default=200)
     parser.add_argument('--save',   action='store_true',
                         help='Save best model weights per fold')
     parser.add_argument('--log',    type=str, default=None,

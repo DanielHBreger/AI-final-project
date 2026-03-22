@@ -84,6 +84,7 @@ Usage
 import argparse
 import json
 import datetime
+import math
 import numpy as np
 import torch
 import torch.nn as nn
@@ -216,6 +217,8 @@ CNN_VARIANTS: dict[str, dict] = {
     'unet_small':    {'base_ch': 16},
     'unet_standard': {'base_ch': 32},
     'unet_large':    {'base_ch': 64},
+    # Residual U-Net with improved training (base_ch=16, dropout=0.1, lr=5e-4, warmup)
+    'unet_residual': {'base_ch': 16, 'dropout': 0.1, 'warmup_epochs': 10},
 }
 
 
@@ -446,9 +449,11 @@ def _train_cnn_fold(train_vols: list[dict],
                     base_ch: int,
                     input_cols: list[str] | None = None,
                     seed: int = 0,
+                    dropout: float = 0.0,
+                    warmup_epochs: int = 0,
                     ) -> tuple[dict, np.ndarray, np.ndarray]:
     """Single CNN fold.  Mirrors train_cnn.train_one_fold but parametrizes
-    base_ch and accepts an optional input_cols list.
+    base_ch, dropout, and accepts an optional input_cols list.
 
     seed fixes torch/numpy randomness so results are reproducible across runs.
     Pass fold index as seed to get deterministic but fold-varied initialisation.
@@ -481,9 +486,15 @@ def _train_cnn_fold(train_vols: list[dict],
     val_dl   = DataLoader(val_ds,   batch_size=1, shuffle=False,
                           num_workers=0, pin_memory=pin_mem)
 
-    model   = UNet3D(n_channels=len(_cols), base_ch=base_ch).to(device)
+    model   = UNet3D(n_channels=len(_cols), base_ch=base_ch, dropout=dropout).to(device)
     opt     = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=1e-5)
-    sched   = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=epochs)
+    # Linear warmup then cosine decay (warmup_epochs=0 → pure cosine)
+    def _lr_lambda(ep: int) -> float:
+        if ep < warmup_epochs:
+            return (ep + 1) / warmup_epochs
+        progress = (ep - warmup_epochs) / max(1, epochs - warmup_epochs)
+        return 0.5 * (1.0 + math.cos(math.pi * progress))
+    sched   = torch.optim.lr_scheduler.LambdaLR(opt, _lr_lambda)
     loss_fn = nn.MSELoss()
 
     best_val   = float('inf')
@@ -539,15 +550,18 @@ def run_cnn_cv_variant(variant_name: str,
                        g0_values: list[float],
                        device: torch.device,
                        ops: list[np.ndarray],
-                       epochs: int = 150,
-                       lr: float = 1e-3,
+                       epochs: int = 200,
+                       lr: float = 5e-4,
                        ) -> tuple[list[dict], list[np.ndarray], list[np.ndarray]]:
     """7-fold CV for one CNN config variant.
     Returns (fold_metrics, y_true_folds, y_pred_folds).
     """
-    base_ch  = config['base_ch']
-    n_params = count_parameters(UNet3D(n_channels=len(CNN_INPUT_COLS), base_ch=base_ch))
-    print(f"  {variant_name}  base_ch={base_ch}  params={n_params:,}")
+    base_ch      = config['base_ch']
+    dropout      = config.get('dropout', 0.0)
+    warmup_ep    = config.get('warmup_epochs', 0)
+    n_params = count_parameters(UNet3D(n_channels=len(CNN_INPUT_COLS),
+                                       base_ch=base_ch, dropout=dropout))
+    print(f"  {variant_name}  base_ch={base_ch}  dropout={dropout}  params={n_params:,}")
     fold_metrics: list[dict]       = []
     y_true_folds: list[np.ndarray] = []
     y_pred_folds: list[np.ndarray] = []
@@ -556,7 +570,8 @@ def run_cnn_cv_variant(variant_name: str,
         train_vols = [v for i, v in enumerate(all_vols) if i != fold]
         val_vols   = [all_vols[fold]]
         metrics, y_true, y_pred = _train_cnn_fold(
-            train_vols, val_vols, ops, device, epochs, lr, base_ch, seed=fold)
+            train_vols, val_vols, ops, device, epochs, lr, base_ch,
+            seed=fold, dropout=dropout, warmup_epochs=warmup_ep)
         fold_metrics.append(metrics)
         y_true_folds.append(y_true)
         y_pred_folds.append(y_pred)
