@@ -3,13 +3,14 @@
 predict_and_visualize.py
 ========================
 Train the best ensemble (ens_sp: XGBoost + MLP with multi-scale spatial
-features 3^3+5^3+7^3) on 6 of the 7 G0 cubes, predict on the held-out cube,
-and display a 3-panel interactive 3D comparison:
+features 3^3+5^3+7^3) and the best CNN (unet_baseline: ResConvBlock U-Net,
+base_ch=32) on 6 of the 7 G0 cubes, predict on the held-out cube, and display
+a 4-panel interactive 3D comparison:
 
-    [ Ground Truth ]  |  [ ens_sp Prediction ]  |  [ |Error| ]
+    [ Ground Truth ] | [ CNN Prediction ] | [ Ensemble ] | [ CNN Error ]
 
-Best ensemble from run 121724: ens_sp R2=0.948, std=0.024
-G0 per-fold: 0.1->0.908 | 0.2->0.915 | 0.4->0.953 | 0.8->0.962
+Best CNN (unet_baseline) from run 20260323: R2=0.974, std=0.035
+Best ensemble (ens_sp):                     R2=0.948, std=0.024
 
 Usage
 -----
@@ -17,10 +18,10 @@ Usage
   python predict_and_visualize.py
 
   # Hold out the hardest extrapolation fold:
-  python predict_and_visualize.py --g0 0.2
+  python predict_and_visualize.py --g0 0.1
 
-  # Quick demo (fewer MLP epochs):
-  python predict_and_visualize.py --g0 1.6 --mlp-epochs 30
+  # Quick demo (fewer epochs):
+  python predict_and_visualize.py --g0 1.6 --mlp-epochs 30 --cnn-epochs 50
 
   # Single-scale spatial only:
   python predict_and_visualize.py --spatial-kernels 3
@@ -37,16 +38,21 @@ import numpy as np
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import xgboost as xgb
 import pyvista as pv
 from sklearn.preprocessing import StandardScaler
 from scipy.ndimage import uniform_filter
+from torch.utils.data import DataLoader
 
 from data_loader import (
     load_all_cubes, cube_to_volumes, get_X_y,
     get_g0_values, FEATURE_COLS, LOG_TARGET_COL,
 )
 from classical_models import compute_metrics
+from augmentation import get_symmetry_ops
+from cnn_model import UNet3D
+from train_cnn import CubeDataset, CNN_INPUT_COLS
 
 # ── XGBoost config (xgb_standard) ─────────────────────────────────────────────
 
@@ -177,6 +183,86 @@ def _train_mlp(X_tr: np.ndarray, y_tr: np.ndarray,
         y_pred = model(torch.from_numpy(X_va_s).to(device)).float().cpu().numpy()
     return y_pred.astype(np.float32)
 
+# ── CNN training ───────────────────────────────────────────────────────────────
+
+def _train_cnn(train_vols: list[dict], val_vol: dict,
+               epochs: int = 150) -> np.ndarray:
+    """Train unet_baseline (ResConvBlock, base_ch=32, no dropout, cosine LR).
+
+    Returns a (128, 128, 128) float32 volume of log10(nH2) predictions,
+    upsampled from the 64³ CNN output via trilinear interpolation.
+    """
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    ops    = get_symmetry_ops(safe_only=True)   # 8 z-preserving augmentations
+
+    train_ds = CubeDataset(train_vols, ops, augment=True)
+    val_ds   = CubeDataset([val_vol],  ops=None, augment=False)
+
+    # Per-channel normalisation from training data only
+    all_x   = torch.stack(train_ds.xs)
+    ch_mean = all_x.mean(dim=(0, 2, 3, 4), keepdim=True).squeeze(0)
+    ch_std  = all_x.std( dim=(0, 2, 3, 4), keepdim=True).squeeze(0).clamp(min=1e-6)
+    train_ds.xs = [(x - ch_mean) / ch_std for x in train_ds.xs]
+    val_ds.xs   = [(x - ch_mean) / ch_std for x in val_ds.xs]
+
+    # Per-fold target normalisation
+    all_y  = torch.stack(train_ds.ys)
+    y_mean = all_y.mean()
+    y_std  = all_y.std().clamp(min=1e-6)
+    train_ds.ys = [(y - y_mean) / y_std for y in train_ds.ys]
+    val_ds.ys   = [(y - y_mean) / y_std for y in val_ds.ys]
+
+    train_dl = DataLoader(train_ds, batch_size=1, shuffle=True,  num_workers=0)
+    val_dl   = DataLoader(val_ds,   batch_size=1, shuffle=False, num_workers=0)
+
+    model   = UNet3D(n_channels=len(CNN_INPUT_COLS), base_ch=32, dropout=0.0).to(device)
+    opt     = torch.optim.Adam(model.parameters(), lr=5e-4, weight_decay=1e-5)
+    sched   = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=epochs)
+    loss_fn = nn.MSELoss()
+
+    best_val: float = float('inf')
+    best_state: dict | None = None
+
+    for epoch in range(1, epochs + 1):
+        model.train()
+        for xb, yb in train_dl:
+            xb, yb = xb.to(device), yb.to(device)
+            opt.zero_grad(set_to_none=True)
+            loss_fn(model(xb), yb).backward()
+            nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+            opt.step()
+        sched.step()
+
+        model.eval()
+        val_loss = 0.0
+        with torch.no_grad():
+            for xb, yb in val_dl:
+                val_loss += loss_fn(model(xb.to(device)), yb.to(device)).item()
+        val_loss /= len(val_dl)
+
+        if val_loss < best_val:
+            best_val   = val_loss
+            best_state = {k: v.cpu().clone() for k, v in model.state_dict().items()}
+
+        if epoch % 10 == 0 or epoch == 1:
+            print(f"    epoch {epoch:3d}/{epochs}  val_loss={val_loss:.4f}")
+
+    model.load_state_dict(best_state)
+    model.eval()
+
+    with torch.no_grad():
+        pred_64 = model(val_ds.xs[0].unsqueeze(0).to(device)).squeeze().cpu().numpy()
+    pred_64 = pred_64 * y_std.item() + y_mean.item()   # inverse-transform to log10(nH2)
+
+    # Trilinear upsample 64^3 -> 128^3 for full-resolution visualisation
+    pred_128 = F.interpolate(
+        torch.from_numpy(pred_64).float()[None, None],
+        size=(128, 128, 128), mode='trilinear', align_corners=False,
+    ).squeeze().numpy().astype(np.float32)
+
+    return pred_128
+
+
 # ── Pyvista helpers ────────────────────────────────────────────────────────────
 
 def _to_pv_grid(vol: np.ndarray, scalar_name: str = 'values') -> pv.ImageData:
@@ -192,101 +278,150 @@ def _to_pv_grid(vol: np.ndarray, scalar_name: str = 'values') -> pv.ImageData:
 def visualize(truth_vol: np.ndarray, pred_vol: np.ndarray,
               err_vol: np.ndarray, g0: float, r2_xgb: float,
               r2_mlp: float, r2_ens: float,
+              pred_cnn_vol: np.ndarray | None = None,
+              err_cnn_vol:  np.ndarray | None = None,
+              r2_cnn: float | None = None,
               scale_label: str = 'nH2') -> None:
-    """Three-panel interactive 3D volume rendering.
+    """Interactive 3D volume rendering.
 
-    Left   – Ground truth log10(nH2)
-    Centre – ens_sp prediction (equal-weight XGB_sp + MLP_sp)
-    Right  – Absolute prediction error |pred - truth| in log10 space
+    With CNN (4 panels):
+      Truth | CNN (unet_baseline) | Ensemble (ens_sp) | CNN Error
 
-    All three panels share a linked camera so rotating one rotates all.
+    Without CNN (3 panels, backward-compatible):
+      Truth | Ensemble (ens_sp) | Ensemble Error
+
+    All panels share a linked camera so rotating one rotates all.
     """
-    # Shared colour limits from truth (1st–99th percentile avoids outlier stretch)
+    has_cnn = pred_cnn_vol is not None
+    has_ens = pred_vol is not None
+    n_panels = (4 if (has_cnn and has_ens) else 3)
+    win_w    = 2400 if n_panels == 4 else 1920
+
+    # Shared colour limits from truth (1st-99th percentile avoids outlier stretch)
     p1, p99 = np.percentile(truth_vol, [1, 99])
     clim    = (float(p1), float(p99))
 
-    plotter = pv.Plotter(shape=(1, 3), window_size=(1920, 700))
+    plotter = pv.Plotter(shape=(1, n_panels), window_size=(win_w, 700))
     plotter.background_color = 'black'
 
-    # ── Left: Ground truth ────────────────────────────────────────────────────
-    plotter.subplot(0, 0)
-    plotter.add_volume(_to_pv_grid(truth_vol), scalars='values',
-                       cmap='magma', opacity='linear', clim=clim,
-                       scalar_bar_args={'title': scale_label, 'color': 'white'})
-    plotter.add_text(f"Ground Truth  G0={g0}", position='upper_edge',
-                     font_size=12, color='white')
-    plotter.add_axes(color='white')
-    plotter.view_isometric()
+    def _add_panel(col, vol, cmap, title, clim_override=None):
+        plotter.subplot(0, col)
+        plotter.add_volume(_to_pv_grid(vol), scalars='values',
+                           cmap=cmap, opacity='linear',
+                           clim=clim_override or clim,
+                           scalar_bar_args={'title': scale_label, 'color': 'white'})
+        plotter.add_text(title, position='upper_edge', font_size=11, color='white')
+        plotter.add_axes(color='white')
+        plotter.view_isometric()
 
-    # ── Centre: Prediction ────────────────────────────────────────────────────
-    plotter.subplot(0, 1)
-    plotter.add_volume(_to_pv_grid(pred_vol), scalars='values',
-                       cmap='magma', opacity='linear', clim=clim,
-                       scalar_bar_args={'title': scale_label, 'color': 'white'})
-    plotter.add_text(
-        f"ens_sp Prediction  R2={r2_ens:.4f}\n"
-        f"XGB={r2_xgb:.4f}  MLP={r2_mlp:.4f}",
-        position='upper_edge', font_size=12, color='white')
-    plotter.add_axes(color='white')
-    plotter.view_isometric()
+    # ── Panel 0: Ground truth ─────────────────────────────────────────────────
+    _add_panel(0, truth_vol, 'magma', f"Ground Truth  G0={g0}")
 
-    # ── Right: Absolute error ─────────────────────────────────────────────────
-    plotter.subplot(0, 2)
-    plotter.add_volume(_to_pv_grid(err_vol), scalars='values',
-                       cmap='bwr', opacity='linear', clim=clim,
-                       scalar_bar_args={'title': f'error ({scale_label})', 'color': 'white'})
-    plotter.add_text("Prediction - Truth", position='upper_edge',
-                     font_size=12, color='white')
-    plotter.add_axes(color='white')
-    plotter.view_isometric()
+    if has_cnn and has_ens:
+        # ── 4-panel: Truth | CNN | Ensemble | CNN Error ───────────────────────
+        _add_panel(1, pred_cnn_vol, 'magma',
+                   f"CNN (unet_baseline)  R2={r2_cnn:.4f}")
+        _add_panel(2, pred_vol, 'magma',
+                   f"Ensemble (ens_sp)  R2={r2_ens:.4f}\n"
+                   f"XGB={r2_xgb:.4f}  MLP={r2_mlp:.4f}")
+        err_max = float(np.percentile(np.abs(err_cnn_vol), 99))
+        _add_panel(3, err_cnn_vol, 'bwr', "CNN Error (pred - truth)",
+                   clim_override=(-err_max, err_max))
+    elif has_cnn:
+        # ── 3-panel CNN-only: Truth | CNN | CNN Error ─────────────────────────
+        _add_panel(1, pred_cnn_vol, 'magma',
+                   f"CNN (unet_baseline)  R2={r2_cnn:.4f}")
+        err_max = float(np.percentile(np.abs(err_cnn_vol), 99))
+        _add_panel(2, err_cnn_vol, 'bwr', "CNN Error (pred - truth)",
+                   clim_override=(-err_max, err_max))
+    else:
+        # ── 3-panel ensemble-only: Truth | Ensemble | Error ───────────────────
+        _add_panel(1, pred_vol, 'magma',
+                   f"ens_sp Prediction  R2={r2_ens:.4f}\n"
+                   f"XGB={r2_xgb:.4f}  MLP={r2_mlp:.4f}")
+        _add_panel(2, err_vol, 'bwr', "Prediction - Truth")
 
-    # Link cameras so all three panels rotate together
     plotter.link_views()
 
     print("\nControls: left-click+drag to rotate | right-click+drag to zoom | "
           "middle-click+drag to pan")
-    print("All three panels share a linked camera.")
+    print("All panels share a linked camera.")
     plotter.show()
 
 # ── Per-fold training / saving ─────────────────────────────────────────────────
 
 def _run_fold(fold: int, g0_val: float,
-              X_sp: np.ndarray, y: np.ndarray, fold_labels: np.ndarray,
-              cubes: list, mlp_epochs: int, spatial_kernels: list) -> None:
-    """Train ens_sp on N-1 cubes, predict on the held-out fold, and save .npz."""
+              X_sp: np.ndarray | None, y: np.ndarray, fold_labels: np.ndarray,
+              cubes: list, all_cnn_vols: list | None,
+              mlp_epochs: int, spatial_kernels: list,
+              cnn_epochs: int, models: str = 'both') -> None:
+    """Train selected model(s) on N-1 cubes, predict on held-out fold, save .npz.
+
+    models : 'cnn' | 'ensemble' | 'both'
+    """
+    run_ens = models in ('ensemble', 'both')
+    run_cnn = models in ('cnn', 'both')
+
     mask = fold_labels != fold
-    X_tr = X_sp[mask];   y_tr = y[mask]
-    X_va = X_sp[~mask];  y_va = y[~mask]
+    y_va = y[~mask]
 
-    print(f"\n[xgb_standard_sp]  {X_tr.shape[0]:,} training samples...")
-    y_xgb = _train_xgb(X_tr, y_tr, X_va, y_va)
-    m_xgb = compute_metrics(y_va, y_xgb)
-    print(f"  XGB  R2={m_xgb['R2']:.4f}  R2_lin={m_xgb['R2_lin']:.4f}  RMSE={m_xgb['RMSE']:.4f}")
+    save_kwargs: dict = dict(
+        g0              = np.float64(g0_val),
+        spatial_kernels = np.array(spatial_kernels, dtype=np.int32),
+        mlp_epochs      = np.int32(mlp_epochs),
+        cnn_epochs      = np.int32(cnn_epochs),
+    )
 
-    print(f"\n[mlp_wide_sp]  {mlp_epochs} epochs...")
-    y_mlp = _train_mlp(X_tr, y_tr, X_va, y_va, epochs=mlp_epochs)
-    m_mlp = compute_metrics(y_va, y_mlp)
-    print(f"  MLP  R2={m_mlp['R2']:.4f}  R2_lin={m_mlp['R2_lin']:.4f}  RMSE={m_mlp['RMSE']:.4f}")
+    # ── Ensemble ──────────────────────────────────────────────────────────────
+    if run_ens:
+        X_tr = X_sp[mask];  y_tr = y[mask]
+        X_va = X_sp[~mask]
 
-    y_ens = 0.5 * y_xgb + 0.5 * y_mlp
-    m_ens = compute_metrics(y_va, y_ens)
-    print(f"\n[ens_sp]  R2={m_ens['R2']:.4f}  R2_lin={m_ens['R2_lin']:.4f}  RMSE={m_ens['RMSE']:.4f}")
+        print(f"\n[xgb_standard_sp]  {X_tr.shape[0]:,} training samples...")
+        y_xgb = _train_xgb(X_tr, y_tr, X_va, y_va)
+        m_xgb = compute_metrics(y_va, y_xgb)
+        print(f"  XGB  R2={m_xgb['R2']:.4f}  R2_lin={m_xgb['R2_lin']:.4f}  RMSE={m_xgb['RMSE']:.4f}")
 
-    pred_vol = _preds_to_volume(cubes[fold], y_ens)
+        print(f"\n[mlp_wide_sp]  {mlp_epochs} epochs...")
+        y_mlp = _train_mlp(X_tr, y_tr, X_va, y_va, epochs=mlp_epochs)
+        m_mlp = compute_metrics(y_va, y_mlp)
+        print(f"  MLP  R2={m_mlp['R2']:.4f}  R2_lin={m_mlp['R2_lin']:.4f}  RMSE={m_mlp['RMSE']:.4f}")
+
+        y_ens = 0.5 * y_xgb + 0.5 * y_mlp
+        m_ens = compute_metrics(y_va, y_ens)
+        print(f"\n[ens_sp]  R2={m_ens['R2']:.4f}  R2_lin={m_ens['R2_lin']:.4f}  RMSE={m_ens['RMSE']:.4f}")
+
+        save_kwargs.update(
+            pred_vol = _preds_to_volume(cubes[fold], y_ens),
+            r2_xgb   = np.float32(m_xgb['R2']),
+            r2_mlp   = np.float32(m_mlp['R2']),
+            r2_ens   = np.float32(m_ens['R2']),
+        )
+
+    # ── CNN (unet_baseline) ───────────────────────────────────────────────────
+    if run_cnn:
+        train_cnn_vols = [v for i, v in enumerate(all_cnn_vols) if i != fold]
+        val_cnn_vol    = all_cnn_vols[fold]
+
+        print(f"\n[unet_baseline]  base_ch=32, dropout=0.0, {cnn_epochs} epochs...")
+        pred_cnn_128 = _train_cnn(train_cnn_vols, val_cnn_vol, epochs=cnn_epochs)
+
+        ix = cubes[fold]['ix'].values.astype(int) - 1
+        iy = cubes[fold]['iy'].values.astype(int) - 1
+        iz = cubes[fold]['iz'].values.astype(int) - 1
+        y_cnn = pred_cnn_128[ix, iy, iz].astype(np.float32)
+        m_cnn = compute_metrics(y_va, y_cnn)
+        print(f"  CNN  R2={m_cnn['R2']:.4f}  R2_lin={m_cnn['R2_lin']:.4f}  RMSE={m_cnn['RMSE']:.4f}")
+
+        save_kwargs.update(
+            pred_cnn_vol = pred_cnn_128,
+            r2_cnn       = np.float32(m_cnn['R2']),
+        )
 
     os.makedirs('predictions', exist_ok=True)
     timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
     save_path = f'predictions/pred_g0_{g0_val}_{timestamp}.npz'
-    np.savez_compressed(
-        save_path,
-        pred_vol        = pred_vol,
-        g0              = np.float64(g0_val),
-        r2_xgb          = np.float32(m_xgb['R2']),
-        r2_mlp          = np.float32(m_mlp['R2']),
-        r2_ens          = np.float32(m_ens['R2']),
-        spatial_kernels = np.array(spatial_kernels, dtype=np.int32),
-        mlp_epochs      = np.int32(mlp_epochs),
-    )
+    np.savez_compressed(save_path, **save_kwargs)
     print(f"Prediction saved -> {save_path}")
 
 
@@ -294,55 +429,70 @@ def _run_fold(fold: int, g0_val: float,
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description='Predict nH2 with ens_sp and compare 3D volumes against truth.')
+        description='Predict nH2 and compare 3D volumes against ground truth.')
     parser.add_argument('--g0', type=float, default=0.8,
                         help='G0 value to hold out as validation (default: 0.8). '
                              'Available: 0.1 0.2 0.4 0.8 1.6 3.2 6.4')
+    parser.add_argument('--model', choices=['cnn', 'ensemble', 'both'], default='both',
+                        help='Which model to train and save (default: both)')
     parser.add_argument('--mlp-epochs', type=int, default=100,
                         help='MLP training epochs (default: 100; use 30 for a fast demo)')
+    parser.add_argument('--cnn-epochs', type=int, default=150,
+                        help='CNN (unet_baseline) training epochs (default: 150)')
     parser.add_argument('--spatial-kernels', nargs='+', type=int, default=[3, 5, 7],
                         help='Spatial filter kernel sizes (default: 3 5 7)')
     parser.add_argument('--all', action='store_true',
                         help='Run all 7 G0 folds and save a prediction file for each')
     args = parser.parse_args()
 
+    run_ens = args.model in ('ensemble', 'both')
+    run_cnn = args.model in ('cnn', 'both')
+
     # ── Load ──────────────────────────────────────────────────────────────────
     print("Loading cubes...")
     cubes   = load_all_cubes()
     g0_vals = get_g0_values(cubes)
 
-    # ── Baseline features ─────────────────────────────────────────────────────
-    print("\nBuilding feature matrix...")
-    X, y, fold_labels = get_X_y(cubes, use_log_target=True)
-    print(f"  Base X shape: {X.shape}   y shape: {y.shape}")
+    _, y, fold_labels = get_X_y(cubes, use_log_target=True)
 
-    # ── Spatial features (needs volumes) ──────────────────────────────────────
-    print(f"\nBuilding volumes and spatial features "
-          f"(kernels={args.spatial_kernels})...")
-    all_vols = [cube_to_volumes(df, FEATURE_COLS) for df in cubes]
-    X_extra  = _compute_spatial_X(cubes, all_vols, FEATURE_COLS,
-                                   kernel_sizes=tuple(args.spatial_kernels))
-    n_sp = len(FEATURE_COLS) * len(args.spatial_kernels)
-    X_sp = np.concatenate([X, X_extra], axis=1)
-    print(f"  Spatial features: {n_sp}  ->  X_sp shape: {X_sp.shape}")
+    # ── Spatial features (ensemble only) ──────────────────────────────────────
+    X_sp = None
+    if run_ens:
+        print(f"\nBuilding spatial features (kernels={args.spatial_kernels})...")
+        X, _, _ = get_X_y(cubes, use_log_target=True)
+        all_vols = [cube_to_volumes(df, FEATURE_COLS) for df in cubes]
+        X_extra  = _compute_spatial_X(cubes, all_vols, FEATURE_COLS,
+                                       kernel_sizes=tuple(args.spatial_kernels))
+        n_sp = len(FEATURE_COLS) * len(args.spatial_kernels)
+        X_sp = np.concatenate([X, X_extra], axis=1)
+        print(f"  Spatial features: {n_sp}  ->  X_sp shape: {X_sp.shape}")
+
+    # ── CNN volumes (CNN only) ─────────────────────────────────────────────────
+    all_cnn_vols = None
+    if run_cnn:
+        print("\nBuilding CNN volumes (features + target)...")
+        all_cnn_vols = [cube_to_volumes(df, FEATURE_COLS + [LOG_TARGET_COL])
+                        for df in cubes]
 
     # ── Run fold(s) ────────────────────────────────────────────────────────────
+    run_kwargs = dict(mlp_epochs=args.mlp_epochs, spatial_kernels=args.spatial_kernels,
+                      cnn_epochs=args.cnn_epochs, models=args.model)
     if args.all:
-        print(f"\nRunning all {len(g0_vals)} folds...")
+        print(f"\nRunning all {len(g0_vals)} folds  (model={args.model})...")
         for fold, g0_val in enumerate(g0_vals):
             print(f"\n{'='*60}\nFold {fold+1}/{len(g0_vals)}  G0={g0_val}\n{'='*60}")
             _run_fold(fold, g0_val, X_sp, y, fold_labels, cubes,
-                      args.mlp_epochs, args.spatial_kernels)
+                      all_cnn_vols, **run_kwargs)
     else:
         if args.g0 not in g0_vals:
             print(f"ERROR: G0={args.g0} not found. Available: {g0_vals}", file=sys.stderr)
             sys.exit(1)
         fold = g0_vals.index(args.g0)
-        print(f"\nValidation fold: {fold}  (G0={args.g0})")
+        print(f"\nValidation fold: {fold}  (G0={args.g0})  model={args.model}")
         print(f"Training on {len(cubes) - 1} cubes  |  "
               f"Validating on 1 cube (G0={args.g0})")
         _run_fold(fold, args.g0, X_sp, y, fold_labels, cubes,
-                  args.mlp_epochs, args.spatial_kernels)
+                  all_cnn_vols, **run_kwargs)
 
 
 if __name__ == '__main__':
