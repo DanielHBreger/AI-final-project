@@ -99,7 +99,7 @@ def augment_cube(volumes: dict[str, np.ndarray],
     Apply a single symmetry operation R to a cube's volume dict.
 
     Expected keys in `volumes`:
-      Scalars : 'log_nH', 'log_T', 'log_nHp', 'ext', 'log_fh2', 'log_G0'
+      Scalars : 'log_nH', 'log_T', 'log_nHp', 'ext', 'log_fh2', 'log_nH2', 'log_G0'
       Polar v : 'vx', 'vy', 'vz'
       Axial B : 'bxl', 'bxr', 'byl', 'byr', 'bzl', 'bzr'
 
@@ -120,7 +120,7 @@ def augment_cube(volumes: dict[str, np.ndarray],
     out = {}
 
     # Scalars — just reindex the grid
-    for col in ('log_nH', 'log_T', 'log_nHp', 'ext', 'log_fh2', 'log_G0'):
+    for col in ('log_nH', 'log_T', 'log_nHp', 'ext', 'log_fh2', 'log_nH2', 'log_G0'):
         if col in volumes:
             out[col] = _apply_grid_op(R, volumes[col])
 
@@ -198,7 +198,7 @@ def augment_all_cubes(cube_volumes: list[dict[str, np.ndarray]],
 
 def _sanity_check(vol: dict[str, np.ndarray], aug: dict[str, np.ndarray]) -> None:
     """Scalars should have identical statistics before and after augmentation."""
-    for col in ('log_nH', 'log_T', 'log_nHp', 'ext', 'log_fh2'):
+    for col in ('log_nH', 'log_T', 'log_nHp', 'ext', 'log_fh2', 'log_nH2'):
         if col not in vol:
             continue
         orig_mean = vol[col].mean()

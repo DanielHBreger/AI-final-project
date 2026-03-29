@@ -5,7 +5,7 @@ Run all models and produce a unified comparison table + visualizations.
 Outputs:
   - Console: per-fold and mean±std metrics for all 4 models
   - Console: XGBoost feature importance ranking
-  - PyVista window: true vs predicted fh2 slice for the CNN on one held-out cube
+  - PyVista window: true vs predicted nH2 slice for the CNN on one held-out cube
 
 Usage:
     python evaluate.py [--cnn-epochs N] [--skip-cnn]
@@ -19,7 +19,7 @@ import matplotlib
 matplotlib.use('Agg')   # non-interactive backend for figure saving
 import matplotlib.pyplot as plt
 
-from data_loader    import load_all_cubes, get_X_y, get_g0_values, FEATURE_COLS, LOG_TARGET_COL
+from data_loader    import load_all_cubes, get_X_y, get_g0_values, get_feature_cols, add_drop_args, build_drop_set, FEATURE_COLS, LOG_TARGET_COL
 from classical_models import (run_linear, run_xgboost, run_mlp,
                                print_feature_importance, compute_metrics)
 from train_cnn      import run_cnn_cv
@@ -30,19 +30,21 @@ from train_cnn      import run_cnn_cv
 def print_summary(all_results: dict[str, list[dict]], g0_values: list[float]) -> None:
     models = list(all_results.keys())
     print("\n" + "="*80)
-    print("  SUMMARY — mean ± std (leave-one-G0-out, fh2 space)")
+    print("  SUMMARY — mean +/- std (leave-one-G0-out)")
     print("="*80)
-    print(f"  {'Model':<20} {'R²':>10} {'RMSE':>14} {'MAE':>14}")
-    print(f"  {'-'*58}")
+    print(f"  {'Model':<20} {'R2_log':>12} {'R2_lin':>12} {'RMSE(dex)':>12} {'MAE(dex)':>12}")
+    print(f"  {'-'*68}")
     for name in models:
         metrics = all_results[name]
-        r2s   = [m['R2']   for m in metrics]
-        rmses = [m['RMSE'] for m in metrics]
-        maes  = [m['MAE']  for m in metrics]
+        r2s     = [m['R2']     for m in metrics]
+        r2_lins = [m['R2_lin'] for m in metrics]
+        rmses   = [m['RMSE']   for m in metrics]
+        maes    = [m['MAE']    for m in metrics]
         print(f"  {name:<20} "
-              f"{np.mean(r2s):>6.4f}±{np.std(r2s):.4f}  "
-              f"{np.mean(rmses):>10.3e}±{np.std(rmses):.3e}  "
-              f"{np.mean(maes):>10.3e}±{np.std(maes):.3e}")
+              f"{np.mean(r2s):>6.4f}+/-{np.std(r2s):.3f}  "
+              f"{np.mean(r2_lins):>6.4f}+/-{np.std(r2_lins):.3f}  "
+              f"{np.mean(rmses):>6.4f}+/-{np.std(rmses):.3f}  "
+              f"{np.mean(maes):>6.4f}+/-{np.std(maes):.3f}")
     print("="*80)
 
 
@@ -59,7 +61,7 @@ def save_results_log(all_results: dict[str, list[dict]],
             for i, (g0, m) in enumerate(zip(g0_values, fold_metrics))
         ]
         summary = {}
-        for metric in ('R2', 'RMSE', 'MAE'):
+        for metric in ('R2', 'R2_lin', 'RMSE', 'MAE'):
             vals = [m[metric] for m in fold_metrics]
             summary[metric] = {'mean': float(np.mean(vals)), 'std': float(np.std(vals))}
         models_log[name] = {'folds': fold_entries, 'summary': summary}
@@ -86,8 +88,8 @@ def plot_r2_comparison(all_results: dict[str, list[dict]],
         ax.bar(x + i * width, r2s, width, label=name, color=colors[i % len(colors)], alpha=0.8)
 
     ax.set_xlabel('Held-out G0 value')
-    ax.set_ylabel('R² (fh2 space)')
-    ax.set_title('Leave-one-G0-out R² by model')
+    ax.set_ylabel('R² (log10 nH2 space)')
+    ax.set_title('Leave-one-G0-out R² by model (log-space)')
     ax.set_xticks(x + width * (len(models) - 1) / 2)
     ax.set_xticklabels([f'{g:.1f}' for g in g0_values])
     ax.legend()
@@ -103,8 +105,10 @@ def plot_r2_comparison(all_results: dict[str, list[dict]],
 def plot_scatter(y_true_log: np.ndarray, y_pred_log: np.ndarray,
                  model_name: str, g0: float,
                  save_path: str | None = None) -> None:
+    clip_lo = float(y_true_log.min()) - 1.0
+    clip_hi = float(y_true_log.max()) + 1.0
     y_true = 10.0 ** y_true_log
-    y_pred = 10.0 ** y_pred_log
+    y_pred = 10.0 ** np.clip(y_pred_log, clip_lo, clip_hi)
 
     fig, ax = plt.subplots(figsize=(6, 6))
     ax.scatter(y_true, y_pred, s=0.5, alpha=0.3, color='steelblue', rasterized=True)
@@ -112,8 +116,8 @@ def plot_scatter(y_true_log: np.ndarray, y_pred_log: np.ndarray,
     ax.plot(lims, lims, 'r--', linewidth=1, label='y=x')
     ax.set_xscale('log')
     ax.set_yscale('log')
-    ax.set_xlabel('True fh2')
-    ax.set_ylabel('Predicted fh2')
+    ax.set_xlabel('True nH2')
+    ax.set_ylabel('Predicted nH2')
     ax.set_title(f'{model_name}  (G0={g0:.1f} held out)')
     ax.legend()
     plt.tight_layout()
@@ -134,7 +138,10 @@ if __name__ == '__main__':
                         help='Use all 48 Oh ops for CNN augmentation')
     parser.add_argument('--log',         type=str, default=None,
                         help='Path for JSON results log (default: evaluation_TIMESTAMP.json)')
+    add_drop_args(parser)
     args = parser.parse_args()
+
+    feat_cols = get_feature_cols(build_drop_set(args))
 
     _ts = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
     _run_config = {
@@ -148,8 +155,8 @@ if __name__ == '__main__':
     print("Loading data...")
     cubes   = load_all_cubes()
     g0_vals = get_g0_values(cubes)
-    X, y, folds = get_X_y(cubes, use_log_target=True)
-    print(f"Total samples: {len(X):,}")
+    X, y, folds = get_X_y(cubes, use_log_target=True, feature_cols=feat_cols)
+    print(f"Total samples: {len(X):,}  features: {len(feat_cols)}")
 
     all_results: dict[str, list[dict]] = {}
 
@@ -161,7 +168,7 @@ if __name__ == '__main__':
     print("\n[2/4] XGBoost")
     xgb_metrics, xgb_models = run_xgboost(X, y, folds, g0_vals)
     all_results['XGBoost'] = xgb_metrics
-    print_feature_importance(xgb_models, FEATURE_COLS)
+    print_feature_importance(xgb_models, feat_cols)
 
     # ── 3. MLP ────────────────────────────────────────────────────────────────
     print("\n[3/4] MLP")
@@ -173,6 +180,7 @@ if __name__ == '__main__':
         all_results['3D U-Net'] = run_cnn_cv(
             safe_only=not args.cnn_all_ops,
             epochs=args.cnn_epochs,
+            feature_cols=feat_cols,
         )
     else:
         print("\n[4/4] CNN skipped (--skip-cnn)")

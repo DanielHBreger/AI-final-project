@@ -1,7 +1,7 @@
 """
 cnn_model.py
 Small 3D U-Net that maps (B, C, D, H, W) input field volumes to a
-(B, 1, D, H, W) predicted log10(fh2) field.
+(B, 1, D, H, W) predicted log10(nH2) field.
 
 Architecture (encoder-decoder with skip connections):
   Encoder:    conv(C→32) → conv(32→64) → pool
@@ -69,7 +69,7 @@ class Up(nn.Module):
 
 class UNet3D(nn.Module):
     """
-    3D U-Net predicting log10(fh2) from multi-channel physical field volumes.
+    3D U-Net predicting log10(nH2) from multi-channel physical field volumes.
 
     Args:
         n_channels : number of input feature channels (default 14)
@@ -102,7 +102,7 @@ class UNet3D(nn.Module):
         x  = self.dec3(x, s3)
         x  = self.dec2(x, s2)
         x  = self.dec1(x, s1)
-        return self.out(x)   # raw log10(fh2) prediction
+        return self.out(x)   # raw log10(nH2) prediction
 
 
 # ── Parameter count helper ─────────────────────────────────────────────────────

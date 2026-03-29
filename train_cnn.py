@@ -21,15 +21,16 @@ from torch.utils.data import Dataset, DataLoader
 import torch.nn.functional as F
 
 from data_loader import (load_all_cubes, cube_to_volumes,
-                         get_g0_values, FEATURE_COLS, LOG_TARGET_COL)
+                         get_g0_values, get_feature_cols, add_drop_args, build_drop_set,
+                         FEATURE_COLS, LOG_TARGET_COL)
 from augmentation import augment_cube, get_symmetry_ops
 from cnn_model import UNet3D, count_parameters
 from classical_models import compute_metrics, print_results
 
 # ── Columns that form the CNN input channels ──────────────────────────────────
 # (same as FEATURE_COLS but expressed as volume keys, not flat-table names)
-CNN_INPUT_COLS  = FEATURE_COLS                 # 14 channels
-CNN_TARGET_COL  = LOG_TARGET_COL               # log10(fh2)
+CNN_INPUT_COLS  = FEATURE_COLS                 # 15 channels
+CNN_TARGET_COL  = LOG_TARGET_COL               # log10(nH2)
 GRID_SIZE       = 64                           # spatial resolution fed to CNN
 RAW_GRID        = 128                          # native resolution
 
@@ -46,12 +47,15 @@ class CubeDataset(Dataset):
     """
     def __init__(self, cube_vols: list[dict[str, np.ndarray]],
                  ops: list[np.ndarray] | None,
-                 augment: bool = True):
+                 augment: bool = True,
+                 input_cols: list[str] | None = None):
         """
-        cube_vols : list of volume dicts (one per source cube)
-        ops       : list of 3x3 symmetry matrices; None means no augmentation
-        augment   : if True, apply ops; if False, use identity only
+        cube_vols  : list of volume dicts (one per source cube)
+        ops        : list of 3x3 symmetry matrices; None means no augmentation
+        augment    : if True, apply ops; if False, use identity only
+        input_cols : feature columns to use (default: CNN_INPUT_COLS)
         """
+        _cols = input_cols if input_cols is not None else CNN_INPUT_COLS
         self.xs: list[torch.Tensor] = []
         self.ys: list[torch.Tensor] = []
 
@@ -62,7 +66,7 @@ class CubeDataset(Dataset):
             for R in active_ops:
                 aug = augment_cube(vol, R)
 
-                channels = np.stack([aug[c] for c in CNN_INPUT_COLS], axis=0)  # (C, 128, 128, 128)
+                channels = np.stack([aug[c] for c in _cols], axis=0)  # (C, 128, 128, 128)
                 target   = aug[CNN_TARGET_COL][None]                            # (1, 128, 128, 128)
 
                 ch_t  = torch.from_numpy(channels).unsqueeze(0)   # (1, C, 128, 128, 128)
@@ -88,10 +92,11 @@ def train_one_fold(train_vols: list[dict],
                    ops:        list[np.ndarray],
                    device:     torch.device,
                    epochs:     int = 50,
-                   lr:         float = 1e-3) -> tuple[UNet3D, dict, list[dict]]:
-
-    train_ds = CubeDataset(train_vols, ops, augment=True)
-    val_ds   = CubeDataset(val_vols,   ops=None, augment=False)
+                   lr:         float = 1e-3,
+                   input_cols: list[str] | None = None) -> tuple[UNet3D, dict, list[dict]]:
+    _cols = input_cols if input_cols is not None else CNN_INPUT_COLS
+    train_ds = CubeDataset(train_vols, ops, augment=True,  input_cols=_cols)
+    val_ds   = CubeDataset(val_vols,   ops=None, augment=False, input_cols=_cols)
 
     # Per-channel normalization — same fold-safe pattern as StandardScaler for the MLP.
     # Statistics computed from training cubes only, then applied to val.
@@ -101,8 +106,8 @@ def train_one_fold(train_vols: list[dict],
     train_ds.xs = [(x - ch_mean) / ch_std for x in train_ds.xs]
     val_ds.xs   = [(x - ch_mean) / ch_std for x in val_ds.xs]
 
-    # Per-fold target normalization — balances log_fh2 loss across the full dynamic
-    # range instead of letting the MSE be dominated by the near-zero-fh2 tail.
+    # Per-fold target normalization — balances log_nH2 loss across the full dynamic
+    # range instead of letting the MSE be dominated by the near-zero-nH2 tail.
     all_y  = torch.stack(train_ds.ys)                                       # (N, 1, 64, 64, 64)
     y_mean = all_y.mean()
     y_std  = all_y.std().clamp(min=1e-6)
@@ -117,7 +122,7 @@ def train_one_fold(train_vols: list[dict],
     val_dl   = DataLoader(val_ds,   batch_size=1, shuffle=False,
                           num_workers=0, pin_memory=pin_mem)
 
-    model      = UNet3D(n_channels=len(CNN_INPUT_COLS), base_ch=32).to(device)
+    model      = UNet3D(n_channels=len(_cols), base_ch=32).to(device)
     opt        = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=1e-5)
     sched      = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=epochs)
     loss_fn    = nn.MSELoss()
@@ -180,7 +185,7 @@ def train_one_fold(train_vols: list[dict],
             y_pred_all.append(pred)
     y_true = np.concatenate(y_true_all)
     y_pred = np.concatenate(y_pred_all)
-    # Inverse-transform back to log_fh2 space before computing metrics
+    # Inverse-transform back to log_nH2 space before computing metrics
     y_std_np  = y_std.item()
     y_mean_np = y_mean.item()
     y_true = y_true * y_std_np + y_mean_np
@@ -195,7 +200,8 @@ def train_one_fold(train_vols: list[dict],
 def run_cnn_cv(safe_only:    bool = True,
                epochs:       int  = 150,
                save_models:  bool = False,
-               log_path:     str | None = None) -> list[dict]:
+               log_path:     str | None = None,
+               feature_cols: list[str] | None = None) -> list[dict]:
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f"Device: {device}")
@@ -205,15 +211,17 @@ def run_cnn_cv(safe_only:    bool = True,
     g0_vals = get_g0_values(cubes)
     n_folds = len(cubes)
 
+    input_cols = feature_cols if feature_cols is not None else CNN_INPUT_COLS
+
     # Pre-compute all volume dicts (expensive but done once)
-    vol_cols = CNN_INPUT_COLS + [CNN_TARGET_COL]
+    vol_cols = input_cols + [CNN_TARGET_COL]
     avail    = [c for c in vol_cols if c in cubes[0].columns]
     print("Converting cubes to volumes (128³)...")
     all_vols = [cube_to_volumes(df, avail) for df in cubes]
 
     ops = get_symmetry_ops(safe_only=safe_only)
     print(f"Symmetry ops: {len(ops)}  ({'safe z-preserving' if safe_only else 'full Oh'})")
-    n_params = count_parameters(UNet3D(n_channels=len(CNN_INPUT_COLS)))
+    n_params = count_parameters(UNet3D(n_channels=len(input_cols)))
     print(f"UNet3D params: {n_params:,}")
 
     run_config = {
@@ -223,7 +231,7 @@ def run_cnn_cv(safe_only:    bool = True,
         'safe_only':   safe_only,
         'n_folds':     n_folds,
         'n_params':    n_params,
-        'input_cols':  CNN_INPUT_COLS,
+        'input_cols':  input_cols,
         'target_col':  CNN_TARGET_COL,
         'grid_size':   GRID_SIZE,
         'n_sym_ops':   len(ops),
@@ -237,7 +245,7 @@ def run_cnn_cv(safe_only:    bool = True,
         val_vols   = [all_vols[fold]]
 
         model, metrics, history = train_one_fold(
-            train_vols, val_vols, ops, device, epochs=epochs)
+            train_vols, val_vols, ops, device, epochs=epochs, input_cols=input_cols)
 
         fold_metrics.append(metrics)
         log_folds.append({
@@ -261,7 +269,7 @@ def run_cnn_cv(safe_only:    bool = True,
         log_path = f'cnn_training_{ts}.json'
 
     summary = {}
-    for metric in ('R2', 'RMSE', 'MAE'):
+    for metric in ('R2', 'R2_lin', 'RMSE', 'MAE'):
         vals = [m[metric] for m in fold_metrics]
         summary[metric] = {'mean': float(np.mean(vals)), 'std': float(np.std(vals))}
 
@@ -284,9 +292,12 @@ if __name__ == '__main__':
                         help='Save best model weights per fold')
     parser.add_argument('--log',    type=str, default=None,
                         help='Path for JSON training log (default: cnn_training_TIMESTAMP.json)')
+    add_drop_args(parser)
     args = parser.parse_args()
 
+    feat_cols = get_feature_cols(build_drop_set(args))
     run_cnn_cv(safe_only=not args.all_ops,
                epochs=args.epochs,
                save_models=args.save,
-               log_path=args.log)
+               log_path=args.log,
+               feature_cols=feat_cols)
