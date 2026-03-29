@@ -19,7 +19,7 @@ import matplotlib
 matplotlib.use('Agg')   # non-interactive backend for figure saving
 import matplotlib.pyplot as plt
 
-from data_loader    import load_all_cubes, get_X_y, get_g0_values, FEATURE_COLS, LOG_TARGET_COL
+from data_loader    import load_all_cubes, get_X_y, get_g0_values, get_feature_cols, add_drop_args, build_drop_set, FEATURE_COLS, LOG_TARGET_COL
 from classical_models import (run_linear, run_xgboost, run_mlp,
                                print_feature_importance, compute_metrics)
 from train_cnn      import run_cnn_cv
@@ -138,7 +138,10 @@ if __name__ == '__main__':
                         help='Use all 48 Oh ops for CNN augmentation')
     parser.add_argument('--log',         type=str, default=None,
                         help='Path for JSON results log (default: evaluation_TIMESTAMP.json)')
+    add_drop_args(parser)
     args = parser.parse_args()
+
+    feat_cols = get_feature_cols(build_drop_set(args))
 
     _ts = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
     _run_config = {
@@ -152,8 +155,8 @@ if __name__ == '__main__':
     print("Loading data...")
     cubes   = load_all_cubes()
     g0_vals = get_g0_values(cubes)
-    X, y, folds = get_X_y(cubes, use_log_target=True)
-    print(f"Total samples: {len(X):,}")
+    X, y, folds = get_X_y(cubes, use_log_target=True, feature_cols=feat_cols)
+    print(f"Total samples: {len(X):,}  features: {len(feat_cols)}")
 
     all_results: dict[str, list[dict]] = {}
 
@@ -165,7 +168,7 @@ if __name__ == '__main__':
     print("\n[2/4] XGBoost")
     xgb_metrics, xgb_models = run_xgboost(X, y, folds, g0_vals)
     all_results['XGBoost'] = xgb_metrics
-    print_feature_importance(xgb_models, FEATURE_COLS)
+    print_feature_importance(xgb_models, feat_cols)
 
     # ── 3. MLP ────────────────────────────────────────────────────────────────
     print("\n[3/4] MLP")
@@ -177,6 +180,7 @@ if __name__ == '__main__':
         all_results['3D U-Net'] = run_cnn_cv(
             safe_only=not args.cnn_all_ops,
             epochs=args.cnn_epochs,
+            feature_cols=feat_cols,
         )
     else:
         print("\n[4/4] CNN skipped (--skip-cnn)")

@@ -3,6 +3,7 @@ data_loader.py
 Load, preprocess, and expose all 7 simulation cubes for ML training.
 """
 
+import argparse
 import os
 import glob
 import pandas as pd
@@ -19,6 +20,39 @@ FEATURE_COLS = ['log_nH', 'log_T', 'log_nHp', 'ext', 'log_fh2', 'log_G0',
 
 TARGET_COL     = 'nH2'
 LOG_TARGET_COL = 'log_nH2'
+
+
+def get_feature_cols(drop: set[str] | None = None) -> list[str]:
+    """Return FEATURE_COLS, optionally excluding the named columns."""
+    if not drop:
+        return FEATURE_COLS
+    return [c for c in FEATURE_COLS if c not in drop]
+
+
+def add_drop_args(parser: argparse.ArgumentParser) -> None:
+    """Add all --no-X feature-exclusion flags to an ArgumentParser."""
+    parser.add_argument('--no-fh2', action='store_true', help='Exclude log_fh2 from features.')
+    parser.add_argument('--no-nH',  action='store_true', help='Exclude log_nH from features.')
+    parser.add_argument('--no-T',   action='store_true', help='Exclude log_T from features.')
+    parser.add_argument('--no-nHp', action='store_true', help='Exclude log_nHp from features.')
+    parser.add_argument('--no-ext', action='store_true', help='Exclude ext from features.')
+    parser.add_argument('--no-G0',  action='store_true', help='Exclude log_G0 from features.')
+    parser.add_argument('--no-vel', action='store_true', help='Exclude vx/vy/vz from features.')
+    parser.add_argument('--no-B',   action='store_true', help='Exclude magnetic field components.')
+
+
+def build_drop_set(args: argparse.Namespace) -> set[str]:
+    """Build the feature drop set from parsed --no-X arguments."""
+    drop: set[str] = set()
+    if args.no_fh2: drop.add('log_fh2')
+    if args.no_nH:  drop.add('log_nH')
+    if args.no_T:   drop.add('log_T')
+    if args.no_nHp: drop.add('log_nHp')
+    if args.no_ext: drop.add('ext')
+    if args.no_G0:  drop.add('log_G0')
+    if args.no_vel: drop.update(['vx', 'vy', 'vz'])
+    if args.no_B:   drop.update(['bxl', 'bxr', 'byl', 'byr', 'bzl', 'bzr'])
+    return drop
 
 # Small epsilon to guard against log(0)
 _EPS = 1e-30
@@ -82,18 +116,21 @@ def get_fold_labels(cubes: list[pd.DataFrame]) -> np.ndarray:
 
 
 def get_X_y(cubes: list[pd.DataFrame],
-            use_log_target: bool = True) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+            use_log_target: bool = True,
+            feature_cols: list[str] | None = None) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
     Stack all cubes into flat (N, F) feature and (N,) target arrays.
 
     Returns:
-        X      : float32 array of shape (N, len(FEATURE_COLS))
+        X      : float32 array of shape (N, len(feature_cols))
         y      : float32 array of shape (N,)  — log_nH2 or nH2
         folds  : int array of shape (N,) — cube index for leave-one-out CV
     """
+    if feature_cols is None:
+        feature_cols = FEATURE_COLS
     target = LOG_TARGET_COL if use_log_target else TARGET_COL
-    X      = np.concatenate([df[FEATURE_COLS].values for df in cubes], axis=0).astype(np.float32)
-    y      = np.concatenate([df[target].values        for df in cubes], axis=0).astype(np.float32)
+    X      = np.concatenate([df[feature_cols].values for df in cubes], axis=0).astype(np.float32)
+    y      = np.concatenate([df[target].values       for df in cubes], axis=0).astype(np.float32)
     folds  = get_fold_labels(cubes)
     return X, y, folds
 

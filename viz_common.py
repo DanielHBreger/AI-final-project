@@ -31,21 +31,17 @@ def select_prediction_file() -> str | None:
 def load_prediction(npz_path: str) -> tuple:
     """Load a saved prediction .npz and return its contents.
 
-    Returns (pred_vol, g0, r2_xgb, r2_mlp, r2_ens, kernels, epochs,
-             pred_cnn_vol, r2_cnn).
-    pred_cnn_vol and r2_cnn are None for older files that predate CNN support.
+    Returns (pred_vol, g0, r2_xgb, r2_mlp, r2_stacked, kernels, epochs).
     """
-    data         = np.load(npz_path)
-    g0           = float(data['g0'])
-    kernels      = data['spatial_kernels'].tolist()
-    epochs       = int(data['mlp_epochs'])
-    pred_vol     = data['pred_vol']     if 'pred_vol'     in data else None
-    r2_xgb       = float(data['r2_xgb']) if 'r2_xgb'     in data else None
-    r2_mlp       = float(data['r2_mlp']) if 'r2_mlp'     in data else None
-    r2_ens       = float(data['r2_ens']) if 'r2_ens'     in data else None
-    pred_cnn_vol = data['pred_cnn_vol'] if 'pred_cnn_vol' in data else None
-    r2_cnn       = float(data['r2_cnn']) if 'r2_cnn'     in data else None
-    return pred_vol, g0, r2_xgb, r2_mlp, r2_ens, kernels, epochs, pred_cnn_vol, r2_cnn
+    data       = np.load(npz_path)
+    pred_vol   = data['pred_vol']
+    g0         = float(data['g0'])
+    r2_xgb     = float(data['r2_xgb'])
+    r2_mlp     = float(data['r2_mlp'])
+    r2_stacked = float(data['r2_stacked'])
+    kernels    = data['spatial_kernels'].tolist()
+    epochs     = int(data['mlp_epochs'])
+    return pred_vol, g0, r2_xgb, r2_mlp, r2_stacked, kernels, epochs
 
 
 def prepare_display(truth_vol: np.ndarray, pred_vol: np.ndarray,
