@@ -1,11 +1,5 @@
 """
-evaluate.py
-Run all models and produce a unified comparison table + visualizations.
-
-Outputs:
-  - Console: per-fold and mean±std metrics for all 4 models
-  - Console: XGBoost feature importance ranking
-  - PyVista window: true vs predicted nH2 slice for the CNN on one held-out cube
+Run all models and print a unified comparison table.
 
 Usage:
     python evaluate.py [--cnn-epochs N] [--skip-cnn]
@@ -16,7 +10,7 @@ import json
 import datetime
 import numpy as np
 import matplotlib
-matplotlib.use('Agg')   # non-interactive backend for figure saving
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
 from data_loader    import load_all_cubes, get_X_y, get_g0_values, get_feature_cols, add_drop_args, build_drop_set, FEATURE_COLS, LOG_TARGET_COL
@@ -25,12 +19,10 @@ from classical_models import (run_linear, run_xgboost, run_mlp,
 from train_cnn      import run_cnn_cv
 
 
-# ── Summary table ─────────────────────────────────────────────────────────────
-
 def print_summary(all_results: dict[str, list[dict]], g0_values: list[float]) -> None:
     models = list(all_results.keys())
     print("\n" + "="*80)
-    print("  SUMMARY — mean +/- std (leave-one-G0-out)")
+    print("  SUMMARY -- mean +/- std (leave-one-G0-out)")
     print("="*80)
     print(f"  {'Model':<20} {'R2_log':>12} {'R2_lin':>12} {'RMSE(dex)':>12} {'MAE(dex)':>12}")
     print(f"  {'-'*68}")
@@ -47,8 +39,6 @@ def print_summary(all_results: dict[str, list[dict]], g0_values: list[float]) ->
               f"{np.mean(maes):>6.4f}+/-{np.std(maes):.3f}")
     print("="*80)
 
-
-# ── JSON results log ──────────────────────────────────────────────────────────
 
 def save_results_log(all_results: dict[str, list[dict]],
                      g0_values:   list[float],
@@ -69,10 +59,8 @@ def save_results_log(all_results: dict[str, list[dict]],
     log = {'run_config': run_config, 'g0_values': g0_values, 'models': models_log}
     with open(log_path, 'w') as f:
         json.dump(log, f, indent=2)
-    print(f"Results log saved -> {log_path}")
+    print(f"Results log -> {log_path}")
 
-
-# ── Per-G0 R² bar chart ───────────────────────────────────────────────────────
 
 def plot_r2_comparison(all_results: dict[str, list[dict]],
                        g0_values: list[float],
@@ -88,8 +76,8 @@ def plot_r2_comparison(all_results: dict[str, list[dict]],
         ax.bar(x + i * width, r2s, width, label=name, color=colors[i % len(colors)], alpha=0.8)
 
     ax.set_xlabel('Held-out G0 value')
-    ax.set_ylabel('R² (log10 nH2 space)')
-    ax.set_title('Leave-one-G0-out R² by model (log-space)')
+    ax.set_ylabel('R2 (log10 nH2 space)')
+    ax.set_title('Leave-one-G0-out R2 by model (log-space)')
     ax.set_xticks(x + width * (len(models) - 1) / 2)
     ax.set_xticklabels([f'{g:.1f}' for g in g0_values])
     ax.legend()
@@ -99,8 +87,6 @@ def plot_r2_comparison(all_results: dict[str, list[dict]],
     print(f"Saved R2 comparison chart -> {save_path}")
     plt.close()
 
-
-# ── True vs predicted scatter ─────────────────────────────────────────────────
 
 def plot_scatter(y_true_log: np.ndarray, y_pred_log: np.ndarray,
                  model_name: str, g0: float,
@@ -127,17 +113,14 @@ def plot_scatter(y_true_log: np.ndarray, y_pred_log: np.ndarray,
     plt.close()
 
 
-# ── Entry point ───────────────────────────────────────────────────────────────
-
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--skip-cnn',    action='store_true',
-                        help='Skip CNN training (faster, classical models only)')
+                        help='Skip CNN training (classical models only)')
     parser.add_argument('--cnn-epochs',  type=int, default=150)
     parser.add_argument('--cnn-all-ops', action='store_true',
                         help='Use all 48 Oh ops for CNN augmentation')
-    parser.add_argument('--log',         type=str, default=None,
-                        help='Path for JSON results log (default: evaluation_TIMESTAMP.json)')
+    parser.add_argument('--log',         type=str, default=None)
     add_drop_args(parser)
     args = parser.parse_args()
 
@@ -145,13 +128,12 @@ if __name__ == '__main__':
 
     _ts = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
     _run_config = {
-        'timestamp':    datetime.datetime.now().isoformat(timespec='seconds'),
-        'skip_cnn':     args.skip_cnn,
-        'cnn_epochs':   args.cnn_epochs,
-        'cnn_all_ops':  args.cnn_all_ops,
+        'timestamp':   datetime.datetime.now().isoformat(timespec='seconds'),
+        'skip_cnn':    args.skip_cnn,
+        'cnn_epochs':  args.cnn_epochs,
+        'cnn_all_ops': args.cnn_all_ops,
     }
 
-    # ── Load data ──────────────────────────────────────────────────────────────
     print("Loading data...")
     cubes   = load_all_cubes()
     g0_vals = get_g0_values(cubes)
@@ -160,21 +142,17 @@ if __name__ == '__main__':
 
     all_results: dict[str, list[dict]] = {}
 
-    # ── 1. Linear Regression ──────────────────────────────────────────────────
     print("\n[1/4] Linear Regression")
     all_results['Linear Regression'] = run_linear(X, y, folds, g0_vals)
 
-    # ── 2. XGBoost ────────────────────────────────────────────────────────────
     print("\n[2/4] XGBoost")
     xgb_metrics, xgb_models = run_xgboost(X, y, folds, g0_vals)
     all_results['XGBoost'] = xgb_metrics
     print_feature_importance(xgb_models, feat_cols)
 
-    # ── 3. MLP ────────────────────────────────────────────────────────────────
     print("\n[3/4] MLP")
     all_results['MLP'] = run_mlp(X, y, folds, g0_vals)
 
-    # ── 4. CNN ────────────────────────────────────────────────────────────────
     if not args.skip_cnn:
         print("\n[4/4] 3D U-Net CNN")
         all_results['3D U-Net'] = run_cnn_cv(
@@ -185,12 +163,9 @@ if __name__ == '__main__':
     else:
         print("\n[4/4] CNN skipped (--skip-cnn)")
 
-    # ── Summary ───────────────────────────────────────────────────────────────
     print_summary(all_results, g0_vals)
 
-    # ── Results log ───────────────────────────────────────────────────────────
     log_path = args.log or f'evaluation_{_ts}.json'
     save_results_log(all_results, g0_vals, _run_config, log_path)
 
-    # ── Plots ─────────────────────────────────────────────────────────────────
     plot_r2_comparison(all_results, g0_vals)

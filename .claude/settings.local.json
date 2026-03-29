@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(grep -r \"jupyter\\\\|notebook\\\\|IPython\" /c/Users/danib/OneDrive/Documents/GitHub/AI-final-project/.claude/worktrees/pedantic-ptolemy/*.py)"
+    ]
+  }
+}

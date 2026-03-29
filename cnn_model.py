@@ -1,30 +1,9 @@
-"""
-cnn_model.py
-Small 3D U-Net that maps (B, C, D, H, W) input field volumes to a
-(B, 1, D, H, W) predicted log10(nH2) field.
-
-Architecture (encoder-decoder with skip connections):
-  Encoder:    ResConvBlock(C→b)   → Down(b→b*2)
-              Down(b*2→b*4)
-  Bottleneck: Down(b*4→b*8)
-  Decoder:    Up(b*8+b*4→b*4) → Up(b*4+b*2→b*2) → Up(b*2+b→b)
-  Output:     Conv1x1(b→1)
-
-Each ResConvBlock has a residual skip connection (with 1×1 projection when
-channel counts differ) for stable gradient flow.
-
-Input grid is expected to be 64×64×64 (downsampled from 128×128×128).
-"""
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
 
-# ── Building blocks ───────────────────────────────────────────────────────────
-
 class ConvBlock(nn.Module):
-    """Two Conv3d layers with InstanceNorm and ReLU, plus optional Dropout3d."""
     def __init__(self, in_ch: int, out_ch: int, dropout: float = 0.0):
         super().__init__()
         layers = [
@@ -44,11 +23,7 @@ class ConvBlock(nn.Module):
 
 
 class ResConvBlock(nn.Module):
-    """Two Conv3d layers with InstanceNorm + residual skip connection.
-
-    The skip uses a 1×1 conv to project when in_ch != out_ch.
-    Dropout3d (if > 0) is applied after the residual addition.
-    """
+    """Conv block with residual skip; 1x1 projection when channels differ."""
     def __init__(self, in_ch: int, out_ch: int, dropout: float = 0.0):
         super().__init__()
         self.conv1 = nn.Sequential(
@@ -72,7 +47,6 @@ class ResConvBlock(nn.Module):
 
 
 class Down(nn.Module):
-    """MaxPool then ResConvBlock."""
     def __init__(self, in_ch: int, out_ch: int, dropout: float = 0.0):
         super().__init__()
         self.pool = nn.MaxPool3d(2)
@@ -83,47 +57,33 @@ class Down(nn.Module):
 
 
 class Up(nn.Module):
-    """Trilinear upsample, concatenate skip, then ResConvBlock."""
     def __init__(self, in_ch: int, skip_ch: int, out_ch: int, dropout: float = 0.0):
         super().__init__()
         self.conv = ResConvBlock(in_ch + skip_ch, out_ch, dropout=dropout)
 
     def forward(self, x: torch.Tensor, skip: torch.Tensor) -> torch.Tensor:
         x = F.interpolate(x, scale_factor=2, mode='trilinear', align_corners=False)
-        # Pad if spatial sizes differ (e.g. odd input dimensions)
+        # pad if spatial sizes don't match (odd input dims)
         diff = [skip.shape[i] - x.shape[i] for i in range(2, 5)]
         x = F.pad(x, [0, diff[2], 0, diff[1], 0, diff[0]])
         return self.conv(torch.cat([x, skip], dim=1))
 
 
-# ── U-Net ─────────────────────────────────────────────────────────────────────
-
 class UNet3D(nn.Module):
-    """
-    3D U-Net predicting log10(nH2) from multi-channel physical field volumes.
-
-    Args:
-        n_channels : number of input feature channels (default 15)
-        base_ch    : base number of feature maps (default 16)
-        dropout    : Dropout3d rate applied after each ResConvBlock (default 0.1);
-                     the bottleneck uses 2× this rate for stronger regularisation
-    """
+    """3D U-Net: (B, C, 64, 64, 64) -> (B, 1, 64, 64, 64) log10(nH2)."""
 
     def __init__(self, n_channels: int = 15, base_ch: int = 16, dropout: float = 0.1):
         super().__init__()
         b = base_ch
-        # Encoder
-        self.enc1 = ResConvBlock(n_channels, b,   dropout=dropout)    # (B, b,   D, H, W)
-        self.enc2 = Down(b,   b*2,               dropout=dropout)    # (B, b*2, D/2, ...)
-        self.enc3 = Down(b*2, b*4,               dropout=dropout)    # (B, b*4, D/4, ...)
-        # Bottleneck — stronger dropout to regularise the most compressed representation
-        self.bot  = Down(b*4, b*8,               dropout=min(dropout*2, 0.5))  # (B, b*8, D/8, ...)
-        # Decoder
-        self.dec3 = Up(b*8, b*4, b*4,            dropout=dropout)    # (B, b*4, D/4, ...)
-        self.dec2 = Up(b*4, b*2, b*2,            dropout=dropout)    # (B, b*2, D/2, ...)
-        self.dec1 = Up(b*2, b,   b,              dropout=dropout)    # (B, b,   D,   ...)
-        # Output
-        self.out  = nn.Conv3d(b, 1, kernel_size=1)                   # (B, 1,   D, H, W)
+        self.enc1 = ResConvBlock(n_channels, b,   dropout=dropout)
+        self.enc2 = Down(b,   b*2,               dropout=dropout)
+        self.enc3 = Down(b*2, b*4,               dropout=dropout)
+        # bottleneck gets 2x dropout
+        self.bot  = Down(b*4, b*8,               dropout=min(dropout*2, 0.5))
+        self.dec3 = Up(b*8, b*4, b*4,            dropout=dropout)
+        self.dec2 = Up(b*4, b*2, b*2,            dropout=dropout)
+        self.dec1 = Up(b*2, b,   b,              dropout=dropout)
+        self.out  = nn.Conv3d(b, 1, kernel_size=1)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         s1 = self.enc1(x)
@@ -133,16 +93,12 @@ class UNet3D(nn.Module):
         x  = self.dec3(x, s3)
         x  = self.dec2(x, s2)
         x  = self.dec1(x, s1)
-        return self.out(x)   # raw log10(nH2) prediction
+        return self.out(x)
 
-
-# ── Parameter count helper ─────────────────────────────────────────────────────
 
 def count_parameters(model: nn.Module) -> int:
     return sum(p.numel() for p in model.parameters() if p.requires_grad)
 
-
-# ── Quick smoke test ───────────────────────────────────────────────────────────
 
 if __name__ == '__main__':
     model = UNet3D(n_channels=15, base_ch=16)
@@ -154,4 +110,4 @@ if __name__ == '__main__':
     print(f"Input : {tuple(x.shape)}")
     print(f"Output: {tuple(y.shape)}")
     assert y.shape == (1, 1, 64, 64, 64), f"Unexpected output shape: {y.shape}"
-    print("Smoke test passed.")
+    print("OK")
