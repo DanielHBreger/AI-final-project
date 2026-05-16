@@ -1,0 +1,67 @@
+\begin{thebibliography}{}
+\makeatletter
+\relax
+\def\mn@urlcharsother{\let\do\@makeother \do\$\do\&\do\#\do\^\do\_\do\%\do\~}
+\def\mn@doi{\begingroup\mn@urlcharsother \@ifnextchar [ {\mn@doi@} {\mn@doi@[]}}
+\def\mn@doi@[#1]#2{\def\@tempa{#1}\ifx\@tempa\@empty \href {http://dx.doi.org/#2} {doi:#2}\else \href {http://dx.doi.org/#2} {#1}\fi \endgroup}
+\def\mn@eprint#1#2{\mn@eprint@#1:#2::\@nil}
+\def\mn@eprint@arXiv#1{\href {http://arxiv.org/abs/#1} {{\tt arXiv:#1}}}
+\def\mn@eprint@dblp#1{\href {http://dblp.uni-trier.de/rec/bibtex/#1.xml} {dblp:#1}}
+\def\mn@eprint@#1:#2:#3:#4\@nil{\def\@tempa {#1}\def\@tempb {#2}\def\@tempc {#3}\ifx \@tempc \@empty \let \@tempc \@tempb \let \@tempb \@tempa \fi \ifx \@tempb \@empty \def\@tempb {arXiv}\fi \@ifundefined {mn@eprint@\@tempb}{\@tempb:\@tempc}{\expandafter \expandafter \csname mn@eprint@\@tempb\endcsname \expandafter{\@tempc}}}
+
+\bibitem[\protect\citeauthoryear{Bisbas, van Dishoeck, Papadopoulos, Sz{\H u}cs, Bialy  \& Zhang}{Bisbas et~al.}{2021}]{Bisbas2021}
+Bisbas T.~G.,  van Dishoeck E.~F.,  Papadopoulos P.~P.,  Sz{\H u}cs L.,  Bialy S.,   Zhang Z.-Y.,  2021, ApJ, 912, 105
+
+\bibitem[\protect\citeauthoryear{Cazaux \& Tielens}{Cazaux \& Tielens}{2004}]{Cazaux2004}
+Cazaux S.,  Tielens A.~G.~G.~M.,  2004, ApJ, 604, 222
+
+\bibitem[\protect\citeauthoryear{Chen \& Guestrin}{Chen \& Guestrin}{2016}]{Chen2016}
+Chen T.,  Guestrin C.,  2016, in Proc.\ 22nd ACM SIGKDD International Conference on Knowledge Discovery and Data Mining. ACM, pp 785--794
+
+\bibitem[\protect\citeauthoryear{Draine \& Bertoldi}{Draine \& Bertoldi}{1996}]{Draine1996}
+Draine B.~T.,  Bertoldi F.,  1996, ApJ, 468, 269
+
+\bibitem[\protect\citeauthoryear{Glover \& Mac~Low}{Glover \& Mac~Low}{2007}]{Glover2007}
+Glover S.~C.~O.,  Mac~Low M.-M.,  2007, ApJS, 169, 239
+
+\bibitem[\protect\citeauthoryear{Glover, Federrath, Mac~Low  \& Klessen}{Glover et~al.}{2010}]{Glover2010}
+Glover S.~C.~O.,  Federrath C.,  Mac~Low M.-M.,   Klessen R.~S.,  2010, MNRAS, 404, 2
+
+\bibitem[\protect\citeauthoryear{Grassi, Bovino, Schleicher, Prieto, Seifried, Simoncini  \& Gianturco}{Grassi et~al.}{2014}]{Grassi2014}
+Grassi T.,  Bovino S.,  Schleicher D.~R.~G.,  Prieto J.,  Seifried D.,  Simoncini E.,   Gianturco F.~A.,  2014, MNRAS, 439, 2386
+
+\bibitem[\protect\citeauthoryear{Grinsztajn, Oyallon  \& Varoquaux}{Grinsztajn et~al.}{2022}]{Grinsztajn2022}
+Grinsztajn L.,  Oyallon E.,   Varoquaux G.,  2022, in Advances in Neural Information Processing Systems.
+
+\bibitem[\protect\citeauthoryear{Habing}{Habing}{1968}]{Habing1968}
+Habing H.~J.,  1968, Bull.\ Astron.\ Inst.\ Netherlands, 19, 421
+
+\bibitem[\protect\citeauthoryear{He, Zhang, Ren  \& Sun}{He et~al.}{2016}]{He2016}
+He K.,  Zhang X.,  Ren S.,   Sun J.,  2016, in Proc.\ IEEE Conference on Computer Vision and Pattern Recognition. pp 770--778
+
+\bibitem[\protect\citeauthoryear{Ioffe \& Szegedy}{Ioffe \& Szegedy}{2015}]{Ioffe2015}
+Ioffe S.,  Szegedy C.,  2015, arXiv e-prints, p. arXiv:1502.03167
+
+\bibitem[\protect\citeauthoryear{Katz et~al.,}{Katz et~al.}{2022}]{Katz2022}
+Katz H.,  et~al., 2022, MNRAS, 510, 5603
+
+\bibitem[\protect\citeauthoryear{Kingma \& Ba}{Kingma \& Ba}{2015}]{Kingma2015}
+Kingma D.~P.,  Ba J.,  2015, in Proc.\ 3rd International Conference on Learning Representations (ICLR).
+
+\bibitem[\protect\citeauthoryear{Narayanan, Krumholz, Ostriker  \& Hernquist}{Narayanan et~al.}{2012}]{Narayanan2012}
+Narayanan D.,  Krumholz M.~R.,  Ostriker E.~C.,   Hernquist L.,  2012, MNRAS, 421, 3127
+
+\bibitem[\protect\citeauthoryear{Ronneberger, Fischer  \& Brox}{Ronneberger et~al.}{2015}]{Ronneberger2015}
+Ronneberger O.,  Fischer P.,   Brox T.,  2015, in Medical Image Computing and Computer-Assisted Intervention -- MICCAI 2015, LNCS. Springer, pp 234--241
+
+\bibitem[\protect\citeauthoryear{Srivastava, Hinton, Krizhevsky, Sutskever  \& Salakhutdinov}{Srivastava et~al.}{2014}]{Srivastava2014}
+Srivastava N.,  Hinton G.,  Krizhevsky A.,  Sutskever I.,   Salakhutdinov R.,  2014, J.\ Mach.\ Learn.\ Res., 15, 1929
+
+\bibitem[\protect\citeauthoryear{Ulyanov, Vedaldi  \& Lempitsky}{Ulyanov et~al.}{2017}]{Ulyanov2017}
+Ulyanov D.,  Vedaldi A.,   Lempitsky V.,  2017, arXiv e-prints, p. arXiv:1607.08022
+
+\bibitem[\protect\citeauthoryear{Wolcott-Green, Haiman  \& Bryan}{Wolcott-Green et~al.}{2011}]{Wolcott-Green2011}
+Wolcott-Green J.,  Haiman Z.,   Bryan G.~L.,  2011, MNRAS, 418, 838
+
+\makeatother
+\end{thebibliography}
