@@ -28,7 +28,6 @@ for path in sorted(glob.glob('predictions/pred_g0_*_20260312_*.npz')):
     true = true_vol.ravel()
 
     # total H2 mass ratio (uniform grid -> mass proportional to sum of nH2)
-    mass_ratio = 10.0 ** pred @ np.ones_like(pred) / np.sum(10.0 ** true)
     mass_ratio = np.sum(10.0 ** pred) / np.sum(10.0 ** true)
 
     def r2(t, p):

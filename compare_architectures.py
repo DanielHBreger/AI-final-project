@@ -82,6 +82,7 @@ from augmentation import augment_cube, get_symmetry_ops
 from model_helpers import (
     GLOBAL_SEED, _set_seeds, _get_env_info,
     _XGB_CFG, FlexMLP, _compute_spatial_X, _compute_weights, _preds_to_volume,
+    fit_g0_bias_correction, predict_bias,
 )
 
 
@@ -529,7 +530,7 @@ def run_ensemble_cv(ensemble_name: str,
 def run_stacked_ensemble_cv(ensemble_name: str,
                              model_names: list[str],
                              all_preds_64: dict[str, tuple[list, list]],
-                             g0_values: list[float]) -> list[dict]:
+                             g0_values: list[float]) -> dict[str, list[dict]]:
     """Ridge-regression stacked ensemble trained on OOF predictions (no leakage).
 
     For each held-out fold i:
@@ -538,15 +539,26 @@ def run_stacked_ensemble_cv(ensemble_name: str,
       - Fit Ridge(alpha=1.0) on meta-train, then predict on fold i's predictions.
       - Reported weights show which model dominates for each fold.
 
+    Mass-budget recalibration: the Ridge intercept zeroes the *pooled* OOF
+    residual, but a G0-dependent bias survives and compounds to a large error
+    in the predicted total H2 mass.  For each fold we therefore also fit the
+    per-training-cube OOF bias as a linear function of log10(G0)
+    (fit_g0_bias_correction) and subtract its value at the held-out G0 —
+    training-cube quantities only, so no leakage.
+
+    Returns {ensemble_name: fold_metrics, ensemble_name + '_cal': fold_metrics}
+    for the raw and recalibrated predictions respectively.
+
     all_preds_64 must already be normalized to 64^3 space (call
     _normalize_preds_to_64 first).
     """
     n_folds = len(g0_values)
-    fold_metrics: list[dict] = []
+    fold_metrics:     list[dict] = []
+    fold_metrics_cal: list[dict] = []
     for fold in range(n_folds):
         y_true_val = all_preds_64[model_names[0]][0][fold]
 
-        X_meta_tr_parts, y_meta_tr_parts = [], []
+        X_meta_tr_parts, y_meta_tr_parts, g0_tr = [], [], []
         for j in range(n_folds):
             if j == fold:
                 continue
@@ -554,6 +566,7 @@ def run_stacked_ensemble_cv(ensemble_name: str,
             yp_j = np.stack([all_preds_64[m][1][j] for m in model_names], axis=1)
             X_meta_tr_parts.append(yp_j)
             y_meta_tr_parts.append(yt_j)
+            g0_tr.append(g0_values[j])
 
         X_meta_tr  = np.concatenate(X_meta_tr_parts, axis=0)   # (6*262144, n_models)
         y_meta_tr  = np.concatenate(y_meta_tr_parts, axis=0)   # (6*262144,)
@@ -563,12 +576,29 @@ def run_stacked_ensemble_cv(ensemble_name: str,
         meta.fit(X_meta_tr, y_meta_tr)
         y_stacked = meta.predict(X_meta_val).astype(np.float32)
 
-        metrics = compute_metrics(y_true_val, y_stacked)
+        # Per-training-cube OOF bias of the fitted meta-learner -> G0 trend
+        per_cube_bias = np.array([
+            float(np.mean(meta.predict(Xp) - yp))
+            for Xp, yp in zip(X_meta_tr_parts, y_meta_tr_parts)
+        ])
+        slope, intercept = fit_g0_bias_correction(per_cube_bias,
+                                                  np.array(g0_tr))
+        offset = predict_bias(slope, intercept, g0_values[fold])
+        y_stacked_cal = (y_stacked - offset).astype(np.float32)
+
+        metrics     = compute_metrics(y_true_val, y_stacked)
+        metrics_cal = compute_metrics(y_true_val, y_stacked_cal)
         fold_metrics.append(metrics)
+        fold_metrics_cal.append(metrics_cal)
         weights = {m: f"{w:.3f}" for m, w in zip(model_names, meta.coef_)}
         print(f"  {ensemble_name:<24}  fold={fold} (G0={g0_values[fold]:.1f})  "
-              f"R2={metrics['R2']:.4f}  w={weights}")
-    return fold_metrics
+              f"R2={metrics['R2']:.4f}  massR={metrics['mass_ratio']:.3f}  "
+              f"w={weights}")
+        print(f"  {ensemble_name + '_cal':<24}  fold={fold} (G0={g0_values[fold]:.1f})  "
+              f"R2={metrics_cal['R2']:.4f}  massR={metrics_cal['mass_ratio']:.3f}  "
+              f"offset={offset:+.3f} dex")
+    return {ensemble_name: fold_metrics,
+            ensemble_name + '_cal': fold_metrics_cal}
 
 
 def run_cnn_cv_guided(variant_name: str,
@@ -647,10 +677,6 @@ def save_comparison_log(all_results: dict[str, list[dict]],
                         log_path: str) -> None:
     out: dict = {'run_config': run_config, 'g0_values': g0_values, 'variants': {}}
     for name, fms in all_results.items():
-        r2s     = [m['R2']     for m in fms]
-        r2_lins = [m['R2_lin'] for m in fms]
-        rmse    = [m['RMSE']   for m in fms]
-        mae     = [m['MAE']    for m in fms]
         out['variants'][name] = {
             'folds': [
                 {'fold': i, 'g0': g0_values[i],
@@ -658,10 +684,9 @@ def save_comparison_log(all_results: dict[str, list[dict]],
                 for i, m in enumerate(fms)
             ],
             'summary': {
-                'R2':     {'mean': float(np.mean(r2s)),     'std': float(np.std(r2s))},
-                'R2_lin': {'mean': float(np.mean(r2_lins)), 'std': float(np.std(r2_lins))},
-                'RMSE':   {'mean': float(np.mean(rmse)),    'std': float(np.std(rmse))},
-                'MAE':    {'mean': float(np.mean(mae)),     'std': float(np.std(mae))},
+                key: {'mean': float(np.mean([m[key] for m in fms])),
+                      'std':  float(np.std([m[key] for m in fms]))}
+                for key in fms[0].keys()
             },
         }
     with open(log_path, 'w') as f:
@@ -871,8 +896,8 @@ if __name__ == '__main__':
             all_results[ens_name] = run_ensemble_cv(
                 ens_name, members, ens_preds, g0_vals)
         for stk_name, members in stacked_to_run:
-            all_results[stk_name] = run_stacked_ensemble_cv(
-                stk_name, members, ens_preds, g0_vals)
+            all_results.update(run_stacked_ensemble_cv(
+                stk_name, members, ens_preds, g0_vals))
 
     print_comparison(all_results, g0_vals)
     save_comparison_log(all_results, g0_vals, run_config, log_path)

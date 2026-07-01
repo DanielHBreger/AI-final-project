@@ -11,6 +11,13 @@ the held-out cube, and display a 3-panel interactive 3D comparison:
 Best model from run 231200: stacked_sp R2=0.9911, R2_lin=0.616
 4-run average: stacked_sp R2=0.988 +/- 0.002
 
+Mass-budget recalibration (on by default): the stacked predictions carry a
+G0-dependent positive bias (~+0.2 dex in the molecular phase) that compounds
+to a x1.6-1.9 error in the predicted total H2 mass.  The per-training-cube
+OOF bias of the Ridge meta-learner is fitted against log10(G0) and the value
+at the held-out G0 is subtracted — training-cube quantities only, no leakage.
+Both raw and recalibrated volumes are saved.  Disable with --no-recalibrate.
+
 Usage
 -----
   # Hold out G0=0.8 (default, near-best fold):
@@ -20,7 +27,7 @@ Usage
   python predict_and_visualize.py --g0 0.1
 
   # Quick demo (fewer epochs):
-  python predict_and_visualize.py --g0 1.6 --mlp-epochs 30 --cnn-epochs 50
+  python predict_and_visualize.py --g0 1.6 --mlp-epochs 30
 
   # Single-scale spatial only:
   python predict_and_visualize.py --spatial-kernels 3
@@ -47,6 +54,7 @@ from data_loader import (
 from classical_models import compute_metrics
 from model_helpers import (
     _XGB_CFG, FlexMLP, _compute_spatial_X, _compute_weights, _preds_to_volume,
+    fit_g0_bias_correction, predict_bias,
 )
 
 # ── Training functions ─────────────────────────────────────────────────────────
@@ -121,7 +129,8 @@ def _train_mlp(X_tr: np.ndarray, y_tr: np.ndarray,
 
 def _run_fold(fold: int, g0_val: float,
               X_sp: np.ndarray, y: np.ndarray, fold_labels: np.ndarray,
-              cubes: list, g0_vals: list, mlp_epochs: int, spatial_kernels: list) -> None:
+              cubes: list, g0_vals: list, mlp_epochs: int, spatial_kernels: list,
+              recalibrate: bool = True) -> None:
     """Train stacked_sp on N-1 cubes, predict on the held-out fold.
 
     Stacking procedure:
@@ -130,6 +139,12 @@ def _run_fold(fold: int, g0_val: float,
       2. Ridge(alpha=1.0) is fit on those OOF predictions.
       3. Final base models are trained on all 6 training cubes; Ridge meta
          is applied to their predictions on the held-out cube.
+
+    Mass-budget recalibration (recalibrate=True): the Ridge intercept zeroes
+    the pooled OOF residual, but a G0-dependent bias survives and inflates
+    the predicted total H2 mass.  The per-training-cube OOF bias of the
+    stacked model is fitted against log10(G0) and the fitted value at the
+    held-out G0 is subtracted from the predictions (leakage-free).
     """
     train_folds = [f for f in np.unique(fold_labels).tolist() if f != fold]
 
@@ -152,6 +167,20 @@ def _run_fold(fold: int, g0_val: float,
     meta   = Ridge(alpha=1.0, fit_intercept=True)
     meta.fit(X_meta, y_meta)
 
+    # ── Mass-budget recalibration: per-cube stacked-OOF bias vs log10(G0) ─────
+    per_cube_bias = np.array([
+        float(np.mean(meta.predict(np.column_stack([xgb_j, mlp_j])) - yt_j))
+        for yt_j, xgb_j, mlp_j in zip(meta_yt, meta_xgb, meta_mlp)
+    ])
+    bias_slope, bias_intercept = fit_g0_bias_correction(
+        per_cube_bias, np.array([g0_vals[j] for j in train_folds]))
+    bias_offset = (predict_bias(bias_slope, bias_intercept, g0_val)
+                   if recalibrate else 0.0)
+    print(f"\n  OOF bias per training cube (dex): "
+          f"{np.array2string(per_cube_bias, precision=3)}")
+    print(f"  Fitted bias(G0={g0_val}) = {bias_offset:+.3f} dex "
+          f"({'applied' if recalibrate else 'NOT applied'})")
+
     # ── Step 2: Final base models on all 6 training cubes ─────────────────────
     mask = fold_labels != fold
     X_tr = X_sp[mask];  y_tr = y[mask]
@@ -164,35 +193,52 @@ def _run_fold(fold: int, g0_val: float,
     m_xgb = compute_metrics(y_va, y_xgb)
     print(f"  XGB  R2={m_xgb['R2']:.4f}  R2_lin={m_xgb['R2_lin']:.4f}  RMSE={m_xgb['RMSE']:.4f}")
 
-        print(f"\n[mlp_wide_sp]  {mlp_epochs} epochs...")
-        y_mlp = _train_mlp(X_tr, y_tr, X_va, y_va, epochs=mlp_epochs)
-        m_mlp = compute_metrics(y_va, y_mlp)
-        print(f"  MLP  R2={m_mlp['R2']:.4f}  R2_lin={m_mlp['R2_lin']:.4f}  RMSE={m_mlp['RMSE']:.4f}")
+    print(f"\n[mlp_wide_sp]  {mlp_epochs} epochs...")
+    y_mlp = _train_mlp(X_tr, y_tr, X_va, y_va, epochs=mlp_epochs)
+    m_mlp = compute_metrics(y_va, y_mlp)
+    print(f"  MLP  R2={m_mlp['R2']:.4f}  R2_lin={m_mlp['R2_lin']:.4f}  RMSE={m_mlp['RMSE']:.4f}")
 
-    # ── Step 3: Apply Ridge meta ───────────────────────────────────────────────
-    y_stacked = meta.predict(np.column_stack([y_xgb, y_mlp])).astype(np.float32)
+    # ── Step 3: Apply Ridge meta + bias recalibration ──────────────────────────
+    y_stacked_raw = meta.predict(np.column_stack([y_xgb, y_mlp])).astype(np.float32)
+    y_stacked     = (y_stacked_raw - bias_offset).astype(np.float32)
+    m_raw     = compute_metrics(y_va, y_stacked_raw)
     m_stacked = compute_metrics(y_va, y_stacked)
-    print(f"\n[Step 3/3] stacked_sp  R2={m_stacked['R2']:.4f}  "
-          f"R2_lin={m_stacked['R2_lin']:.4f}  RMSE={m_stacked['RMSE']:.4f}")
+    print(f"\n[Step 3/3] stacked_sp (raw)  R2={m_raw['R2']:.4f}  "
+          f"R2_lin={m_raw['R2_lin']:.4f}  RMSE={m_raw['RMSE']:.4f}  "
+          f"bias={m_raw['bias']:+.3f}  massRatio={m_raw['mass_ratio']:.3f}")
+    print(f"           stacked_sp (cal)  R2={m_stacked['R2']:.4f}  "
+          f"R2_lin={m_stacked['R2_lin']:.4f}  RMSE={m_stacked['RMSE']:.4f}  "
+          f"bias={m_stacked['bias']:+.3f}  massRatio={m_stacked['mass_ratio']:.3f}")
     print(f"  Ridge weights: XGB={meta.coef_[0]:.3f}  MLP={meta.coef_[1]:.3f}  "
           f"intercept={meta.intercept_:.3f}")
 
-    pred_vol = _preds_to_volume(cubes[fold], y_stacked)
+    # pred_vol is the delivered (recalibrated) prediction; the raw volume is
+    # kept alongside so the correction remains inspectable after the fact.
+    pred_vol     = _preds_to_volume(cubes[fold], y_stacked)
+    pred_vol_raw = _preds_to_volume(cubes[fold], y_stacked_raw)
 
     os.makedirs('predictions', exist_ok=True)
     timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
     save_path = f'predictions/pred_g0_{g0_val}_{timestamp}.npz'
     np.savez_compressed(
         save_path,
-        pred_vol        = pred_vol,
-        g0              = np.float64(g0_val),
-        r2_xgb          = np.float32(m_xgb['R2']),
-        r2_mlp          = np.float32(m_mlp['R2']),
-        r2_stacked      = np.float32(m_stacked['R2']),
-        meta_coef       = np.array(meta.coef_,    dtype=np.float32),
-        meta_intercept  = np.float32(meta.intercept_),
-        spatial_kernels = np.array(spatial_kernels, dtype=np.int32),
-        mlp_epochs      = np.int32(mlp_epochs),
+        pred_vol         = pred_vol,
+        pred_vol_raw     = pred_vol_raw,
+        g0               = np.float64(g0_val),
+        r2_xgb           = np.float32(m_xgb['R2']),
+        r2_mlp           = np.float32(m_mlp['R2']),
+        r2_stacked       = np.float32(m_stacked['R2']),
+        r2_stacked_raw   = np.float32(m_raw['R2']),
+        mass_ratio       = np.float32(m_stacked['mass_ratio']),
+        mass_ratio_raw   = np.float32(m_raw['mass_ratio']),
+        bias_offset      = np.float32(bias_offset),
+        bias_slope       = np.float32(bias_slope),
+        bias_intercept   = np.float32(bias_intercept),
+        per_cube_bias    = per_cube_bias.astype(np.float32),
+        meta_coef        = np.array(meta.coef_,    dtype=np.float32),
+        meta_intercept   = np.float32(meta.intercept_),
+        spatial_kernels  = np.array(spatial_kernels, dtype=np.int32),
+        mlp_epochs       = np.int32(mlp_epochs),
     )
     print(f"Prediction saved -> {save_path}")
 
@@ -205,16 +251,17 @@ def main() -> None:
     parser.add_argument('--g0', type=float, default=0.8,
                         help='G0 value to hold out as validation (default: 0.8). '
                              'Available: 0.1 0.2 0.4 0.8 1.6 3.2 6.4')
-    parser.add_argument('--model', choices=['cnn', 'ensemble', 'both'], default='both',
-                        help='Which model to train and save (default: both)')
     parser.add_argument('--mlp-epochs', type=int, default=100,
                         help='MLP training epochs (default: 100; use 30 for a fast demo)')
-    parser.add_argument('--cnn-epochs', type=int, default=150,
-                        help='CNN (unet_baseline) training epochs (default: 150)')
     parser.add_argument('--spatial-kernels', nargs='+', type=int, default=[3, 5, 7],
                         help='Spatial filter kernel sizes (default: 3 5 7)')
     parser.add_argument('--all', action='store_true',
                         help='Run all 7 G0 folds and save a prediction file for each')
+    parser.add_argument('--no-recalibrate', action='store_false', dest='recalibrate',
+                        help='Disable the G0-dependent bias recalibration '
+                             '(mass-budget fix); raw stacked predictions are '
+                             'then saved as pred_vol.')
+    parser.set_defaults(recalibrate=True)
     add_drop_args(parser)
     args = parser.parse_args()
 
@@ -240,32 +287,25 @@ def main() -> None:
     X_sp = np.concatenate([X, X_extra], axis=1)
     print(f"  Spatial features: {n_sp}  ->  X_sp shape: {X_sp.shape}")
 
-    # ── CNN volumes (CNN only) ─────────────────────────────────────────────────
-    all_cnn_vols = None
-    if run_cnn:
-        print("\nBuilding CNN volumes (features + target)...")
-        all_cnn_vols = [cube_to_volumes(df, FEATURE_COLS + [LOG_TARGET_COL])
-                        for df in cubes]
-
     # ── Run fold(s) ────────────────────────────────────────────────────────────
-    run_kwargs = dict(mlp_epochs=args.mlp_epochs, spatial_kernels=args.spatial_kernels,
-                      cnn_epochs=args.cnn_epochs, models=args.model)
     if args.all:
-        print(f"\nRunning all {len(g0_vals)} folds  (model={args.model})...")
+        print(f"\nRunning all {len(g0_vals)} folds...")
         for fold, g0_val in enumerate(g0_vals):
             print(f"\n{'='*60}\nFold {fold+1}/{len(g0_vals)}  G0={g0_val}\n{'='*60}")
             _run_fold(fold, g0_val, X_sp, y, fold_labels, cubes, g0_vals,
-                      args.mlp_epochs, args.spatial_kernels)
+                      args.mlp_epochs, args.spatial_kernels,
+                      recalibrate=args.recalibrate)
     else:
         if args.g0 not in g0_vals:
             print(f"ERROR: G0={args.g0} not found. Available: {g0_vals}", file=sys.stderr)
             sys.exit(1)
         fold = g0_vals.index(args.g0)
-        print(f"\nValidation fold: {fold}  (G0={args.g0})  model={args.model}")
+        print(f"\nValidation fold: {fold}  (G0={args.g0})")
         print(f"Training on {len(cubes) - 1} cubes  |  "
               f"Validating on 1 cube (G0={args.g0})")
         _run_fold(fold, args.g0, X_sp, y, fold_labels, cubes, g0_vals,
-                  args.mlp_epochs, args.spatial_kernels)
+                  args.mlp_epochs, args.spatial_kernels,
+                  recalibrate=args.recalibrate)
 
 
 if __name__ == '__main__':

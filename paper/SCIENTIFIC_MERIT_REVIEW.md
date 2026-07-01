@@ -249,7 +249,7 @@ memorable.
 
 | # | Action | Cost | Effect |
 |---|--------|------|--------|
-| 1 | Mass-budget table/panel + mass-weighted metrics; recalibrate or show full-schedule run is unbiased (with D2/D3) | hours | removes a hidden ×1.7 systematic; mandatory |
+| 1 | Mass-budget table/panel + mass-weighted metrics; recalibrate or show full-schedule run is unbiased (with D2/D3) — **fix implemented in code (see below), not yet run** | hours | removes a hidden ×1.7 systematic; mandatory |
 | 2 | Phase-conditional metrics (molecular/diffuse) in results; quote molecular RMSE in abstract | hours | honest headline |
 | 3 | One different-seed test simulation (ask simulators) | external | transforms scope of claims |
 | 4 | z-column cumulative features vs f_H2 gap | ~3 h compute | mechanism demonstrated |
@@ -264,3 +264,34 @@ Manuscript changes already applied during this round: Section 2.1 corrected
 from the data; medians quoted), and the corresponding limitation rephrased.
 Analysis scripts `merit_metrics.py` and `check_fields.py` are in the repo
 root for reproduction.
+
+### Mass-budget fix: implemented in code (2026-07-02), awaiting a run
+
+The recalibration is now wired into the pipeline; nothing has been executed
+yet. Design: the Ridge meta-learner's intercept already zeroes the *pooled*
+OOF residual, so a constant offset would be a no-op — the surviving bias is
+G0-dependent. The fix computes the stacked model's mean OOF residual on each
+*training* cube, fits it as a linear function of log10(G0)
+(`fit_g0_bias_correction` / `predict_bias` in `model_helpers.py`), and
+subtracts the fitted value at the held-out G0. Training-cube quantities only:
+leakage-free.
+
+Where it lives:
+
+- `classical_models.compute_metrics` now also returns `bias` (mean residual,
+  dex) and `mass_ratio` (predicted/true total H2 mass, clipped like R2_lin),
+  so every pipeline and JSON log reports the mass budget automatically.
+- `compare_architectures.run_stacked_ensemble_cv` reports each stacked
+  ensemble twice: raw (`stacked_sp`) and recalibrated (`stacked_sp_cal`),
+  with the per-fold offset printed; JSON summaries now aggregate all metric
+  keys including `mass_ratio`.
+- `predict_and_visualize.py` applies the correction by default
+  (`--no-recalibrate` to disable); saved `.npz` files now contain the
+  recalibrated `pred_vol`, the raw `pred_vol_raw`, the fitted
+  slope/intercept/offset, the per-cube OOF biases, and raw+calibrated
+  R²/mass-ratio. (The script's dead CNN code paths, which had left it
+  syntactically broken, were repaired in passing.)
+
+To produce the paper numbers: rerun `predict_and_visualize.py --all`
+(full-schedule volumes + recalibration, addresses D2+D3 together) and rerun
+`compare_architectures.py` to get the `stacked_sp_cal` row for Table 1/2.

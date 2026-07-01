@@ -16,6 +16,8 @@ Contents
   _compute_spatial_X   -- multi-scale neighbourhood mean features
   _compute_weights     -- exponential density-weighted sample weights
   _preds_to_volume     -- reshape flat predictions to 128^3 volume
+  fit_g0_bias_correction -- fit per-cube OOF bias vs log10(G0) (mass-budget fix)
+  predict_bias         -- evaluate the fitted bias correction at a G0 value
   _fit_xgb             -- fit XGBoost, return (model, scaler)
   _predict_xgb         -- predict with fitted XGBoost
   _fit_mlp             -- fit MLP with density weighting, return (model, scaler, device, y_min, y_max)
@@ -161,6 +163,39 @@ def _preds_to_volume(cube_df, y_pred_log: np.ndarray) -> np.ndarray:
     iz  = cube_df['iz'].values.astype(int) - 1
     vol[ix, iy, iz] = y_pred_log.astype(np.float32)
     return np.nan_to_num(vol)
+
+
+# ── G0-dependent bias recalibration (mass-budget fix) ─────────────────────────
+#
+# The stacked ensemble carries a systematic positive residual (pred - true) of
+# ~+0.2 dex in the molecular phase, which compounds to a x1.6-1.9 error in the
+# total H2 mass of a predicted cube.  A constant offset cannot fix this: the
+# Ridge meta-learner fits an intercept on the pooled OOF sample, so the pooled
+# mean residual is already ~0 and the surviving bias is G0-dependent.  The fix
+# fits the per-training-cube OOF bias as a linear function of log10(G0) and
+# subtracts the value interpolated/extrapolated at the held-out G0.  Only
+# training-cube quantities are used: leakage-free.
+
+def fit_g0_bias_correction(per_cube_bias: np.ndarray,
+                           g0_train: np.ndarray) -> tuple[float, float]:
+    """Least-squares fit of per-cube OOF prediction bias against log10(G0).
+
+    per_cube_bias[j] is the mean residual (pred - true, dex) of the stacked
+    model's out-of-fold predictions on training cube j; g0_train[j] is that
+    cube's G0.  Returns (slope, intercept) such that
+
+        predicted_bias(G0) = slope * log10(G0) + intercept.
+    """
+    lg = np.log10(np.asarray(g0_train, dtype=np.float64))
+    A  = np.stack([lg, np.ones_like(lg)], axis=1)
+    coef, *_ = np.linalg.lstsq(A, np.asarray(per_cube_bias, dtype=np.float64),
+                               rcond=None)
+    return float(coef[0]), float(coef[1])
+
+
+def predict_bias(slope: float, intercept: float, g0: float) -> float:
+    """Evaluate the fitted bias correction at a G0 value (dex offset)."""
+    return slope * float(np.log10(g0)) + intercept
 
 
 # ── Fit / predict helpers (single-model, return model for reuse) ───────────────

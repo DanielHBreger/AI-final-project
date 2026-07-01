@@ -52,26 +52,39 @@ def compute_metrics(y_true_log: np.ndarray, y_pred_log: np.ndarray) -> dict:
     clipped to [min_true - 1 dex, max_true + 1 dex] before exponentiation
     to prevent numerical explosion from outlier neural-net predictions.
 
+    Mass-budget metrics: 'bias' is the mean log-space residual (pred - true,
+    dex); 'mass_ratio' is predicted / true total nH2 (uniform grid, so the
+    cell-volume factor cancels and this equals the H2 mass ratio), computed
+    from the same clipped predictions as R2_lin.  R2 is insensitive to a
+    small uniform offset against the 16-dex target range, but that offset
+    compounds exponentially in the mass budget — these two numbers expose it.
+
     Inputs are log10(nH2) arrays.
     """
     # Primary: log-space metrics
     r2   = float(r2_score(y_true_log, y_pred_log))
     rmse = float(np.sqrt(mean_squared_error(y_true_log, y_pred_log)))
     mae  = float(mean_absolute_error(y_true_log, y_pred_log))
+    bias = float(np.mean(np.asarray(y_pred_log, dtype=np.float64)
+                         - np.asarray(y_true_log, dtype=np.float64)))
 
     # Secondary: linear-space R2 with clipped predictions
     clip_lo = float(y_true_log.min()) - 1.0
     clip_hi = float(y_true_log.max()) + 1.0
     y_pred_clip = np.clip(y_pred_log, clip_lo, clip_hi)
-    y_true_lin = 10.0 ** y_true_log
-    y_pred_lin = 10.0 ** y_pred_clip
+    y_true_lin = 10.0 ** np.asarray(y_true_log, dtype=np.float64)
+    y_pred_lin = 10.0 ** np.asarray(y_pred_clip, dtype=np.float64)
     r2_lin = float(r2_score(y_true_lin, y_pred_lin))
 
+    mass_ratio = float(y_pred_lin.sum() / y_true_lin.sum())
+
     return {
-        'R2':     r2,
-        'RMSE':   rmse,
-        'MAE':    mae,
-        'R2_lin': r2_lin,
+        'R2':         r2,
+        'RMSE':       rmse,
+        'MAE':        mae,
+        'R2_lin':     r2_lin,
+        'bias':       bias,
+        'mass_ratio': mass_ratio,
     }
 
 
