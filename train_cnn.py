@@ -23,10 +23,12 @@ import torch.nn.functional as F
 
 from data_loader import (load_all_cubes, cube_to_volumes,
                          get_g0_values, get_feature_cols, add_drop_args, build_drop_set,
-                         FEATURE_COLS, LOG_TARGET_COL)
+                         FEATURE_COLS, LOG_TARGET_COL, compute_data_checksum)
 from augmentation import augment_cube, get_symmetry_ops
 from cnn_model import UNet3D, count_parameters
 from classical_models import compute_metrics, print_results
+from model_helpers import GLOBAL_SEED, _set_seeds, _get_env_info
+
 
 # ── Columns that form the CNN input channels ──────────────────────────────────
 # (same as FEATURE_COLS but expressed as volume keys, not flat-table names)
@@ -92,12 +94,18 @@ def train_one_fold(train_vols: list[dict],
                    val_vols:   list[dict],
                    ops:        list[np.ndarray],
                    device:     torch.device,
-                   epochs:     int = 50,
+                   epochs:     int = 150,
                    lr:         float = 5e-4,
-                   warmup_epochs: int = 10) -> tuple[UNet3D, dict, list[dict]]:
+                   warmup_epochs: int = 10,
+                   base_ch:    int = 32,
+                   dropout:    float = 0.0,
+                   seed:       int = 0,
+                   input_cols: list[str] | None = None,
+                   ) -> tuple[UNet3D, dict, list[dict]]:
 
-    train_ds = CubeDataset(train_vols, ops, augment=True)
-    val_ds   = CubeDataset(val_vols,   ops=None, augment=False)
+    _set_seeds(GLOBAL_SEED + seed)
+    train_ds = CubeDataset(train_vols, ops, augment=True, input_cols=input_cols)
+    val_ds   = CubeDataset(val_vols,   ops=None, augment=False, input_cols=input_cols)
 
     # Per-channel normalization — same fold-safe pattern as StandardScaler for the MLP.
     # Statistics computed from training cubes only, then applied to val.
@@ -123,7 +131,8 @@ def train_one_fold(train_vols: list[dict],
     val_dl   = DataLoader(val_ds,   batch_size=1, shuffle=False,
                           num_workers=0, pin_memory=pin_mem)
 
-    model      = UNet3D(n_channels=len(CNN_INPUT_COLS), base_ch=16, dropout=0.1).to(device)
+    _n_ch  = len(input_cols) if input_cols is not None else len(CNN_INPUT_COLS)
+    model      = UNet3D(n_channels=_n_ch, base_ch=base_ch, dropout=dropout).to(device)
     opt        = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=1e-5)
     # Linear warmup for `warmup_epochs`, then cosine decay to 0
     def _lr_lambda(ep: int) -> float:
@@ -206,10 +215,13 @@ def train_one_fold(train_vols: list[dict],
 
 def run_cnn_cv(safe_only:    bool = True,
                epochs:       int  = 150,
+               base_ch:      int  = 32,
+               dropout:      float = 0.0,
                save_models:  bool = False,
                log_path:     str | None = None,
                feature_cols: list[str] | None = None) -> list[dict]:
 
+    _set_seeds(GLOBAL_SEED)
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f"Device: {device}")
 
@@ -228,20 +240,40 @@ def run_cnn_cv(safe_only:    bool = True,
 
     ops = get_symmetry_ops(safe_only=safe_only)
     print(f"Symmetry ops: {len(ops)}  ({'safe z-preserving' if safe_only else 'full Oh'})")
-    n_params = count_parameters(UNet3D(n_channels=len(input_cols)))
-    print(f"UNet3D params: {n_params:,}")
+    n_params = count_parameters(UNet3D(n_channels=len(input_cols), base_ch=base_ch, dropout=dropout))
+    print(f"UNet3D params: {n_params:,}  (base_ch={base_ch}, dropout={dropout})")
+
+    print("Computing data checksum...")
+    data_checksum = compute_data_checksum()
+    env_info = _get_env_info()
 
     run_config = {
-        'timestamp':   datetime.datetime.now().isoformat(timespec='seconds'),
-        'device':      str(device),
-        'epochs':      epochs,
-        'safe_only':   safe_only,
-        'n_folds':     n_folds,
-        'n_params':    n_params,
-        'input_cols':  input_cols,
-        'target_col':  CNN_TARGET_COL,
-        'grid_size':   GRID_SIZE,
-        'n_sym_ops':   len(ops),
+        'timestamp':          datetime.datetime.now().isoformat(timespec='seconds'),
+        'global_seed':        GLOBAL_SEED,
+        'device':             str(device),
+        'epochs':             epochs,
+        'safe_only':          safe_only,
+        'n_folds':            n_folds,
+        'n_params':           n_params,
+        'input_cols':         input_cols,
+        'target_col':         CNN_TARGET_COL,
+        'grid_size':          GRID_SIZE,
+        'raw_grid':           RAW_GRID,
+        'n_sym_ops':          len(ops),
+        'sym_ops_type':       'z-preserving' if safe_only else 'full_Oh',
+        'architecture':       'UNet3D',
+        'base_ch':            base_ch,
+        'dropout':            dropout,
+        'lr':                 5e-4,
+        'weight_decay':       1e-5,
+        'warmup_epochs':      10,
+        'optimizer':          'Adam',
+        'scheduler':          'LambdaLR_warmup+cosine',
+        'loss':               'MSE',
+        'batch_size':         1,
+        'cudnn_deterministic': True,
+        'env':                env_info,
+        'data':               data_checksum,
     }
 
     fold_metrics  = []
@@ -252,7 +284,9 @@ def run_cnn_cv(safe_only:    bool = True,
         val_vols   = [all_vols[fold]]
 
         model, metrics, history = train_one_fold(
-            train_vols, val_vols, ops, device, epochs=epochs, input_cols=input_cols)
+            train_vols, val_vols, ops, device, epochs=epochs,
+            base_ch=base_ch, dropout=dropout,
+            input_cols=input_cols, seed=fold)
 
         fold_metrics.append(metrics)
         log_folds.append({
@@ -292,12 +326,19 @@ def run_cnn_cv(safe_only:    bool = True,
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--all-ops', action='store_true',
+    parser.add_argument('--all-ops',  action='store_true',
                         help='Use all 48 Oh operations (default: 8 safe z-preserving)')
-    parser.add_argument('--epochs', type=int, default=200)
-    parser.add_argument('--save',   action='store_true',
+    parser.add_argument('--epochs',   type=int,   default=150,
+                        help='Training epochs per fold (paper uses 150 for unet_standard)')
+    parser.add_argument('--base-ch',  type=int,   default=32,
+                        help='Base channel count: 16=unet_small, 32=unet_standard (default), '
+                             '64=unet_large')
+    parser.add_argument('--dropout',  type=float, default=0.0,
+                        help='Dropout probability (default 0.0; paper shows dropout '
+                             'catastrophically degrades extrapolation folds)')
+    parser.add_argument('--save',     action='store_true',
                         help='Save best model weights per fold')
-    parser.add_argument('--log',    type=str, default=None,
+    parser.add_argument('--log',      type=str,   default=None,
                         help='Path for JSON training log (default: cnn_training_TIMESTAMP.json)')
     add_drop_args(parser)
     args = parser.parse_args()
@@ -305,6 +346,8 @@ if __name__ == '__main__':
     feat_cols = get_feature_cols(build_drop_set(args))
     run_cnn_cv(safe_only=not args.all_ops,
                epochs=args.epochs,
+               base_ch=args.base_ch,
+               dropout=args.dropout,
                save_models=args.save,
                log_path=args.log,
                feature_cols=feat_cols)

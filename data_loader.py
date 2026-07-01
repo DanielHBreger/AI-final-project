@@ -4,6 +4,7 @@ Load, preprocess, and expose all 7 simulation cubes for ML training.
 """
 
 import argparse
+import hashlib
 import os
 import glob
 import pandas as pd
@@ -151,6 +152,32 @@ def cube_to_volumes(df: pd.DataFrame, cols: list[str]) -> dict[str, np.ndarray]:
         vol[ix, iy, iz] = df[col].values.astype(np.float32)
         volumes[col] = vol
     return volumes
+
+
+def compute_data_checksum(data_root: str = 'icedrive-dl-182bd/UVonly') -> dict:
+    """Compute a reproducibility fingerprint of the dataset CSV files.
+
+    Hashes the first 8 KB + file size of every CSV to detect any change in
+    the input data without reading the full files.  Include the returned dict
+    in every experiment log so readers can verify they used the same data.
+    """
+    csv_paths = sorted(glob.glob(os.path.join(data_root, '*', '*.csv')))
+    h = hashlib.sha256()
+    file_info = []
+    for path in csv_paths:
+        size = os.path.getsize(path)
+        with open(path, 'rb') as f:
+            head = f.read(8192)
+        h.update(path.encode())
+        h.update(size.to_bytes(8, 'little'))
+        h.update(head)
+        file_info.append({'path': os.path.relpath(path).replace('\\', '/'),
+                          'size_bytes': size})
+    return {
+        'sha256_partial': h.hexdigest(),
+        'n_files': len(csv_paths),
+        'files': file_info,
+    }
 
 
 def get_g0_values(cubes: list[pd.DataFrame]) -> list[float]:

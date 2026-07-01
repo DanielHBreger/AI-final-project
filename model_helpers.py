@@ -8,6 +8,9 @@ Imported by: predict_and_visualize.py, compare_architectures.py,
 
 Contents
 --------
+  GLOBAL_SEED          -- canonical random seed used across all scripts
+  _set_seeds           -- set all RNG seeds + cudnn determinism flags
+  _get_env_info        -- collect package versions for experiment logs
   _XGB_CFG             -- xgb_standard hyper-parameter dict
   FlexMLP              -- configurable feed-forward MLP (BatchNorm + ReLU)
   _compute_spatial_X   -- multi-scale neighbourhood mean features
@@ -19,6 +22,9 @@ Contents
   _predict_mlp         -- predict with fitted MLP (with output clipping)
 """
 
+import platform
+import random
+import sys
 import warnings
 import numpy as np
 import torch
@@ -29,6 +35,43 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import Ridge   # noqa: F401 — re-exported for convenience
 
 from classical_models import compute_metrics
+
+
+# ── Reproducibility ───────────────────────────────────────────────────────────
+
+GLOBAL_SEED = 67
+
+
+def _set_seeds(seed: int) -> None:
+    """Set all global RNG seeds and enable cudnn determinism."""
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+
+
+def _get_env_info() -> dict:
+    """Return package versions and hardware info for experiment logs."""
+    import sklearn
+    import scipy
+    info: dict = {
+        'python':             sys.version,
+        'platform':           platform.platform(),
+        'numpy':              np.__version__,
+        'torch':              torch.__version__,
+        'torch_cuda_version': torch.version.cuda,
+        'xgboost':            xgb.__version__,
+        'sklearn':            sklearn.__version__,
+        'scipy':              scipy.__version__,
+        'cuda_available':     torch.cuda.is_available(),
+    }
+    if torch.cuda.is_available():
+        info['cuda_device']       = torch.cuda.get_device_name(0)
+        info['cuda_device_count'] = torch.cuda.device_count()
+    return info
 
 
 # ── XGBoost config ─────────────────────────────────────────────────────────────
@@ -44,7 +87,7 @@ _XGB_CFG = dict(
 
 class FlexMLP(nn.Module):
     """Feed-forward MLP with configurable hidden dimensions and BatchNorm."""
-    def __init__(self, in_dim: int, hidden_dims: list[int] = (512, 512, 256, 128)):
+    def __init__(self, in_dim: int, hidden_dims: list[int] = [512, 512, 256, 128]):
         super().__init__()
         layers: list[nn.Module] = []
         prev = in_dim
@@ -67,6 +110,10 @@ def _compute_spatial_X(cubes: list, all_vols: list[dict], feature_cols: list[str
     For each kernel size in kernel_sizes, computes the k^3 neighbourhood mean at
     every grid point, then indexes back to DataFrame row order using ix/iy/iz.
     Results from all scales are concatenated along the feature axis.
+
+    kernel_sizes are FULL side lengths passed directly to scipy uniform_filter's
+    `size` parameter (e.g. size=3 → 3×3×3 = 27-voxel window). The paper's
+    Eq. 3 label "kernel half-widths" is a notation error; the code is correct.
 
     Returns (N, len(feature_cols) * len(kernel_sizes)) float32 array.
     Default scales (3, 5, 7) give 3 x 15 = 45 spatial features.
@@ -137,6 +184,7 @@ def _predict_xgb(model: xgb.XGBRegressor, sc: StandardScaler,
 
 def _fit_mlp(X_tr: np.ndarray, y_tr: np.ndarray,
              epochs: int = 100, quiet: bool = False,
+             seed: int = 0,
              ) -> tuple[nn.Module, StandardScaler, torch.device, float, float]:
     """Fit MLP (mlp_wide + density weighting). Return (model, scaler, device, y_min, y_max)."""
     device  = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -152,15 +200,18 @@ def _fit_mlp(X_tr: np.ndarray, y_tr: np.ndarray,
     n_tr   = len(X_tr_t)
     w_tr_t = torch.from_numpy(_compute_weights(y_tr)).to(device)
 
-    torch.manual_seed(0)
-    np.random.seed(0)
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
 
     model = FlexMLP(X_tr_s.shape[1]).to(device)
     opt   = torch.optim.Adam(model.parameters(), lr=1e-3, weight_decay=1e-5)
     with warnings.catch_warnings():
         warnings.simplefilter('ignore', UserWarning)
         sched = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=epochs)
-    scaler_amp = torch.amp.GradScaler('cuda', enabled=use_amp)
+    scaler_amp = torch.amp.GradScaler('cuda', enabled=use_amp) # type: ignore
     batch_size = 262_144
 
     log_at = {0, epochs // 4, epochs // 2, 3 * epochs // 4, epochs - 1}
@@ -173,7 +224,7 @@ def _fit_mlp(X_tr: np.ndarray, y_tr: np.ndarray,
             yb = y_tr_t[perm[i : i + batch_size]]
             wb = w_tr_t[perm[i : i + batch_size]]
             opt.zero_grad(set_to_none=True)
-            with torch.amp.autocast('cuda', enabled=use_amp):
+            with torch.amp.autocast('cuda', enabled=use_amp): # type: ignore
                 loss = (wb * (model(xb) - yb) ** 2).mean()
             scaler_amp.scale(loss).backward()
             scaler_amp.step(opt)
@@ -197,6 +248,6 @@ def _predict_mlp(model: nn.Module, sc: StandardScaler,
     use_amp = device.type == 'cuda'
     X_s = sc.transform(X).astype(np.float32)
     model.eval()
-    with torch.no_grad(), torch.amp.autocast('cuda', enabled=use_amp):
+    with torch.no_grad(), torch.amp.autocast('cuda', enabled=use_amp): # type: ignore
         y_pred = model(torch.from_numpy(X_s).to(device)).float().cpu().numpy()
     return np.clip(y_pred, y_min - 2.0, y_max + 2.0).astype(np.float32)

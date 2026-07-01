@@ -7,121 +7,152 @@
 \citation{Narayanan2012}
 \citation{Wolcott-Green2011}
 \citation{Grassi2014}
+\citation{Krumholz2009,Gnedin2011,Sternberg2014,Bialy2016}
+\citation{deMijolla2019}
+\citation{Holdship2021}
+\citation{Grassi2022}
+\citation{Branca2024}
+\citation{Grassi2014}
 \citation{Glover2007,Glover2010}
-\citation{Bisbas2021,Katz2022}
 \newlabel{firstpage}{{}{1}{}{Doc-Start}{}}
 \@writefile{toc}{\contentsline {section}{\numberline {1}Introduction}{1}{section.1}\protected@file@percent }
 \newlabel{sec:intro}{{1}{1}{}{section.1}{}}
+\citation{Ronneberger2015,Cicek2016}
 \citation{Habing1968}
+\citation{Cazaux2004}
+\citation{Draine1996}
+\citation{Wolcott-Green2011}
 \@writefile{toc}{\contentsline {section}{\numberline {2}Data}{2}{section.2}\protected@file@percent }
 \newlabel{sec:data}{{2}{2}{}{section.2}{}}
 \@writefile{toc}{\contentsline {subsection}{\numberline {2.1}Simulation suite}{2}{subsection.2.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {2.2}Physical fields and feature construction}{2}{subsection.2.2}\protected@file@percent }
+\newlabel{sec:suite}{{2.1}{2}{}{subsection.2.1}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {1}{\ignorespaces The 15 input features. ``Transform'' is the preprocessing applied before modelling. ``Type'' distinguishes local primitive variables, the global run parameter, and non-local quantities. ``Deployable'' indicates whether the feature would be directly available in a target application where the chemistry solver has not been run; the self-shielding factor $f_{\mathrm  {H_2}}$ is the single problematic input and is treated by ablation in Section~\ref {sec:ablation_fh2}.}}{2}{table.1}\protected@file@percent }
+\newlabel{tab:features}{{1}{2}{The 15 input features. ``Transform'' is the preprocessing applied before modelling. ``Type'' distinguishes local primitive variables, the global run parameter, and non-local quantities. ``Deployable'' indicates whether the feature would be directly available in a target application where the chemistry solver has not been run; the self-shielding factor $\fshield $ is the single problematic input and is treated by ablation in Section~\ref {sec:ablation_fh2}}{table.1}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.2}Physical fields}{2}{subsection.2.2}\protected@file@percent }
 \newlabel{sec:fields}{{2.2}{2}{}{subsection.2.2}{}}
 \newlabel{eq:logtransform}{{1}{2}{}{equation.1}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {2.3}Target distribution}{2}{subsection.2.3}\protected@file@percent }
-\newlabel{sec:target}{{2.3}{2}{}{subsection.2.3}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {3}Evaluation protocol}{2}{section.3}\protected@file@percent }
-\newlabel{sec:protocol}{{3}{2}{}{section.3}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {3.1}Leave-one-$G_0$-out cross-validation}{2}{subsection.3.1}\protected@file@percent }
 \citation{Chen2016}
-\@writefile{lof}{\contentsline {figure}{\numberline {1}{\ignorespaces Distribution of $\log _{10}(n_{\mathrm  {H_2}})$ across six UV field strengths (the seventh cube, $G_0= 0.2$, is omitted for clarity). Each panel shows the cell-count histogram for one simulation cube. The bimodal structure visible at $G_0= 0.1$ (UV-exposed and self-shielded populations) progressively collapses to a single UV-dominated mode as $G_0$ increases. Dashed vertical lines mark per-cube means, which shift from $-3.1$ at $G_0= 0.1$ to $-7.2$ at $G_0= 6.4$ as H$_2$ photodissociation becomes increasingly dominant. All modelling is performed in log-space.}}{3}{figure.1}\protected@file@percent }
-\newlabel{fig:histograms}{{1}{3}{Distribution of $\logn $ across six UV field strengths (the seventh cube, $\Gzero = 0.2$, is omitted for clarity). Each panel shows the cell-count histogram for one simulation cube. The bimodal structure visible at $\Gzero = 0.1$ (UV-exposed and self-shielded populations) progressively collapses to a single UV-dominated mode as $\Gzero $ increases. Dashed vertical lines mark per-cube means, which shift from $-3.1$ at $\Gzero = 0.1$ to $-7.2$ at $\Gzero = 6.4$ as H$_2$ photodissociation becomes increasingly dominant. All modelling is performed in log-space}{figure.1}{}}
+\citation{Ioffe2015}
+\citation{Kingma2015}
+\citation{He2016}
+\citation{Ronneberger2015,Cicek2016}
+\citation{Ulyanov2017}
+\citation{Srivastava2014}
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.3}Target distribution}{3}{subsection.2.3}\protected@file@percent }
+\newlabel{sec:target}{{2.3}{3}{}{subsection.2.3}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {3}Evaluation protocol}{3}{section.3}\protected@file@percent }
+\newlabel{sec:protocol}{{3}{3}{}{section.3}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.1}Leave-one-$G_0$-out cross-validation}{3}{subsection.3.1}\protected@file@percent }
+\newlabel{sec:cv}{{3.1}{3}{}{subsection.3.1}{}}
 \@writefile{toc}{\contentsline {subsection}{\numberline {3.2}Metrics}{3}{subsection.3.2}\protected@file@percent }
 \newlabel{sec:metrics}{{3.2}{3}{}{subsection.3.2}{}}
 \newlabel{eq:r2}{{2}{3}{}{equation.2}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.3}Reproducibility}{3}{subsection.3.3}\protected@file@percent }
+\newlabel{sec:repro}{{3.3}{3}{}{subsection.3.3}{}}
 \@writefile{toc}{\contentsline {section}{\numberline {4}Methods}{3}{section.4}\protected@file@percent }
 \newlabel{sec:methods}{{4}{3}{}{section.4}{}}
 \@writefile{toc}{\contentsline {subsection}{\numberline {4.1}Multi-scale spatial neighbourhood features}{3}{subsection.4.1}\protected@file@percent }
 \newlabel{sec:spatial}{{4.1}{3}{}{subsection.4.1}{}}
 \newlabel{eq:boxfilter}{{3}{3}{}{equation.3}{}}
 \newlabel{eq:featurevec}{{4}{3}{}{equation.4}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {4.2}Model architectures}{3}{subsection.4.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.2}Models}{3}{subsection.4.2}\protected@file@percent }
 \newlabel{sec:models}{{4.2}{3}{}{subsection.4.2}{}}
-\@writefile{toc}{\contentsline {subsubsection}{\numberline {4.2.1}Linear regression}{3}{subsubsection.4.2.1}\protected@file@percent }
-\citation{Kingma2015}
-\citation{Ioffe2015}
-\citation{He2016}
-\citation{Ronneberger2015}
-\citation{Ulyanov2017}
-\@writefile{lof}{\contentsline {figure}{\numberline {2}{\ignorespaces Schematic comparison of the traditional per-cell modelling approach (\emph  {left}) and the multi-scale spatial neighbourhood feature approach introduced in this work (\emph  {right}). A traditional model receives only the 15 local physical properties at cell $i$, missing the shielding context that distinguishes two cells with identical $(T, n_{\mathrm  {H}})$ but very different $n_{\mathrm  {H_2}}$. Our approach augments the local feature vector with box-filter averages of all 15 features at three nested kernel sizes ($3^3$, $5^3$, $7^3$ voxels), producing a 60-dimensional feature vector that encodes the spatial environment of each cell without requiring volumetric model training.}}{4}{figure.2}\protected@file@percent }
-\newlabel{fig:diagram}{{2}{4}{Schematic comparison of the traditional per-cell modelling approach (\emph {left}) and the multi-scale spatial neighbourhood feature approach introduced in this work (\emph {right}). A traditional model receives only the 15 local physical properties at cell $i$, missing the shielding context that distinguishes two cells with identical $(T, n_{\mathrm {H}})$ but very different $\nHH $. Our approach augments the local feature vector with box-filter averages of all 15 features at three nested kernel sizes ($3^3$, $5^3$, $7^3$ voxels), producing a 60-dimensional feature vector that encodes the spatial environment of each cell without requiring volumetric model training}{figure.2}{}}
-\@writefile{toc}{\contentsline {subsubsection}{\numberline {4.2.2}Gradient-boosted trees}{4}{subsubsection.4.2.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsubsection}{\numberline {4.2.3}Fully-connected MLP}{4}{subsubsection.4.2.3}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsubsection}{\numberline {4.2.4}3D U-Net}{4}{subsubsection.4.2.4}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsubsection}{\numberline {4.2.5}Physics-aware data augmentation for the CNN}{4}{subsubsection.4.2.5}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {4.3}Ensemble strategy}{4}{subsection.4.3}\protected@file@percent }
-\newlabel{sec:ensemble}{{4.3}{4}{}{subsection.4.3}{}}
-\newlabel{eq:ensemble}{{5}{4}{}{equation.5}{}}
-\citation{Srivastava2014}
-\@writefile{lot}{\contentsline {table}{\numberline {1}{\ignorespaces Incremental ablation of the \textsc  {ens\_sp}{} model. All $R^2$ values are computed on $\log _{10}(n_{\mathrm  {H_2}})$ (dex) under leave-one-$G_0$-out cross-validation. The delta column gives the improvement over the previous step.}}{5}{table.1}\protected@file@percent }
-\newlabel{tab:ablation}{{1}{5}{Incremental ablation of the \enssp {} model. All $\Rsq $ values are computed on $\logn $ (dex) under leave-one-$\Gzero $-out cross-validation. The delta column gives the improvement over the previous step}{table.1}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {4.4}Regularisation}{5}{subsection.4.4}\protected@file@percent }
-\newlabel{sec:reg}{{4.4}{5}{}{subsection.4.4}{}}
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {4.2.1}Gradient-boosted trees}{3}{subsubsection.4.2.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {4.2.2}Wide MLP}{3}{subsubsection.4.2.2}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {1}{\ignorespaces Distribution of $\log _{10}(n_{\mathrm  {H_2}})$ across six UV field strengths. The seventh cube, $G_0= 0.2$, closely resembles $G_0= 0.1$ and is omitted from this figure only to avoid visual redundancy; it is included in all quantitative analyses. The bimodal structure at low $G_0$ (UV-exposed and self-shielded populations) collapses to a single UV-dominated mode as $G_0$ increases. Dashed lines mark per-cube means. All modelling is performed in log-space.}}{4}{figure.1}\protected@file@percent }
+\newlabel{fig:histograms}{{1}{4}{Distribution of $\logn $ across six UV field strengths. The seventh cube, $\Gzero = 0.2$, closely resembles $\Gzero = 0.1$ and is omitted from this figure only to avoid visual redundancy; it is included in all quantitative analyses. The bimodal structure at low $\Gzero $ (UV-exposed and self-shielded populations) collapses to a single UV-dominated mode as $\Gzero $ increases. Dashed lines mark per-cube means. All modelling is performed in log-space}{figure.1}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {2}{\ignorespaces Schematic comparison of per-cell modelling (\emph  {left}) and the multi-scale spatial neighbourhood representation used here (\emph  {right}). Note that the 15-feature baseline already includes one non-local quantity, the solver-computed self-shielding factor $f_{\mathrm  {H_2}}$; what the spatial features add is explicit neighbourhood context for \emph  {all} fields, including the directly observable ones, at three nested scales.}}{4}{figure.2}\protected@file@percent }
+\newlabel{fig:diagram}{{2}{4}{Schematic comparison of per-cell modelling (\emph {left}) and the multi-scale spatial neighbourhood representation used here (\emph {right}). Note that the 15-feature baseline already includes one non-local quantity, the solver-computed self-shielding factor $\fshield $; what the spatial features add is explicit neighbourhood context for \emph {all} fields, including the directly observable ones, at three nested scales}{figure.2}{}}
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {4.2.3}3D U-Net}{5}{subsubsection.4.2.3}\protected@file@percent }
+\newlabel{sec:cnn}{{4.2.3}{5}{}{subsubsection.4.2.3}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.3}Ensembles}{5}{subsection.4.3}\protected@file@percent }
+\newlabel{sec:ensemble}{{4.3}{5}{}{subsection.4.3}{}}
 \@writefile{toc}{\contentsline {section}{\numberline {5}Results}{5}{section.5}\protected@file@percent }
 \newlabel{sec:results}{{5}{5}{}{section.5}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {5.1}Ablation study}{5}{subsection.5.1}\protected@file@percent }
-\newlabel{sec:ablation}{{5.1}{5}{}{subsection.5.1}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {5.2}Per-fold analysis and error characterisation}{5}{subsection.5.2}\protected@file@percent }
-\newlabel{sec:per_fold}{{5.2}{5}{}{subsection.5.2}{}}
-\@writefile{lof}{\contentsline {figure}{\numberline {3}{\ignorespaces Progressive improvement in mean leave-one-$G_0$-out $R^2$ at each step of the ablation. Bars show the mean; whiskers indicate $\pm 1\sigma $ across folds; filled and open dots show individual fold $R^2$ values (open dots: extrapolation folds $G_0= 0.1$ and $G_0= 0.2$). The $3^3$ spatial step contributes the largest single-step gain (+0.030), exceeding the combined effect of all subsequent steps.}}{5}{figure.3}\protected@file@percent }
-\newlabel{fig:ablation}{{3}{5}{Progressive improvement in mean leave-one-$\Gzero $-out $\Rsq $ at each step of the ablation. Bars show the mean; whiskers indicate $\pm 1\sigma $ across folds; filled and open dots show individual fold $\Rsq $ values (open dots: extrapolation folds $\Gzero = 0.1$ and $\Gzero = 0.2$). The $3^3$ spatial step contributes the largest single-step gain (+0.030), exceeding the combined effect of all subsequent steps}{figure.3}{}}
-\@writefile{lot}{\contentsline {table}{\numberline {2}{\ignorespaces Leave-one-$G_0$-out performance (log-space $R^2$) for all evaluated configurations. The best result in each column is bold. The 3D U-Net results represent the best-performing size variant (\textsc  {unet\_standard}, 5.8\,M parameters, 150 epochs, no dropout) for each fold where a result was obtained; missing entries indicate runs that were not completed for that fold variant. The linear regression results are shown for context; negative $R^2$ values indicate performance worse than predicting the fold mean.}}{6}{table.2}\protected@file@percent }
-\newlabel{tab:full}{{2}{6}{Leave-one-$\Gzero $-out performance (log-space $\Rsq $) for all evaluated configurations. The best result in each column is bold. The 3D U-Net results represent the best-performing size variant (\textsc {unet\_standard}, 5.8\,M parameters, 150 epochs, no dropout) for each fold where a result was obtained; missing entries indicate runs that were not completed for that fold variant. The linear regression results are shown for context; negative $\Rsq $ values indicate performance worse than predicting the fold mean}{table.2}{}}
-\@writefile{lof}{\contentsline {figure}{\numberline {4}{\ignorespaces Three-panel summary of the final model (\textsc  {ens\_sp}) performance. \emph  {(a)} Log-space $R^2$ per held-out fold. The two extrapolation folds ($G_0= 0.1$ and $G_0= 6.4$) are the most challenging; the dashed line marks the seven-fold mean. \emph  {(b)} Secondary clipped linear-space $R^2$ with predictions constrained to $\pm 1\,\text  {dex}$ of the true range before exponentiation; the substantially lower values illustrate the difficulty of linear-space density prediction over the full dynamic range. \emph  {(c)} Fraction of cells with absolute log-space residual below 0.1\,\text  {dex}. The concentration of accurate cells in mid-range folds indicates that the low-$G_0$ self-shielding-dominated regime is the most difficult to emulate accurately.}}{6}{figure.4}\protected@file@percent }
-\newlabel{fig:summary}{{4}{6}{Three-panel summary of the final model (\enssp ) performance. \emph {(a)} Log-space $\Rsq $ per held-out fold. The two extrapolation folds ($\Gzero = 0.1$ and $\Gzero = 6.4$) are the most challenging; the dashed line marks the seven-fold mean. \emph {(b)} Secondary clipped linear-space $\Rsq $ with predictions constrained to $\pm 1\dex $ of the true range before exponentiation; the substantially lower values illustrate the difficulty of linear-space density prediction over the full dynamic range. \emph {(c)} Fraction of cells with absolute log-space residual below 0.1\dex . The concentration of accurate cells in mid-range folds indicates that the low-$\Gzero $ self-shielding-dominated regime is the most difficult to emulate accurately}{figure.4}{}}
-\@writefile{lof}{\contentsline {figure}{\numberline {5}{\ignorespaces Predicted versus true $\log _{10}(n_{\mathrm  {H_2}})$ for all seven held-out folds. Each panel is a two-dimensional histogram with colour encoding point density on a logarithmic scale; the dashed line marks perfect prediction. Per-fold $R^2$, RMSE (dex), and MAE (dex) are annotated in each panel. Scatter is widest at the two extrapolation folds ($G_0= 0.1$ and $G_0= 0.2$) and tightest at the mid-range interpolation folds ($G_0= 0.8$--3.2).}}{6}{figure.5}\protected@file@percent }
-\newlabel{fig:scatter}{{5}{6}{Predicted versus true $\logn $ for all seven held-out folds. Each panel is a two-dimensional histogram with colour encoding point density on a logarithmic scale; the dashed line marks perfect prediction. Per-fold $\Rsq $, RMSE (dex), and MAE (dex) are annotated in each panel. Scatter is widest at the two extrapolation folds ($\Gzero = 0.1$ and $\Gzero = 0.2$) and tightest at the mid-range interpolation folds ($\Gzero = 0.8$--3.2)}{figure.5}{}}
-\@writefile{lof}{\contentsline {figure}{\numberline {6}{\ignorespaces Residual distributions (prediction $-$ truth, in dex) for all seven held-out folds. Histograms show the empirical distribution; curves show the best-fit normal $\mathcal  {N}(\mu , \sigma )$ with parameters annotated. The distributions are approximately Gaussian and near-zero centred in all folds; the width decreases from the boundary folds ($G_0= 0.1$ and $G_0= 0.2$) to the interior folds ($G_0= 1.6$--3.2).}}{7}{figure.6}\protected@file@percent }
-\newlabel{fig:residuals}{{6}{7}{Residual distributions (prediction $-$ truth, in dex) for all seven held-out folds. Histograms show the empirical distribution; curves show the best-fit normal $\mathcal {N}(\mu , \sigma )$ with parameters annotated. The distributions are approximately Gaussian and near-zero centred in all folds; the width decreases from the boundary folds ($\Gzero = 0.1$ and $\Gzero = 0.2$) to the interior folds ($\Gzero = 1.6$--3.2)}{figure.6}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {5.3}Ensemble comparison}{7}{subsection.5.3}\protected@file@percent }
-\newlabel{sec:results_ensemble}{{5.3}{7}{}{subsection.5.3}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {5.4}Spatial structure of predictions}{7}{subsection.5.4}\protected@file@percent }
-\newlabel{sec:spatial_preds}{{5.4}{7}{}{subsection.5.4}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {6}Supplementary experiments}{7}{section.6}\protected@file@percent }
-\newlabel{sec:supp}{{6}{7}{}{section.6}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {6.1}Single-cube extrapolation: knowledge transfer across $G_0$}{7}{subsection.6.1}\protected@file@percent }
-\newlabel{sec:single_cube}{{6.1}{7}{}{subsection.6.1}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {6.2}Intra-cube spatial section: observational survey design}{7}{subsection.6.2}\protected@file@percent }
-\newlabel{sec:intra_cube}{{6.2}{7}{}{subsection.6.2}{}}
-\@writefile{lof}{\contentsline {figure}{\numberline {7}{\ignorespaces Density-stratified performance analysis for \textsc  {ens\_sp}. \emph  {(a)} $R^2$ evaluated on cells above a minimum-density percentile; restricting to denser cells universally improves accuracy. \emph  {(b)} Fraction of cells with absolute residuals below thresholds of 0.05, 0.10, 0.20, and 0.50\,\text  {dex}{} as a function of $G_0$. \emph  {(c)} MAE per density decile (decile 1 = lowest density); errors peak in decile 2, at the sharp H/H$_2$ phase transition. \emph  {(d)} $R^2$ within the top-$M$ per cent highest-density cells; even the densest 1 per cent are predicted with $R^2> 0.9$ for most folds.}}{8}{figure.7}\protected@file@percent }
-\newlabel{fig:stratified}{{7}{8}{Density-stratified performance analysis for \enssp . \emph {(a)} $\Rsq $ evaluated on cells above a minimum-density percentile; restricting to denser cells universally improves accuracy. \emph {(b)} Fraction of cells with absolute residuals below thresholds of 0.05, 0.10, 0.20, and 0.50\dex {} as a function of $\Gzero $. \emph {(c)} MAE per density decile (decile 1 = lowest density); errors peak in decile 2, at the sharp H/H$_2$ phase transition. \emph {(d)} $\Rsq $ within the top-$M$ per cent highest-density cells; even the densest 1 per cent are predicted with $\Rsq > 0.9$ for most folds}{figure.7}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.1}Main comparison}{5}{subsection.5.1}\protected@file@percent }
+\newlabel{sec:results_main}{{5.1}{5}{}{subsection.5.1}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.2}Dependence on the self-shielding factor}{5}{subsection.5.2}\protected@file@percent }
+\newlabel{sec:ablation_fh2}{{5.2}{5}{}{subsection.5.2}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.3}The volumetric baseline}{5}{subsection.5.3}\protected@file@percent }
+\newlabel{sec:results_cnn}{{5.3}{5}{}{subsection.5.3}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.4}Error analysis of the final model}{5}{subsection.5.4}\protected@file@percent }
+\newlabel{sec:per_fold}{{5.4}{5}{}{subsection.5.4}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {2}{\ignorespaces Leave-one-$G_0$-out log-space $R^2$ for all evaluated models on the full feature set. ``Feat.'' gives the input dimension (15 local; 60 = 15 local + 45 spatial; vol. = volumetric input at $64^3$). The best result in each column is bold. Tabular results are from the master comparison run (Section~\ref {sec:repro}); the 3D U-Net row is its best training configuration (32 base channels, 150 epochs, no dropout). The U-Net operates on $2\times $ downsampled volumes, so its comparison to the tabular rows is not at equal resolution.}}{6}{table.2}\protected@file@percent }
+\newlabel{tab:main}{{2}{6}{Leave-one-$\Gzero $-out log-space $\Rsq $ for all evaluated models on the full feature set. ``Feat.'' gives the input dimension (15 local; 60 = 15 local + 45 spatial; vol. = volumetric input at $64^3$). The best result in each column is bold. Tabular results are from the master comparison run (Section~\ref {sec:repro}); the 3D U-Net row is its best training configuration (32 base channels, 150 epochs, no dropout). The U-Net operates on $2\times $ downsampled volumes, so its comparison to the tabular rows is not at equal resolution}{table.2}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {3}{\ignorespaces Ablation of the solver-derived self-shielding factor $f_{\mathrm  {H_2}}$. Each cell gives the mean $\pm $ fold std.\ of log-space $R^2$ over the seven leave-one-$G_0$-out folds. ``With'' rows use all 15 local features (60 with spatial); ``without'' rows exclude $f_{\mathrm  {H_2}}$ from the local features and from the spatial averages (14 local; 56 with spatial). All runs use the identical pipeline, seeds, and hyperparameters.}}{6}{table.3}\protected@file@percent }
+\newlabel{tab:fh2}{{3}{6}{Ablation of the solver-derived self-shielding factor $\fshield $. Each cell gives the mean $\pm $ fold std.\ of log-space $\Rsq $ over the seven leave-one-$\Gzero $-out folds. ``With'' rows use all 15 local features (60 with spatial); ``without'' rows exclude $\fshield $ from the local features and from the spatial averages (14 local; 56 with spatial). All runs use the identical pipeline, seeds, and hyperparameters}{table.3}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {6}Supplementary experiments}{6}{section.6}\protected@file@percent }
+\newlabel{sec:supp}{{6}{6}{}{section.6}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.1}Single-cube transfer across $G_0$}{6}{subsection.6.1}\protected@file@percent }
+\newlabel{sec:single_cube}{{6.1}{6}{}{subsection.6.1}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.2}Within-cube sampling geometry}{6}{subsection.6.2}\protected@file@percent }
+\newlabel{sec:intra_cube}{{6.2}{6}{}{subsection.6.2}{}}
+\newlabel{eq:maskedfilter}{{5}{6}{}{equation.5}{}}
 \citation{Grinsztajn2022}
-\@writefile{lof}{\contentsline {figure}{\numberline {8}{\ignorespaces Marginal distributions of $\log _{10}(n_{\mathrm  {H_2}})$: true (blue, filled) and predicted (red, dashed outline) for each held-out fold. The ensemble accurately reproduces the bimodal structure at low $G_0$ and the narrower UV-dominated distribution at high $G_0$. Per-fold $R^2$, KL divergence, and MAE are annotated in each panel.}}{9}{figure.8}\protected@file@percent }
-\newlabel{fig:distributions}{{8}{9}{Marginal distributions of $\logn $: true (blue, filled) and predicted (red, dashed outline) for each held-out fold. The ensemble accurately reproduces the bimodal structure at low $\Gzero $ and the narrower UV-dominated distribution at high $\Gzero $. Per-fold $\Rsq $, KL divergence, and MAE are annotated in each panel}{figure.8}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {7}Discussion}{9}{section.7}\protected@file@percent }
-\newlabel{sec:discussion}{{7}{9}{}{section.7}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {7.1}Feature engineering versus architecture search}{9}{subsection.7.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {7.2}Volumetric versus per-cell representations}{9}{subsection.7.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {7.3}Regularisation in the limited-parameter regime}{9}{subsection.7.3}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {7.4}Limitations}{9}{subsection.7.4}\protected@file@percent }
-\@writefile{lof}{\contentsline {figure}{\numberline {9}{\ignorespaces Representative 2D mid-plane slices of the $\log _{10}(n_{\mathrm  {H_2}})$ field across all seven $G_0$ values. Each row shows the ground truth, prediction, and absolute error (columns) for one fold. At low $G_0$ (top rows) the field has rich filamentary structure and residuals are elevated at cloud boundaries. At high $G_0$ (bottom rows) the field is nearly uniform and residuals are small. Colour encodes $\log _{10}(n_{\mathrm  {H_2}})$ on a common scale.}}{10}{figure.9}\protected@file@percent }
-\newlabel{fig:spatial}{{9}{10}{Representative 2D mid-plane slices of the $\logn $ field across all seven $\Gzero $ values. Each row shows the ground truth, prediction, and absolute error (columns) for one fold. At low $\Gzero $ (top rows) the field has rich filamentary structure and residuals are elevated at cloud boundaries. At high $\Gzero $ (bottom rows) the field is nearly uniform and residuals are small. Colour encodes $\logn $ on a common scale}{figure.9}{}}
-\@writefile{lof}{\contentsline {figure}{\numberline {10}{\ignorespaces Single-cube extrapolation: $7 \times 7$ log-space $R^2$ matrices for XGBoost (\emph  {left}), MLP (\emph  {centre}), and stacked ensemble (\emph  {right}). Rows index training cubes; columns index test cubes; the diagonal (bold outline) gives in-sample fit ($R^2\approx 0.99$). Colours range from red ($R^2< 0$) through white (0.5) to green ($R^2> 0.9$). Off-diagonal values decay monotonically with $G_0$ distance: chemical knowledge transfers well within $\times 4$ in $G_0$ but degrades rapidly at larger separations.}}{11}{figure.10}\protected@file@percent }
-\newlabel{fig:heatmap}{{10}{11}{Single-cube extrapolation: $7 \times 7$ log-space $\Rsq $ matrices for XGBoost (\emph {left}), MLP (\emph {centre}), and stacked ensemble (\emph {right}). Rows index training cubes; columns index test cubes; the diagonal (bold outline) gives in-sample fit ($\Rsq \approx 0.99$). Colours range from red ($\Rsq < 0$) through white (0.5) to green ($\Rsq > 0.9$). Off-diagonal values decay monotonically with $\Gzero $ distance: chemical knowledge transfers well within $\times 4$ in $\Gzero $ but degrades rapidly at larger separations}{figure.10}{}}
-\@writefile{lof}{\contentsline {figure}{\numberline {11}{\ignorespaces Intra-cube spatial section: test $R^2$ as a function of training geometry (columns) and source $G_0$ (rows) for XGBoost (\emph  {left}), MLP (\emph  {centre}), and stacked ensemble (\emph  {right}). Random sampling at 1 per cent achieves $R^2\approx 0.90$ (green); contiguous slabs at 50 per cent coverage achieve $R^2\ll 0$ (red), worse than predicting the training mean at every test cell. Contiguous boxes are intermediate. The pattern is consistent across all seven $G_0$ values.}}{11}{figure.11}\protected@file@percent }
-\newlabel{fig:intra_cube}{{11}{11}{Intra-cube spatial section: test $\Rsq $ as a function of training geometry (columns) and source $\Gzero $ (rows) for XGBoost (\emph {left}), MLP (\emph {centre}), and stacked ensemble (\emph {right}). Random sampling at 1 per cent achieves $\Rsq \approx 0.90$ (green); contiguous slabs at 50 per cent coverage achieve $\Rsq \ll 0$ (red), worse than predicting the training mean at every test cell. Contiguous boxes are intermediate. The pattern is consistent across all seven $\Gzero $ values}{figure.11}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {8}Conclusions}{11}{section.8}\protected@file@percent }
-\newlabel{sec:conc}{{8}{11}{}{section.8}{}}
+\citation{Krumholz2009,Gnedin2011,Bialy2016}
+\@writefile{lof}{\contentsline {figure}{\numberline {3}{\ignorespaces Summary of the final-model prediction run. \emph  {(a)} Log-space $R^2$ per held-out fold; the upward extrapolation fold $G_0= 6.4$ is the hardest for this model, followed by $G_0= 0.8$; the dashed line marks the seven-fold mean. \emph  {(b)} Clipped linear-space $R^2$ (secondary metric; Section~\ref {sec:metrics}); the much lower values reflect the dominance of the densest cells in linear space. \emph  {(c)} Fraction of cells with absolute residual below 0.1\,\text  {dex}, highest at low $G_0$ where the well-predicted shielded population is largest.}}{7}{figure.3}\protected@file@percent }
+\newlabel{fig:summary}{{3}{7}{Summary of the final-model prediction run. \emph {(a)} Log-space $\Rsq $ per held-out fold; the upward extrapolation fold $\Gzero = 6.4$ is the hardest for this model, followed by $\Gzero = 0.8$; the dashed line marks the seven-fold mean. \emph {(b)} Clipped linear-space $\Rsq $ (secondary metric; Section~\ref {sec:metrics}); the much lower values reflect the dominance of the densest cells in linear space. \emph {(c)} Fraction of cells with absolute residual below 0.1\dex , highest at low $\Gzero $ where the well-predicted shielded population is largest}{figure.3}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {4}{\ignorespaces Predicted versus true $\log _{10}(n_{\mathrm  {H_2}})$ per held-out fold (two-dimensional histograms, log colour scale; dashed line = identity). Per-fold $R^2$, RMSE, and MAE are annotated. The bimodal target structure is reproduced in every fold; scatter is dominated by the diffuse UV-exposed population.}}{7}{figure.4}\protected@file@percent }
+\newlabel{fig:scatter}{{4}{7}{Predicted versus true $\logn $ per held-out fold (two-dimensional histograms, log colour scale; dashed line = identity). Per-fold $\Rsq $, RMSE, and MAE are annotated. The bimodal target structure is reproduced in every fold; scatter is dominated by the diffuse UV-exposed population}{figure.4}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {5}{\ignorespaces Residual distributions (predicted $-$ true, dex) per fold, with best-fit normal curves and their $(\mu , \sigma )$ annotated. Distribution widths decrease monotonically with $G_0$. Note the systematic positive bias at the interior folds (up to $+0.5\,\text  {dex}$ at $G_0= 0.8$) and the multi-modal structure at several folds: the Gaussian curves summarise location and scale only and should not be read as a claim of normality.}}{8}{figure.5}\protected@file@percent }
+\newlabel{fig:residuals}{{5}{8}{Residual distributions (predicted $-$ true, dex) per fold, with best-fit normal curves and their $(\mu , \sigma )$ annotated. Distribution widths decrease monotonically with $\Gzero $. Note the systematic positive bias at the interior folds (up to $+0.5\dex $ at $\Gzero = 0.8$) and the multi-modal structure at several folds: the Gaussian curves summarise location and scale only and should not be read as a claim of normality}{figure.5}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {7}Discussion}{8}{section.7}\protected@file@percent }
+\newlabel{sec:discussion}{{7}{8}{}{section.7}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {7.1}Feature engineering versus architecture}{8}{subsection.7.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {7.2}Volumetric versus per-cell representations}{8}{subsection.7.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {7.3}Deployability and the shielding factor}{8}{subsection.7.3}\protected@file@percent }
+\newlabel{sec:deploy}{{7.3}{8}{}{subsection.7.3}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {7.4}Limitations}{8}{subsection.7.4}\protected@file@percent }
+\newlabel{sec:limitations}{{7.4}{8}{}{subsection.7.4}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {6}{\ignorespaces Density-stratified error analysis. \emph  {(a)} $R^2$ on the subset of cells above a minimum-density percentile: $R^2$ \emph  {decreases} toward the dense tail because the within-subset target variance shrinks faster than the errors. \emph  {(b)} Fraction of cells with absolute residual below fixed thresholds versus $G_0$; the dip at $G_0= 0.8$ reflects that fold's $+0.5\,\text  {dex}$ bias. \emph  {(c)} MAE per true-density decile: errors peak in the low-density deciles of the low-$G_0$ folds, at the steep atomic-to-molecular transition; high-$G_0$ folds are flat at $\sim $0.2\,\text  {dex}. \emph  {(d)} $R^2$ within the top-$N$ per cent densest cells.}}{9}{figure.6}\protected@file@percent }
+\newlabel{fig:stratified}{{6}{9}{Density-stratified error analysis. \emph {(a)} $\Rsq $ on the subset of cells above a minimum-density percentile: $\Rsq $ \emph {decreases} toward the dense tail because the within-subset target variance shrinks faster than the errors. \emph {(b)} Fraction of cells with absolute residual below fixed thresholds versus $\Gzero $; the dip at $\Gzero = 0.8$ reflects that fold's $+0.5\dex $ bias. \emph {(c)} MAE per true-density decile: errors peak in the low-density deciles of the low-$\Gzero $ folds, at the steep atomic-to-molecular transition; high-$\Gzero $ folds are flat at $\sim $0.2\dex . \emph {(d)} $\Rsq $ within the top-$N$ per cent densest cells}{figure.6}{}}
+\citation{Paszke2019}
+\citation{Chen2016}
+\citation{Harris2020}
+\citation{Virtanen2020}
+\citation{Pedregosa2011}
+\citation{Hunter2007}
 \bibstyle{mnras}
 \bibdata{references}
-\bibcite{Bisbas2021}{{1}{2021}{{Bisbas et~al.}}{{Bisbas, van Dishoeck, Papadopoulos, Sz{\H u}cs, Bialy \& Zhang}}}
-\bibcite{Cazaux2004}{{2}{2004}{{Cazaux \& Tielens}}{{Cazaux \& Tielens}}}
-\bibcite{Chen2016}{{3}{2016}{{Chen \& Guestrin}}{{Chen \& Guestrin}}}
-\bibcite{Draine1996}{{4}{1996}{{Draine \& Bertoldi}}{{Draine \& Bertoldi}}}
-\bibcite{Glover2007}{{5}{2007}{{Glover \& Mac~Low}}{{Glover \& Mac~Low}}}
-\bibcite{Glover2010}{{6}{2010}{{Glover et~al.}}{{Glover, Federrath, Mac~Low \& Klessen}}}
-\bibcite{Grassi2014}{{7}{2014}{{Grassi et~al.}}{{Grassi, Bovino, Schleicher, Prieto, Seifried, Simoncini \& Gianturco}}}
-\bibcite{Grinsztajn2022}{{8}{2022}{{Grinsztajn et~al.}}{{Grinsztajn, Oyallon \& Varoquaux}}}
-\bibcite{Habing1968}{{9}{1968}{{Habing}}{{Habing}}}
-\bibcite{He2016}{{10}{2016}{{He et~al.}}{{He, Zhang, Ren \& Sun}}}
-\bibcite{Ioffe2015}{{11}{2015}{{Ioffe \& Szegedy}}{{Ioffe \& Szegedy}}}
-\bibcite{Katz2022}{{12}{2022}{{Katz et~al.}}{{Katz et~al.,}}}
-\bibcite{Kingma2015}{{13}{2015}{{Kingma \& Ba}}{{Kingma \& Ba}}}
-\bibcite{Narayanan2012}{{14}{2012}{{Narayanan et~al.}}{{Narayanan, Krumholz, Ostriker \& Hernquist}}}
-\bibcite{Ronneberger2015}{{15}{2015}{{Ronneberger et~al.}}{{Ronneberger, Fischer \& Brox}}}
-\bibcite{Srivastava2014}{{16}{2014}{{Srivastava et~al.}}{{Srivastava, Hinton, Krizhevsky, Sutskever \& Salakhutdinov}}}
-\bibcite{Ulyanov2017}{{17}{2017}{{Ulyanov et~al.}}{{Ulyanov, Vedaldi \& Lempitsky}}}
-\bibcite{Wolcott-Green2011}{{18}{2011}{{Wolcott-Green et~al.}}{{Wolcott-Green, Haiman \& Bryan}}}
+\bibcite{Bialy2016}{{1}{2016}{{Bialy \& Sternberg}}{{Bialy \& Sternberg}}}
+\@writefile{lof}{\contentsline {figure}{\numberline {7}{\ignorespaces True (filled) versus predicted (outline) marginal distributions of $\log _{10}(n_{\mathrm  {H_2}})$ per fold, with $R^2$, KL divergence $D_{\mathrm  {KL}}(P_{\mathrm  {true}} \,\Vert \, P_{\mathrm  {pred}})$ (computed from equal-width histograms over the common support), and MAE annotated. The bimodal structure and peak positions are reproduced; the interior-fold positive bias appears as a small rightward shift of the predicted distribution.}}{10}{figure.7}\protected@file@percent }
+\newlabel{fig:distributions}{{7}{10}{True (filled) versus predicted (outline) marginal distributions of $\logn $ per fold, with $\Rsq $, KL divergence $D_{\mathrm {KL}}(P_{\mathrm {true}} \,\Vert \, P_{\mathrm {pred}})$ (computed from equal-width histograms over the common support), and MAE annotated. The bimodal structure and peak positions are reproduced; the interior-fold positive bias appears as a small rightward shift of the predicted distribution}{figure.7}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {8}Conclusions}{10}{section.8}\protected@file@percent }
+\newlabel{sec:conc}{{8}{10}{}{section.8}{}}
+\bibcite{Branca2024}{{2}{2024}{{Branca \& Pallottini}}{{Branca \& Pallottini}}}
+\bibcite{Cazaux2004}{{3}{2004}{{Cazaux \& Tielens}}{{Cazaux \& Tielens}}}
+\bibcite{Chen2016}{{4}{2016}{{Chen \& Guestrin}}{{Chen \& Guestrin}}}
+\bibcite{Cicek2016}{{5}{2016}{{{\c {C}}i{\c {c}}ek et~al.}}{{{\c {C}}i{\c {c}}ek, Abdulkadir, Lienkamp, Brox \& Ronneberger}}}
+\@writefile{lof}{\contentsline {figure}{\numberline {8}{\ignorespaces Mid-plane slices of the $\log _{10}(n_{\mathrm  {H_2}})$ field for each $G_0$ (rows): ground truth, prediction, and absolute error (columns). At low $G_0$ residuals trace the boundaries of shielded filaments; at high $G_0$ the field is nearly uniform. Colour scale is shared within each row.}}{11}{figure.8}\protected@file@percent }
+\newlabel{fig:spatial}{{8}{11}{Mid-plane slices of the $\logn $ field for each $\Gzero $ (rows): ground truth, prediction, and absolute error (columns). At low $\Gzero $ residuals trace the boundaries of shielded filaments; at high $\Gzero $ the field is nearly uniform. Colour scale is shared within each row}{figure.8}{}}
+\bibcite{Draine1996}{{6}{1996}{{Draine \& Bertoldi}}{{Draine \& Bertoldi}}}
+\bibcite{Glover2007}{{7}{2007}{{Glover \& Mac~Low}}{{Glover \& Mac~Low}}}
+\bibcite{Glover2010}{{8}{2010}{{Glover et~al.}}{{Glover, Federrath, Mac~Low \& Klessen}}}
+\bibcite{Gnedin2011}{{9}{2011}{{Gnedin \& Kravtsov}}{{Gnedin \& Kravtsov}}}
+\bibcite{Grassi2014}{{10}{2014}{{Grassi et~al.}}{{Grassi, Bovino, Schleicher, Prieto, Seifried, Simoncini \& Gianturco}}}
+\bibcite{Grassi2022}{{11}{2022}{{Grassi et~al.}}{{Grassi, Nauman, Ramsey, Bovino, Picogna \& Ercolano}}}
+\bibcite{Grinsztajn2022}{{12}{2022}{{Grinsztajn et~al.}}{{Grinsztajn, Oyallon \& Varoquaux}}}
+\bibcite{Habing1968}{{13}{1968}{{Habing}}{{Habing}}}
+\bibcite{Harris2020}{{14}{2020}{{Harris et~al.}}{{Harris, Millman, van~der Walt et~al.}}}
+\bibcite{He2016}{{15}{2016}{{He et~al.}}{{He, Zhang, Ren \& Sun}}}
+\bibcite{Holdship2021}{{16}{2021}{{Holdship et~al.}}{{Holdship, Viti, Haworth \& Ilee}}}
+\bibcite{Hunter2007}{{17}{2007}{{Hunter}}{{Hunter}}}
+\bibcite{Ioffe2015}{{18}{2015}{{Ioffe \& Szegedy}}{{Ioffe \& Szegedy}}}
+\bibcite{Kingma2015}{{19}{2015}{{Kingma \& Ba}}{{Kingma \& Ba}}}
+\bibcite{Krumholz2009}{{20}{2009}{{Krumholz et~al.}}{{Krumholz, McKee \& Tumlinson}}}
+\bibcite{Narayanan2012}{{21}{2012}{{Narayanan et~al.}}{{Narayanan, Krumholz, Ostriker \& Hernquist}}}
+\bibcite{Paszke2019}{{22}{2019}{{Paszke et~al.}}{{Paszke, Gross, Massa et~al.}}}
+\bibcite{Pedregosa2011}{{23}{2011}{{Pedregosa et~al.}}{{Pedregosa, Varoquaux, Gramfort et~al.}}}
+\bibcite{Ronneberger2015}{{24}{2015}{{Ronneberger et~al.}}{{Ronneberger, Fischer \& Brox}}}
+\bibcite{Srivastava2014}{{25}{2014}{{Srivastava et~al.}}{{Srivastava, Hinton, Krizhevsky, Sutskever \& Salakhutdinov}}}
+\bibcite{Sternberg2014}{{26}{2014}{{Sternberg et~al.}}{{Sternberg, Le~Petit, Roueff \& Le~Bourlot}}}
+\bibcite{Ulyanov2017}{{27}{2017}{{Ulyanov et~al.}}{{Ulyanov, Vedaldi \& Lempitsky}}}
+\bibcite{Virtanen2020}{{28}{2020}{{Virtanen et~al.}}{{Virtanen, Gommers, Oliphant et~al.}}}
+\bibcite{Wolcott-Green2011}{{29}{2011}{{Wolcott-Green et~al.}}{{Wolcott-Green, Haiman \& Bryan}}}
+\bibcite{deMijolla2019}{{30}{2019}{{de~Mijolla et~al.}}{{de Mijolla, Viti, Holdship, Manolopoulou \& Yates}}}
+\@writefile{lof}{\contentsline {figure}{\numberline {9}{\ignorespaces Single-cube transfer: log-space $R^2$ for models trained on one cube (rows) and evaluated on each cube (columns), for XGBoost (\emph  {left}), MLP (\emph  {centre}), and the stacked ensemble (\emph  {right}). Diagonal cells are in-sample fits. Transfer quality decays with $G_0$ separation; values for separations of four or more geometric steps are poor and can be strongly negative.}}{12}{figure.9}\protected@file@percent }
+\newlabel{fig:heatmap}{{9}{12}{Single-cube transfer: log-space $\Rsq $ for models trained on one cube (rows) and evaluated on each cube (columns), for XGBoost (\emph {left}), MLP (\emph {centre}), and the stacked ensemble (\emph {right}). Diagonal cells are in-sample fits. Transfer quality decays with $\Gzero $ separation; values for separations of four or more geometric steps are poor and can be strongly negative}{figure.9}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {10}{\ignorespaces Within-cube sampling geometry: test $R^2$ per training geometry (columns) and cube (rows) for XGBoost (\emph  {left}), MLP (\emph  {centre}), and the stacked ensemble (\emph  {right}). Random coverage $\geq $5--10 per cent reconstructs the held-out cells well in every cube; 50 per cent contiguous slabs fail in every cube; compact boxes are intermediate; 1 per cent random coverage is unstable, varying from $R^2\approx 0.9$ to strongly negative between cubes.}}{12}{figure.10}\protected@file@percent }
+\newlabel{fig:intra_cube}{{10}{12}{Within-cube sampling geometry: test $\Rsq $ per training geometry (columns) and cube (rows) for XGBoost (\emph {left}), MLP (\emph {centre}), and the stacked ensemble (\emph {right}). Random coverage $\geq $5--10 per cent reconstructs the held-out cells well in every cube; 50 per cent contiguous slabs fail in every cube; compact boxes are intermediate; 1 per cent random coverage is unstable, varying from $\Rsq \approx 0.9$ to strongly negative between cubes}{figure.10}{}}
 \newlabel{lastpage}{{8}{12}{}{section.8}{}}
 \gdef \@abspage@last{12}

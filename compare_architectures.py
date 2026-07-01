@@ -75,11 +75,12 @@ import xgboost as xgb
 
 from data_loader import (load_all_cubes, cube_to_volumes, get_X_y,
                           get_g0_values, get_feature_cols, add_drop_args, build_drop_set,
-                          FEATURE_COLS, LOG_TARGET_COL)
+                          FEATURE_COLS, LOG_TARGET_COL, compute_data_checksum)
 from classical_models import compute_metrics
 from cnn_model import UNet3D, count_parameters
 from augmentation import augment_cube, get_symmetry_ops
 from model_helpers import (
+    GLOBAL_SEED, _set_seeds, _get_env_info,
     _XGB_CFG, FlexMLP, _compute_spatial_X, _compute_weights, _preds_to_volume,
 )
 
@@ -174,6 +175,35 @@ class CubeDataset(Dataset):
 
 # ── Training helpers ──────────────────────────────────────────────────────────
 
+def _standardize_inplace(X_tr: np.ndarray, X_va: np.ndarray,
+                         chunk: int = 2_000_000) -> tuple[np.ndarray, np.ndarray]:
+    """Memory-efficient per-column standardization (float32, in place).
+
+    Equivalent to StandardScaler fit on X_tr / transform on both, but avoids
+    sklearn's full-size float64 temporaries (which need >5 GB for the
+    14.7M x 56 spatial matrix).  Means/variances are accumulated in float64
+    over row chunks; the arrays are modified in place.
+    """
+    n, d = X_tr.shape
+    s  = np.zeros(d, dtype=np.float64)
+    s2 = np.zeros(d, dtype=np.float64)
+    for i in range(0, n, chunk):
+        c = X_tr[i:i + chunk].astype(np.float64)
+        s  += c.sum(axis=0)
+        s2 += (c * c).sum(axis=0)
+    mu = (s / n)
+    sd = np.sqrt(np.maximum(s2 / n - mu * mu, 0.0))
+    sd[sd < 1e-8] = 1.0
+    mu32 = mu.astype(np.float32)
+    sd32 = sd.astype(np.float32)
+    for arr in (X_tr, X_va):
+        m = len(arr)
+        for i in range(0, m, chunk):
+            arr[i:i + chunk] -= mu32
+            arr[i:i + chunk] /= sd32
+    return X_tr, X_va
+
+
 def run_xgb_cv(variant_name: str,
                config: dict,
                X: np.ndarray,
@@ -196,12 +226,11 @@ def run_xgb_cv(variant_name: str,
     y_pred_folds: list[np.ndarray] = []
     xgb_vols:     list[np.ndarray] = []
     for fold in range(len(g0_values)):
+        _set_seeds(GLOBAL_SEED + fold)
         mask   = fold_labels != fold
         X_tr, y_tr = X[mask],  y[mask]
         X_va, y_va = X[~mask], y[~mask]
-        sc = StandardScaler()
-        X_tr_s = sc.fit_transform(X_tr)
-        X_va_s = sc.transform(X_va)
+        X_tr_s, X_va_s = _standardize_inplace(X_tr, X_va)
         model = xgb.XGBRegressor(**cfg)
         sw = _compute_weights(y_tr) if weighted else None
         model.fit(X_tr_s, y_tr, sample_weight=sw,
@@ -229,7 +258,7 @@ def run_mlp_cv(variant_name: str,
                y: np.ndarray,
                fold_labels: np.ndarray,
                g0_values: list[float],
-               epochs: int = 60,
+               epochs: int = 100,
                batch_size: int = 262144,
                lr: float = 1e-3,
                weighted: bool = False,
@@ -249,6 +278,7 @@ def run_mlp_cv(variant_name: str,
     y_pred_folds: list[np.ndarray] = []
 
     for fold in range(len(g0_values)):
+        _set_seeds(GLOBAL_SEED + fold)
         mask   = fold_labels != fold
         X_tr, y_tr = X[mask],  y[mask]
         X_va, y_va = X[~mask], y[~mask]
@@ -326,8 +356,7 @@ def _train_cnn_fold(train_vols: list[dict],
 
     Returns (metrics_dict, y_true_log, y_pred_log) in original log_nH2 space.
     """
-    torch.manual_seed(seed)
-    np.random.seed(seed)
+    _set_seeds(GLOBAL_SEED + seed)
     _cols    = input_cols if input_cols is not None else CNN_INPUT_COLS
     train_ds = CubeDataset(train_vols, ops, augment=True,  input_cols=_cols)
     val_ds   = CubeDataset(val_vols,   ops=None, augment=False, input_cols=_cols)
@@ -663,7 +692,7 @@ if __name__ == '__main__':
                              '(enabled by default when volumes are loaded)')
     parser.add_argument('--spatial-kernels', nargs='+', type=int, default=[3, 5, 7],
                         help='Kernel sizes for multi-scale spatial features '
-                             '(default: 3 5 7 -> 42 spatial features)')
+                             '(default: 3 5 7 -> 45 spatial features)')
     parser.set_defaults(spatial=True)
     parser.add_argument('--log',        type=str, default=None,
                         help='Output JSON path '
@@ -673,6 +702,9 @@ if __name__ == '__main__':
 
     _drop = build_drop_set(args)
     feat_cols = get_feature_cols(_drop)
+
+    _set_seeds(GLOBAL_SEED)
+    env_info = _get_env_info()
 
     ts       = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
     log_path = args.log or f'arch_comparison_{ts}.json'
@@ -686,16 +718,29 @@ if __name__ == '__main__':
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f"Device: {device}")
 
+    print("Computing data checksum...")
+    data_checksum = compute_data_checksum()
+
     run_config = {
-        'timestamp':       datetime.datetime.now().isoformat(timespec='seconds'),
-        'device':          str(device),
-        'run_cnn':         args.cnn,
-        'cnn_epochs':      args.cnn_epochs,
-        'mlp_epochs':      args.mlp_epochs,
-        'all_ops':         args.all_ops,
-        'spatial':         args.spatial,
-        'spatial_kernels': args.spatial_kernels,
+        'timestamp':        datetime.datetime.now().isoformat(timespec='seconds'),
+        'global_seed':      GLOBAL_SEED,
+        'device':           str(device),
+        'run_cnn':          args.cnn,
+        'cnn_epochs':       args.cnn_epochs,
+        'mlp_epochs':       args.mlp_epochs,
+        'all_ops':          args.all_ops,
+        'spatial':          args.spatial,
+        'spatial_kernels':  args.spatial_kernels,
         'dropped_features': sorted(_drop),
+        'feature_cols':     feat_cols,
+        'n_features':       len(feat_cols),
+        'n_samples':        int(len(X)),
+        'n_folds':          len(g0_vals),
+        'g0_values':        g0_vals,
+        'xgb_config':       dict(_XGB_CFG),
+        'mlp_config':       MLP_VARIANTS,
+        'env':              env_info,
+        'data':             data_checksum,
     }
 
     # Load 128^3 volumes whenever CNN variants or spatial features are needed

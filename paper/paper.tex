@@ -15,16 +15,14 @@
 \newcommand{\logn}{\log_{10}(n_{\mathrm{H_2}})}
 \newcommand{\Gzero}{G_0}
 \newcommand{\fshield}{f_{\mathrm{H_2}}}
-\newcommand{\enssp}{\textsc{ens\_sp}}
 \newcommand{\dex}{\,\text{dex}}
 \newcommand{\Rsq}{R^2}
 
 % ============================================================
-\title[ML surrogates for H\(_2\) density in ISM simulations]%
-      {Machine learning surrogates for molecular hydrogen density in
-       three-dimensional interstellar medium simulations:
-       multi-scale spatial features outperform volumetric neural networks
-       under out-of-distribution generalisation}
+\title[ML surrogates for \(\mathrm{H_2}\) density in ISM simulations]%
+      {Machine-learning surrogates for molecular hydrogen density in
+       three-dimensional interstellar medium simulations
+       using multi-scale spatial features}
 
 \author[D.~H.~Breger]{Daniel H.~Breger$^{1}$\thanks{E-mail: danielbreger@campus.technion.ac.il}
 \\
@@ -43,47 +41,40 @@ Haifa, Israel}
 
 % ============================================================
 \begin{abstract}
-The molecular hydrogen number density $\nHH$ is a fundamental quantity
-in interstellar-medium physics, yet computing it self-consistently in
-three-dimensional simulations requires solving time-dependent
-non-equilibrium chemistry coupled to radiative transfer, an expense that
-severely limits the resolution and UV-parameter coverage of modern
-calculations. We train a machine learning surrogate to predict
-$\logn$ from 15 local physical properties at each cell of a $128^3$
-simulation grid, and evaluate it under a stringent
-leave-one-$\Gzero$-out cross-validation protocol in which each fold
-withholds an entire simulation at a UV field strength $\Gzero$ (Habing
-units) absent from training. Our data set comprises seven UV-only
-chemistry simulations at $\Gzero \in \{0.1, 0.2, 0.4, 0.8, 1.6, 3.2,
-6.4\}$ Habing, totalling 14,680,064 cells. The principal methodological
-contribution is the replacement of a 3D U-Net convolutional neural
-network with multi-scale spatial neighbourhood features: uniform
-box-filter averages of all 15 physical fields computed at kernel sizes
-$3^3$, $5^3$, and $7^3$ voxels via separable convolution in
-$\approx$30\,s. Adding these 45 spatial features to a gradient-boosted
-tree model improves the mean log-space $\Rsq$ from 0.886 to 0.924 in a
-single deterministic preprocessing step. An equal-weight ensemble of
-XGBoost and a wide fully-connected MLP, each trained on the resulting
-60-dimensional feature set (\enssp), achieves a mean $\Rsq$ of
-$0.948 \pm 0.024$ across all seven folds, with per-fold values ranging
-from 0.908 at the most demanding extrapolation fold ($\Gzero = 0.1$) to
-0.967 at mid-range interpolation folds. The 3D U-Net achieves a best
-mean $\Rsq$ of $0.803 \pm 0.172$ with an order-of-magnitude greater
-fold-to-fold variance, owing to the mismatch between the volumetric
-training sample count (48 augmented cubes) and the model parameter count
-(1.5--23\,M). We further demonstrate that dropout regularisation
-catastrophically degrades extrapolation to unseen $\Gzero$ values while
-L2 weight decay is benign, and that per-fold target normalisation is
-essential for CNN stability. An intra-cube spatial sampling study shows
-that 1 per cent uniform random coverage reconstructs the $\nHH$ field
-with $\Rsq = 0.897$, while 50 per cent contiguous-slab coverage yields
-$\Rsq = -0.394$, establishing coverage uniformity as the critical design
-parameter for observational H$_2$ density surveys.
+Computing the molecular hydrogen number density $\nHH$ self-consistently
+in three-dimensional interstellar-medium (ISM) simulations requires
+solving stiff non-equilibrium chemistry coupled to radiative transfer, a
+cost that limits the resolution and parameter coverage of modern
+calculations. We evaluate machine-learning surrogates that predict
+$\logn$ cell-by-cell on a controlled suite of seven $128^3$ UV-only
+chemistry simulations spanning $\Gzero \in \{0.1, \dots, 6.4\}$ Habing
+(14.7 million cells), under leave-one-$\Gzero$-out cross-validation: each
+fold withholds an entire simulation at a UV field strength absent from
+training. Augmenting 15 per-cell physical features with 45 multi-scale
+box-filter neighbourhood averages (kernel widths $3$, $5$, $7$ voxels;
+computed in $\approx$30\,s by separable convolution) raises the mean
+log-space $\Rsq$ of gradient-boosted trees from 0.950 to 0.963, and a
+Ridge-stacked ensemble with a wide multilayer perceptron reaches
+$\Rsq = 0.988 \pm 0.013$. Because one input, the H$_2$ self-shielding
+factor $\fshield$, is a non-local quantity produced by the chemistry
+solver, we quantify its contribution with an ablation: without
+$\fshield$, the pointwise models retain $\Rsq = 0.909$--$0.911$, the
+spatial features recover roughly half of the loss, and the fully
+solver-independent stacked ensemble retains $\Rsq = 0.977$. A 3D
+U-Net baseline trained on the same suite attains
+$\Rsq = 0.974 \pm 0.035$ at its best configuration, matching the tabular
+models on interpolation folds but degrading at the extrapolation
+boundaries and varying strongly across training configurations, at
+roughly two orders of magnitude higher training cost. Within-cube
+sampling experiments show that reconstruction quality is controlled by
+sampling geometry rather than sample volume: 10 per cent uniformly
+random coverage yields $\Rsq = 0.977$ while a contiguous half-cube fails
+entirely.
 \end{abstract}
 
 \begin{keywords}
-ISM: molecules -- ISM: clouds -- radiative transfer --
-astrochemistry -- methods: numerical -- methods: statistical
+ISM: molecules -- ISM: clouds -- astrochemistry --
+methods: numerical -- methods: statistical
 \end{keywords}
 
 % ============================================================
@@ -92,153 +83,234 @@ astrochemistry -- methods: numerical -- methods: statistical
 
 The formation of molecular hydrogen on dust-grain surfaces
 \citep{Cazaux2004} and its photodissociation by Lyman--Werner UV photons
-\citep{Habing1968,Draine1996} together determine the molecular fraction
-$f_{\mathrm{H_2}}$ of the interstellar medium (ISM). Because H$_2$ is
-both the dominant gas-phase coolant below $\sim$300\,K and the direct
-precursor of CO and other molecular tracers used to infer star-formation
-rates \citep{Narayanan2012}, $f_{\mathrm{H_2}}$ sets the initial
-conditions for the entire star-formation sequence. Computing
-$f_{\mathrm{H_2}}$ self-consistently within a three-dimensional
-hydrodynamics simulation requires integrating a stiff system of
-non-equilibrium chemistry equations at every grid cell, tracking the
-time-dependent competition between H$_2$ formation on grain surfaces,
-UV photodissociation in the Lyman--Werner band (11.2--13.6\,eV), and the
-H$_2$ self-shielding that occurs when dense H$_2$ columns attenuate
-their own dissociating radiation \citep{Wolcott-Green2011}. In
-simulations with $10^6$--$10^7$ cells, this chemistry solver can
-dominate the total compute budget; including it at all resolutions and
-over a wide UV-parameter range is often infeasible \citep{Grassi2014}.
+\citep{Habing1968,Draine1996} together determine the molecular content
+of the interstellar medium (ISM). Because H$_2$ is both an important
+low-temperature coolant and the direct precursor of CO and the other
+molecular tracers used to infer star-formation rates
+\citep{Narayanan2012}, the H$_2$ abundance sets the initial conditions
+for the star-formation sequence. Computing it self-consistently within a
+three-dimensional hydrodynamics simulation requires integrating a stiff
+system of non-equilibrium chemistry equations at every grid cell,
+tracking the competition between H$_2$ formation on grain surfaces, UV
+photodissociation in the Lyman--Werner band (11.2--13.6\,eV), and the
+H$_2$ self-shielding that occurs when H$_2$ columns attenuate their own
+dissociating radiation \citep{Wolcott-Green2011}. In simulations with
+$10^6$--$10^7$ cells this chemistry solver can dominate the compute
+budget, and covering a wide UV-parameter range at full resolution is
+often infeasible \citep{Grassi2014}.
 
-Machine learning (ML) surrogates offer a route to replacing or
-accelerating the chemistry calculation. A model trained on a finite set
-of high-fidelity simulations can predict the chemical state in new
-simulations without running the full solver, reducing the marginal cost
-of a chemistry-coupled simulation from hours to seconds. This approach
-has been applied across several regimes of astrophysical chemistry, from
-primordial gas cooling in early-universe simulations to CO chemistry in
-turbulent molecular clouds \citep{Glover2007,Glover2010}, and has
-attracted growing interest as the resolution and scope of ISM simulations
-increases \citep{Bisbas2021,Katz2022}.
+Two families of shortcuts exist. The older one replaces the solver with
+analytic or fitted formulae for the atomic-to-molecular transition,
+derived from photodissociation-region theory or calibrated on
+simulations \citep{Krumholz2009,Gnedin2011,Sternberg2014,Bialy2016};
+these are fast and interpretable, but each is tied to the equilibrium
+assumptions, geometry, and averaging scale for which it was derived. The
+newer family trains machine-learning (ML) surrogates on solver outputs:
+\citet{deMijolla2019} emulate UCLCHEM abundances for molecular-line
+modelling, \citet{Holdship2021} advance a thermochemical state through a
+time-step with the Chemulator network, \citet{Grassi2022} compress a
+chemical network onto a learned low-dimensional manifold, and, closest
+to this work, \citet{Branca2024} train DeepONet emulators on KROME
+\citep{Grassi2014} integrations to reproduce the \emph{time evolution}
+of a nine-species ISM photochemistry network at a single point, reaching
+mean relative errors below 3 per cent with a $\sim$128$\times$ speed-up
+over the stiff ODE solver. All of these emulators are zero-dimensional:
+they map a local initial state to a local final state and treat every
+cell independently. The present work addresses a complementary question
+that a zero-dimensional emulator cannot: how should a per-cell surrogate
+represent the \emph{non-local} information --- principally UV shielding
+by surrounding gas \citep[cf.][]{Glover2007,Glover2010} --- that couples
+a cell's equilibrium H$_2$ density to its three-dimensional environment,
+and how well do the resulting models generalise to radiation-field
+strengths absent from training?
 
-The shared challenge in these settings is threefold. First, the target
-quantity $\nHH$ spans approximately 35 orders of magnitude in linear
-space between UV-exposed ($\nHH \approx 10^{-30}$\,cm$^{-3}$) and
-deeply shielded ($\nHH \approx 10^{5}$\,cm$^{-3}$) gas, making
-regression in linear space numerically intractable. Second, the
-transition between phases is sharp and exponentially sensitive to
-temperature: the H$^0$/H$_2$ boundary occurs over less than a factor
-of two in column density. Third, a cell's chemical state is not fully
-determined by its local physical properties alone. Whether a cell
-is shielded from dissociating UV depends on the column density of
-gas and dust between it and the UV source --- an inherently non-local
-quantity. Per-cell models must rely on proxy quantities such as the
-self-shielding factor or local extinction to recover this spatial
-information.
+Three properties of the problem shape the answer. First, $\nHH$ in our
+simulation suite spans roughly 16 orders of magnitude (from
+$\sim$$10^{-12}$ to $\sim$$10^{4}$\,cm$^{-3}$), so all modelling is done
+in $\log_{10}$ space. Second, the atomic-to-molecular transition is
+sharp: the equilibrium abundance changes by orders of magnitude across a
+small range of shielding column. Third, and most importantly, a cell's
+chemical state is not a function of its local primitive variables alone;
+whether it is shielded from dissociating UV depends on the column of gas
+and dust between it and the radiation source.
 
-A volumetric convolutional neural network (CNN) naturally addresses the
-non-locality problem: by processing the entire simulation volume, it can
-in principle learn to aggregate spatial context through its receptive
-field. However, CNN-based surrogates for ISM chemistry have received
-limited systematic evaluation. When the available training data consists
-of only a handful of simulation cubes at discrete parameter values, the
-mismatch between volumetric sample count and model parameter count can
-be severe, and the stability of CNN predictions on out-of-distribution
-parameter values is unclear.
+A volumetric convolutional neural network (CNN) is the textbook answer
+to the non-locality problem: a 3D U-Net
+\citep{Ronneberger2015,Cicek2016} processing the whole volume can in
+principle learn shielding-like aggregations through its receptive field.
+But when the training set contains only a handful of simulation cubes at
+discrete parameter values, the volumetric sample count is tiny compared
+with the parameter count of even a small U-Net, and the behaviour of
+such models on out-of-distribution parameter values is not well
+characterised. We compare this learned approach against a deliberately
+simple engineered alternative: precomputed multi-scale box-filter
+averages of all input fields, appended to the per-cell feature vector of
+tabular models (gradient-boosted trees and multilayer perceptrons).
 
-In this paper we address these questions systematically on the UV-only
-chemistry suite, seven $128^3$-cell simulations spanning a 64-fold range
-in UV field strength $\Gzero$. We compare a hierarchy of models ranging
-from linear regression through gradient-boosted trees, fully-connected
-MLPs, and a 3D U-Net, evaluating all under the demanding protocol of
-leave-one-$\Gzero$-out cross-validation. Our principal finding is that
-\emph{engineered spatial features} --- precomputed multi-scale box-filter
-averages of local physical fields --- provide spatial context more
-reliably and efficiently than learned volumetric representations,
-achieving both higher accuracy and lower fold-to-fold variance than the
-3D CNN at a fraction of the computational cost.
+This paper makes four contributions. (i) We define a stringent
+out-of-distribution evaluation protocol --- leave-one-$\Gzero$-out
+cross-validation over a controlled seven-simulation UV-parameter sweep
+--- and show that it reverses the inflated conclusions that random
+cell-level splits would give. (ii) We show that multi-scale spatial
+neighbourhood features deliver a consistent accuracy gain to tabular
+models at negligible cost, and that a Ridge-stacked ensemble of
+gradient-boosted trees and a wide MLP reaches a mean log-space $\Rsq$ of
+$0.988$. (iii) Because one input feature --- the H$_2$ self-shielding
+factor $\fshield$ --- is itself produced by the chemistry solver, we
+quantify the surrogate's dependence on it with a dedicated ablation,
+finding that the baseline models lose only $\approx$0.04 in mean $\Rsq$
+when it is removed, that the spatial features recover about half of the
+loss, and that the fully solver-independent ensemble retains
+$\Rsq = 0.977$. (iv) We characterise when the volumetric
+approach is and is not competitive: the best 3D U-Net configuration
+matches the tabular models on interpolation folds but is less robust at
+the extrapolation boundaries, far more sensitive to training
+configuration, and roughly two orders of magnitude more expensive to
+train.
 
 The paper is structured as follows. Section~\ref{sec:data} describes the
-simulation dataset. Section~\ref{sec:protocol} defines the evaluation
-protocol. Section~\ref{sec:methods} describes feature engineering and
-model architectures. Results are presented in Section~\ref{sec:results},
-supplementary experiments in Section~\ref{sec:supp}, and the discussion
-and conclusions in Sections~\ref{sec:discussion} and~\ref{sec:conc}.
+data. Section~\ref{sec:protocol} defines the evaluation protocol and
+reproducibility measures. Section~\ref{sec:methods} describes the
+feature engineering and models. Section~\ref{sec:results} presents the
+main comparison, the $\fshield$ ablation, and the error analysis of the
+final model. Section~\ref{sec:supp} reports supplementary experiments on
+cross-$\Gzero$ transfer and within-cube sampling geometry.
+Sections~\ref{sec:discussion} and~\ref{sec:conc} give the discussion and
+conclusions.
 
 % ============================================================
 \section{Data}
 \label{sec:data}
 
 \subsection{Simulation suite}
+\label{sec:suite}
 
-The data set consists of seven three-dimensional uniform-grid simulations
-from the UV-only chemistry suite. Each simulation occupies a
+The data set consists of seven three-dimensional uniform-grid
+simulations from a UV-only chemistry suite. Each simulation occupies a
 $128 \times 128 \times 128$ grid of 2,097,152 cells, evolving identical
-initial conditions of turbulent ISM gas under a spatially uniform,
-time-steady UV radiation field of strength $\Gzero$ measured in Habing
-units \citep{Habing1968}. The seven simulations span a 64-fold dynamic
-range: $\Gzero \in \{0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 6.4\}$ Habing,
-sampled on a geometric sequence with a factor-of-two spacing. Adjacent
-simulations are physically similar enough for cross-validation to be
-meaningful, while the full 64-fold range produces qualitatively distinct
-chemical equilibria. The total data set contains 14,680,064 cells.
+turbulent ISM initial conditions under a spatially uniform, time-steady
+UV radiation field of strength $\Gzero$ in Habing units
+\citep{Habing1968}. The seven runs differ in their imposed $\Gzero$
+alone, sharing the same initial turbulent realisation and grid geometry;
+the suite is a controlled UV-parameter sweep, not a set of independent
+realisations. The evolved snapshots nonetheless differ in their
+hydrodynamic state as well as their chemistry --- the median gas
+temperature rises from $\approx$$1.0\times10^{3}$\,K at $\Gzero = 0.1$
+to $\approx$$1.1\times10^{4}$\,K at $\Gzero = 6.4$ as UV heating
+strengthens, with corresponding shifts in the density and velocity
+fields --- while the large-scale structure remains strongly correlated
+across the suite. The $\Gzero$
+values span a 64-fold range on a geometric sequence,
+$\Gzero \in \{0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 6.4\}$, and the snapshots
+represent quasi-equilibrium chemical states. The UV field illuminates
+each cube along the $+z$ axis, which breaks the full octahedral grid
+symmetry and dictates the augmentation strategy of
+Section~\ref{sec:cnn}. The dominant chemical processes in the suite are
+H$_2$ formation on grain surfaces \citep{Cazaux2004} and Lyman--Werner
+photodissociation \citep{Draine1996} attenuated by H$_2$ self-shielding
+computed along the illumination axis \citep{Wolcott-Green2011}. The
+total data set contains 14,680,064 cells.
 
-\subsection{Physical fields and feature construction}
+We use this suite as a controlled testbed for surrogate methodology: the
+single-parameter design isolates the question of generalisation across
+the UV field strength from all other sources of variation. The
+corresponding limitation --- that generalisation across turbulent
+realisations, metallicities, or density regimes is untested --- is
+discussed in Section~\ref{sec:limitations}. A complete description of
+the simulation code, chemical network, and initial conditions
+(box size, resolution, driving, metallicity, dust model) is beyond the
+scope of this methods-focused paper and must accompany any future
+application of the surrogate to scientific inference; we state
+explicitly which conclusions depend only on the internal structure of
+the data (all of them) and which depend on the physical realism of the
+simulations (none directly).
+
+\subsection{Physical fields}
 \label{sec:fields}
 
-Each cell carries 18 raw fields. Three coordinate fields (\texttt{ix},
-\texttt{iy}, \texttt{iz}) serve as grid indices and are excluded from
-model input. The target is $\nHH$ (cm$^{-3}$). The remaining 15 fields
-constitute the input feature set.
-
-Three fields spanning many orders of magnitude --- total hydrogen number
-density $n_{\mathrm{H}}$, gas temperature $T$, and ionised hydrogen
-density $n_{\mathrm{H}^+}$ --- are log-transformed:
+Each cell carries 18 raw fields: three integer grid coordinates
+(excluded from model input), the target $\nHH$, and 15 input features
+summarised in Table~\ref{tab:features}. Fields spanning many orders of
+magnitude are log-transformed,
 \begin{equation}
   x_\ell = \log_{10}(x + \varepsilon), \qquad \varepsilon = 10^{-30},
   \label{eq:logtransform}
 \end{equation}
-where $\varepsilon$ prevents singularities without affecting physics at
-any physically realised value. The H$_2$ self-shielding factor
-$\fshield$ is similarly log-transformed and merits special attention: it
-measures the fraction of Lyman--Werner photons attenuated by the
-line-of-sight H$_2$ column between each cell and the UV source, computed
-by the chemistry solver as a non-local integral along the illumination
-axis. Two cells with identical local $\nHH$ can have very different
-$\fshield$ values depending on their position within the cloud; $\fshield$
-is therefore not algebraically derivable from local properties and
-constitutes a legitimate, highly informative input feature. The
-remaining fields are the dust extinction proxy \texttt{ext}, the global
-UV field strength $\log \Gzero$ (constant within each cube), the three
-gas velocity components ($v_x$, $v_y$, $v_z$) tracing turbulent
-motions, and six face-centred magnetic field components ($B_{xl}$,
-$B_{xr}$, $B_{yl}$, $B_{yr}$, $B_{zl}$, $B_{zr}$).
+where $\varepsilon$ guards against $\log(0)$ without affecting any
+physically realised value.
+
+\begin{table}
+\centering
+\caption{The 15 input features. ``Transform'' is the preprocessing
+applied before modelling. ``Type'' distinguishes local primitive
+variables, the global run parameter, and non-local quantities.
+``Deployable'' indicates whether the feature would be directly available
+in a target application where the chemistry solver has not been run;
+the self-shielding factor $\fshield$ is the single problematic input and
+is treated by ablation in Section~\ref{sec:ablation_fh2}.}
+\label{tab:features}
+\begin{tabular}{lllll}
+\hline
+Feature & Units & Transform & Type & Deployable \\
+\hline
+$n_{\mathrm{H}}$       & cm$^{-3}$ & $\log_{10}$ & local & yes \\
+$T$                    & K         & $\log_{10}$ & local & yes \\
+$n_{\mathrm{H^+}}$     & cm$^{-3}$ & $\log_{10}$ & local & yes \\
+\texttt{ext}           & --        & none        & non-local proxy & yes \\
+$\fshield$             & --        & $\log_{10}$ & non-local, solver & no \\
+$\Gzero$               & Habing    & $\log_{10}$ & global  & yes \\
+$v_x, v_y, v_z$        & code      & none        & local & yes \\
+$B$ (6 face comps.)    & code      & none        & local & yes \\
+\hline
+\end{tabular}
+\end{table}
+
+The H$_2$ self-shielding factor $\fshield$ merits a precise statement.
+It is the attenuation factor applied to the Lyman--Werner
+photodissociation rate, computed by the chemistry solver from the H$_2$
+column between each cell and the UV source. It is \emph{not}
+algebraically derived from the cell's own $\nHH$: we verified directly
+in the data that $\fshield$ does not equal the local molecular fraction
+$2\nHH/(n_{\mathrm{H}} + 2\nHH)$ for any cell, and that cells with
+nearly identical local $\nHH$ carry $\fshield$ values differing by
+orders of magnitude depending on their depth within the cloud. It is
+nonetheless an output of the very calculation the surrogate aims to
+replace: in a deployment scenario where the solver has not been run,
+$\fshield$ would have to be estimated, e.g.\ from a dust-extinction
+proxy or an approximate radiative-transfer sweep. Its contribution to
+surrogate accuracy is therefore quantified separately
+(Section~\ref{sec:ablation_fh2}) rather than assumed. The
+dust-extinction proxy \texttt{ext} is also a column-type quantity, but
+unlike $\fshield$ it is computable from the density field alone without
+chemical information.
 
 \subsection{Target distribution}
 \label{sec:target}
 
-Figure~\ref{fig:histograms} shows the distribution of $\logn$ across six
-representative $\Gzero$ values. At $\Gzero = 0.1$ the distribution is
-bimodal, with a UV-exposed population near $\logn \approx -10$ and a
-self-shielded molecular population near $\logn \approx 0$. As $\Gzero$
-increases, photodissociation pushes the shielded peak to lower densities
-and eventually merges the two populations into a single UV-dominated
-mode. The full dynamic range spans $\sim$35 dex in linear space, making
-regression in that space numerically intractable. In $\log_{10}$ space
-the distribution is approximately Gaussian, which is why log-space
-prediction is both numerically necessary and statistically natural.
+Figure~\ref{fig:histograms} shows the distribution of $\logn$ across
+$\Gzero$. The target spans $\approx$16 orders of magnitude, from
+$\sim$$10^{-12}$\,cm$^{-3}$ in UV-exposed gas to
+$\sim$$10^{4}$\,cm$^{-3}$ in shielded cores, making linear-space
+regression numerically useless and motivating log-space modelling
+throughout. At $\Gzero = 0.1$ the distribution is bimodal --- a
+UV-exposed population near $\logn \approx -10$ and a self-shielded
+molecular population near $\logn \approx 0$ --- and the per-cube mean
+falls from $-3.1$ at $\Gzero = 0.1$ to $-7.2$ at $\Gzero = 6.4$ as
+photodissociation becomes dominant. This strong dependence of the
+marginal target distribution on $\Gzero$ is what makes
+leave-one-$\Gzero$-out evaluation demanding: each held-out cube has a
+target distribution shifted relative to everything seen in training.
 
 \begin{figure*}
 \centering
 \includegraphics[width=\textwidth]{nH2_histograms.png}
-\caption{Distribution of $\logn$ across six UV field strengths (the
-seventh cube, $\Gzero = 0.2$, is omitted for clarity). Each panel shows
-the cell-count histogram for one simulation cube. The bimodal structure
-visible at $\Gzero = 0.1$ (UV-exposed and self-shielded populations)
-progressively collapses to a single UV-dominated mode as $\Gzero$
-increases. Dashed vertical lines mark per-cube means, which shift from
-$-3.1$ at $\Gzero = 0.1$ to $-7.2$ at $\Gzero = 6.4$ as H$_2$
-photodissociation becomes increasingly dominant. All modelling is
-performed in log-space.}
+\caption{Distribution of $\logn$ across six UV field strengths. The
+seventh cube, $\Gzero = 0.2$, closely resembles $\Gzero = 0.1$ and is
+omitted from this figure only to avoid visual redundancy; it is included
+in all quantitative analyses. The bimodal structure at low $\Gzero$
+(UV-exposed and self-shielded populations) collapses to a single
+UV-dominated mode as $\Gzero$ increases. Dashed lines mark per-cube
+means. All modelling is performed in log-space.}
 \label{fig:histograms}
 \end{figure*}
 
@@ -247,49 +319,61 @@ performed in log-space.}
 \label{sec:protocol}
 
 \subsection{Leave-one-\texorpdfstring{$\Gzero$}{G0}-out cross-validation}
+\label{sec:cv}
 
-We adopt leave-one-$\Gzero$-out seven-fold cross-validation: each fold
-withholds one entire simulation cube ($\approx$2.1\,M cells at a single
-$\Gzero$) and trains on the remaining six ($\approx$12.6\,M cells). This
-design was chosen over random $k$-fold splitting because random splits
-would allow the model to see cells from every $\Gzero$ value during
-training. Since all cells within a cube share the same global UV
-intensity, a randomly split model faces only within-distribution
-interpolation, grossly inflating apparent performance. The real-world
-application is to predict $\nHH$ for a simulation at a UV field strength
-not yet computed; leave-one-$\Gzero$-out directly measures this
-out-of-distribution capability.
+All headline results use leave-one-$\Gzero$-out seven-fold
+cross-validation: each fold withholds one entire cube
+($\approx$2.1\,M cells) and trains on the remaining six
+($\approx$12.6\,M cells). Random cell-level splits would place cells
+from every cube --- hence every $\Gzero$ and the single shared
+turbulence realisation --- in both training and test sets; under that
+protocol a pointwise gradient-boosted tree already exceeds
+$\Rsq = 0.99$, telling us nothing about generalisation. The intended
+application is prediction at a UV field strength that has not been
+simulated, and leave-one-$\Gzero$-out measures exactly that.
 
-The difficulty of each fold depends on whether the held-out $\Gzero$
-falls within the convex hull of training values (interpolation) or
-outside it (extrapolation). The two boundary folds --- $\Gzero = 0.1$,
-for which no training data lies below, and $\Gzero = 6.4$, above which
-no training data lies --- require downward and upward extrapolation
-respectively. All interior folds require interpolation between a pair of
-bracketing training cubes. This a-priori prediction is confirmed by every
-experiment: $\Gzero = 0.1$ and $\Gzero = 0.2$ are consistently the
-hardest folds. The upper boundary fold $\Gzero = 6.4$ is intermediate in
-difficulty because at high UV intensity photodissociation dominates
-uniformly, producing a simpler chemistry than the self-shielding
-dominated regime at low $\Gzero$.
+The two boundary folds require genuine extrapolation: no training data
+exist below $\Gzero = 0.1$ or above $\Gzero = 6.4$. The five interior
+folds require interpolation between bracketing cubes. Empirically, which
+folds are hardest depends on the model family
+(Table~\ref{tab:main}). Gradient-boosted trees lose most accuracy at the
+upward fold ($\Gzero = 6.4$), where the dissociation-dominated
+equilibrium lies beyond the training range and tree leaves extrapolate
+as constants; the 3D U-Net degrades at both boundaries, most strongly at
+the downward fold ($\Gzero = 0.1$), where the self-shielded molecular
+phase is most developed. The MLP and the ensembles built on it are
+instead weakest at the interior fold $\Gzero = 0.8$, showing that
+$\Gzero$-extrapolation is not the only failure mode the protocol
+exposes.
 
 \subsection{Metrics}
 \label{sec:metrics}
 
-All primary results are reported in $\logn$ space (dex). The coefficient
-of determination
+All primary metrics are computed in $\logn$ space: the coefficient of
+determination
 \begin{equation}
-  \Rsq = 1 - \frac{\sum_i (y_i - \hat{y}_i)^2}{\sum_i (y_i - \bar{y})^2}
+  \Rsq = 1 - \frac{\sum_i (y_i - \hat{y}_i)^2}{\sum_i (y_i - \bar{y})^2},
   \label{eq:r2}
 \end{equation}
-is the primary metric. $\Rsq = 0.95$ corresponds to typical per-cell
-errors of $\sim$0.1--0.2\dex{}, equivalent to a factor of 1.3--1.6 in
-linear $\nHH$. The root mean square error (RMSE) and mean absolute error
-(MAE) in dex quantify the magnitude and distribution of errors
-respectively. As a secondary metric, a clipped linear-space $\Rsq$ is
-computed by exponentiating predictions clipped to $\pm 1\dex$ of the
-true range before computing equation~(\ref{eq:r2}), providing a bounded
-linear-space comparison.
+the root-mean-square error (RMSE), and the mean absolute error (MAE),
+the latter two in dex. As a secondary metric we report a clipped
+linear-space $\Rsq$: predictions are clipped to within $1\dex$ of the
+true range of the fold before exponentiation, preventing a handful of
+outlier cells from dominating the linear-space statistic. Linear-space
+$\Rsq$ is reported for completeness only; with a 16-dex target range it
+is dominated by the few densest cells.
+
+\subsection{Reproducibility}
+\label{sec:repro}
+
+Every experiment is logged to a timestamped JSON file containing the
+full run configuration (feature list, hyperparameters, random seed,
+software environment) and per-fold metrics. Random seeds are fixed per
+fold (a global seed plus the fold index). The data files are
+fingerprinted by a SHA-256 checksum recorded in each log, so any change
+to the input data is detectable. Every result quoted in this paper is
+traceable to an archived log, and the complete pipeline runs end-to-end
+on one consumer GPU.
 
 % ============================================================
 \section{Methods}
@@ -298,30 +382,23 @@ linear-space comparison.
 \subsection{Multi-scale spatial neighbourhood features}
 \label{sec:spatial}
 
-The dominant non-local effect governing $\nHH$ is the attenuation of
-Lyman--Werner photons by surrounding gas. A cell's effective UV exposure
-depends on the column density of gas and dust between it and the UV
-source, information encoded in the 3D spatial arrangement of neighbours.
-To provide pointwise models with spatial context without the complexity
-and instability of a full volumetric CNN, we precompute multi-scale
-box-filter averages of all 15 physical features.
-
-For each feature $f$ and simulation cube, we reshape the $N = 2{,}097{,}152$
-tabular values into a $128^3$ volume and apply a uniform box filter at
-kernel half-widths $k \in \{3, 5, 7\}$:
+The dominant non-local effect on $\nHH$ is UV attenuation by surrounding
+gas. To give pointwise models access to spatial context without training
+a volumetric network, we precompute uniform box-filter averages of all
+15 input fields. For each feature $f$ and cube, the tabular values are
+reshaped to a $128^3$ volume and filtered at kernel widths
+$k \in \{3, 5, 7\}$ voxels:
 \begin{equation}
   \bar{f}_{\bm{i},k} = \frac{1}{k^3}
     \sum_{\bm{j} \in \mathcal{N}_k(\bm{i})} f_{\bm{j}},
   \label{eq:boxfilter}
 \end{equation}
-where $\mathcal{N}_k(\bm{i})$ denotes the $k^3$ voxels centred on grid
-position $\bm{i}$. Because the box filter is separable, the cost is
-$\mathcal{O}(N)$ per scale regardless of $k$. The total compute time for
-all 15 features at all three scales across all seven cubes is
-approximately 30 seconds. The filtered values are re-indexed to tabular
-form using the original grid coordinates, yielding $15 \times 3 = 45$
-spatial features per cell. These are concatenated with the 15 baseline
-features to produce a 60-dimensional representation:
+where $\mathcal{N}_k(\bm{i})$ is the $k \times k \times k$ neighbourhood
+centred on $\bm{i}$ (kernel volumes of 27, 125, and 343 voxels). The box
+filter is separable, so the cost is $\mathcal{O}(N)$ per scale
+independent of $k$; computing all 45 filtered fields for all seven cubes
+takes $\approx$30\,s. The filtered values are concatenated with the 15
+local features into a 60-dimensional vector:
 \begin{equation}
   \bm{x}_i^{(60)} = \left[
     \bm{x}_i^{(15)}\,\big\|\,
@@ -331,388 +408,363 @@ features to produce a 60-dimensional representation:
   \right].
   \label{eq:featurevec}
 \end{equation}
-Figure~\ref{fig:diagram} illustrates the contrast between traditional
-per-cell modelling and this approach. The three scales encode
-complementary physical information: the $3^3$ kernel captures local
-density and temperature gradients; the $5^3$ kernel captures the cloud
-environment over which self-shielding columns become significant; and the
-$7^3$ kernel captures meso-scale structure such as the cloud--inter-cloud
-boundary.
+Figure~\ref{fig:diagram} contrasts this representation with per-cell
+modelling. Spatial averages of the deployable column-type fields
+(density, extinction) act as crude shielding estimators; this is why the
+spatial features partially substitute for $\fshield$ in the ablation of
+Section~\ref{sec:ablation_fh2}.
 
 \begin{figure*}
 \centering
-\includegraphics[width=\textwidth]{slide6_diagram.png}
-\caption{Schematic comparison of the traditional per-cell modelling
-approach (\emph{left}) and the multi-scale spatial neighbourhood feature
-approach introduced in this work (\emph{right}). A traditional model
-receives only the 15 local physical properties at cell $i$, missing the
-shielding context that distinguishes two cells with identical $(T,
-n_{\mathrm{H}})$ but very different $\nHH$. Our approach augments the
-local feature vector with box-filter averages of all 15 features at
-three nested kernel sizes ($3^3$, $5^3$, $7^3$ voxels), producing a
-60-dimensional feature vector that encodes the spatial environment of
-each cell without requiring volumetric model training.}
+\includegraphics[width=\textwidth]{fig_method_diagram.png}
+\caption{Schematic comparison of per-cell modelling (\emph{left}) and
+the multi-scale spatial neighbourhood representation used here
+(\emph{right}). Note that the 15-feature baseline already includes one
+non-local quantity, the solver-computed self-shielding factor
+$\fshield$; what the spatial features add is explicit neighbourhood
+context for \emph{all} fields, including the directly observable ones,
+at three nested scales.}
 \label{fig:diagram}
 \end{figure*}
 
-\subsection{Model architectures}
+\subsection{Models}
 \label{sec:models}
 
-\subsubsection{Linear regression}
-Ordinary least-squares regression with feature standardisation serves as
-a lower bound, testing whether the $\nHH$ relationship is approximately
-linear after log-transformation.
-
 \subsubsection{Gradient-boosted trees}
-We use XGBoost \citep{Chen2016} with the GPU-accelerated histogram tree
-method. Each fold trains on $\approx$12.6\,M cells with 400 boosting
-rounds, maximum tree depth 6, learning rate 0.1, and a row subsampling
-fraction of 0.3. Three depth variants (4, 6, 8) were evaluated; all
-produced $\Rsq \approx 0.886$ (differences $< 0.002$), confirming that
-the primary predictive signal comes from low-order feature interactions
-and that tree depth is not a bottleneck.
+We use XGBoost \citep{Chen2016} with the GPU histogram method: 400
+boosting rounds, maximum depth 6, learning rate 0.1, row subsampling
+0.3, column subsampling 0.8. Depth variants 4 and 8 change the mean
+$\Rsq$ by less than 0.003 and were retired. Features are standardised
+per training fold (a no-op for trees in principle; retained for pipeline
+uniformity).
 
-\subsubsection{Fully-connected MLP}
-The MLP is implemented in PyTorch and trained on GPU. All training data
-are preloaded to device memory in a single transfer; batching within each
-epoch is executed via GPU-native random permutation, eliminating
-per-batch host--device transfer overhead. Training uses the Adam
-optimiser \citep{Kingma2015} with learning rate $10^{-3}$, L2 weight
-decay $10^{-5}$, batch size 262\,144, 100 epochs per fold, and a cosine
-annealing learning rate schedule. Three architectures were evaluated:
-\textsc{mlp\_standard} with widths $[256, 256, 128, 64]$ and batch
-normalisation \citep{Ioffe2015}; \textsc{mlp\_wide} with $[512, 512,
-256, 128]$; and \textsc{mlp\_residual} with four residual blocks
-\citep{He2016} of width 256. All three produced $\Rsq \approx 0.885$
-(differences $< 0.003$), confirming that model capacity is not the
-bottleneck; we report \textsc{mlp\_wide} as the representative result.
+\subsubsection{Wide MLP}
+The multilayer perceptron has hidden widths $[512, 512, 256, 128]$ with
+batch normalisation \citep{Ioffe2015} and ReLU activations, trained with
+Adam \citep{Kingma2015} (learning rate $10^{-3}$, weight decay
+$10^{-5}$), batch size 262,144, 100 epochs per fold, cosine-annealed
+learning rate, and mixed precision. The full training fold is preloaded
+to GPU memory and batched by on-device permutation. Predictions are
+clipped to the training-target range $\pm 2\dex$. Narrower and
+residual-block \citep{He2016} variants give mean $\Rsq$ within
+$\sim$0.02 with no consistent ordering across runs; differences between
+MLP architectures are comparable to seed-to-seed variation.
 
 \subsubsection{3D U-Net}
-The volumetric CNN is a 3D U-Net \citep{Ronneberger2015} with three
-encoder downsampling stages ($64^3 \to 32^3 \to 16^3$) via $3 \times 3
-\times 3$ convolutions with max-pooling, a bottleneck at $8^3$ spanning
-the full input volume, and a symmetric decoder with trilinear upsampling
-and skip connections. Because the batch size is necessarily 1 (one entire
-$64^3$ volume), batch normalisation is replaced with instance
-normalisation \citep{Ulyanov2017}, which normalises spatial dimensions
-per channel and is stable at any batch size. Input volumes are
-downsampled from $128^3$ to $64^3$ by average pooling before entering
-the network, reducing memory requirements by $8\times$. Three capacity
-variants are compared: \textsc{unet\_small} (16 base channels, 1.5\,M
-parameters), \textsc{unet\_standard} (32 base channels, 5.8\,M
-parameters), and \textsc{unet\_large} (64 base channels, 23\,M
-parameters).
+\label{sec:cnn}
+The volumetric baseline is a 3D U-Net \citep{Ronneberger2015,Cicek2016}
+with three encoder stages, a bottleneck spanning the full (downsampled)
+volume, trilinear-upsampling decoder, and skip connections. Because each
+training sample is one entire volume (batch size 1), instance
+normalisation \citep{Ulyanov2017} replaces batch normalisation. Inputs
+are average-pooled from $128^3$ to $64^3$, an $8\times$ memory
+reduction; the tabular models, by contrast, use all $128^3$ cells, so
+the CNN comparison is not at equal resolution
+(Section~\ref{sec:results_cnn}). Channel inputs and the training target
+are standardised per fold from training-cube statistics; per-fold target
+standardisation is necessary for stable training because the target mean
+shifts by several dex from fold to fold (Section~\ref{sec:target}) and
+otherwise dominates the loss. Training uses Adam (learning
+rate $5\times10^{-4}$, weight decay $10^{-5}$), gradient-norm clipping
+at 1.0, and checkpoint selection on held-out volume loss. L2 weight
+decay is the sole regulariser: a residual variant that adds dropout
+\citep{Srivastava2014} of 0.1 at reduced capacity underperforms the
+dropout-free baseline at matched epochs (mean $\Rsq$ 0.948 versus
+0.974), with the loss concentrated at the two extrapolation folds (0.867
+and 0.815 versus 0.900 and 0.945); we did not isolate the dropout
+contribution from the architecture change. Capacity
+variants with 16, 32, and 64 base channels (1.5\,M, 5.8\,M, and 23\,M
+parameters) are compared; 150 epochs per fold.
 
-\subsubsection{Physics-aware data augmentation for the CNN}
-The cubic simulation grid has the full $O_h$ octahedral symmetry group
-of 48 operations. However, the UV field illuminates the cube along the
-$+z$ axis, breaking any operation that interchanges $z$ with a transverse
-axis. The physically valid augmentations are the eight $z$-preserving
-operations (four rotations about $z$ and four reflections through planes
-containing $z$). Scalar fields (density, temperature, etc.) transform
-by index permutation. Polar vector fields (velocity) transform as
-$\bm{v}' = \bm{R}\bm{v}$. Axial vector fields (magnetic field)
-transform as $\bm{B}' = \det(\bm{R})\,\bm{R}\bm{B}$, with additional
-left--right face index swaps on axes whose sign is negated by $\bm{R}$.
-Using the full 48-element group injects physically invalid training
-samples and was verified to degrade results.
+Data augmentation respects the broken symmetry of the illuminated cube:
+of the 48 octahedral operations, only the eight $z$-preserving ones
+(rotations about $z$ and reflections through planes containing $z$) are
+physically valid. Scalars transform by index permutation, velocities as
+polar vectors, and the face-centred magnetic field components as axial
+vectors with the appropriate face swaps. Using all 48 operations
+injects unphysical samples and degrades validation accuracy. Each fold
+therefore trains on $6 \times 8 = 48$ augmented volumes.
 
-\subsection{Ensemble strategy}
+\subsection{Ensembles}
 \label{sec:ensemble}
 
-The primary ensemble (\enssp) combines the per-cell predictions of
-\textsc{xgb\_standard\_sp} and \textsc{mlp\_wide\_sp} (both trained on
-the 60-feature set) with equal weights:
-\begin{equation}
-  \hat{y}_i^{\,\enssp} = \tfrac{1}{2}\,\hat{y}_i^{\,\mathrm{XGB}} +
-                          \tfrac{1}{2}\,\hat{y}_i^{\,\mathrm{MLP}}.
-  \label{eq:ensemble}
-\end{equation}
-XGBoost produces piecewise-constant predictions defined by axis-aligned
-decision boundaries and extrapolates conservatively (constant leaf
-values) beyond the training feature range. The MLP produces smooth,
-continuous predictions accurate in regions of smooth feature variation.
-These complementary inductive biases produce correlated but non-identical
-errors, and their average is consistently superior to either component
-alone (Section~\ref{sec:results_ensemble}).
-
-A Ridge-regression meta-learner (\textsc{stacked\_sp}) that learns
-fold-specific combination weights was also evaluated. It is trained on
-out-of-fold predictions from the six meta-training folds for each target
-fold.
-
-\subsection{Regularisation}
-\label{sec:reg}
-
-A central and reproducible finding of this work is that dropout
-\citep{Srivastava2014} is harmful in this setting. Adding dropout of
-probability 0.10 to the CNN encoder and 0.20 to the bottleneck caused
-the $\Gzero = 6.4$ extrapolation fold to collapse from $\Rsq = +0.22$
-to $\Rsq = -0.61$, a catastrophic failure. With only six distinct
-$\Gzero$ values in training, the model must form coherent representations
-of how $\nHH$ responds to changes in $\Gzero$ and its interaction with
-local conditions. Dropout randomly zeros feature channels, forcing
-redundant information encoding and preventing the structured
-representations needed for coherent extrapolation beyond the training
-range. For interpolation folds this degradation is modest; for
-extrapolation folds it is catastrophic. An equivalent instability was
-observed with DART (dropout additive regression trees) applied to
-XGBoost. L2 weight decay ($\lambda = 10^{-5}$) constrains parameter
-magnitudes without disrupting their structural organisation and is used
-as the sole regulariser throughout.
+Two ensembles combine the spatial-feature XGBoost and MLP. The
+\emph{equal-weight ensemble} averages their per-cell predictions. The
+\emph{Ridge-stacked ensemble} fits a Ridge regression
+($\alpha = 1$) meta-learner on out-of-fold predictions: for each
+held-out fold, the meta-learner is trained on the base-model predictions
+for the six training cubes (each obtained from folds where that cube was
+itself held out, so no cell's own-fold prediction enters its
+meta-training) and applied to the held-out cube. The two base models
+have complementary inductive biases --- piecewise-constant, conservative
+extrapolation for the trees; smooth interpolation for the MLP --- and
+the stacked combination is the best model in every experiment
+(Section~\ref{sec:results_main}).
 
 % ============================================================
 \section{Results}
 \label{sec:results}
 
-\subsection{Ablation study}
-\label{sec:ablation}
+\subsection{Main comparison}
+\label{sec:results_main}
 
-Table~\ref{tab:ablation} presents the incremental gains from the spatial
-features and ensemble, and Table~\ref{tab:full} the complete per-model,
-per-fold comparison. Figure~\ref{fig:ablation} visualises the ablation
-with individual fold dots.
-
-\begin{table}
-\centering
-\caption{Incremental ablation of the \enssp{} model. All $\Rsq$ values
-are computed on $\logn$ (dex) under leave-one-$\Gzero$-out
-cross-validation. The delta column gives the improvement over the
-previous step.}
-\label{tab:ablation}
-\begin{tabular}{lccrc}
-\hline
-Configuration & Features & Mean $\Rsq$ & $\sigma$ & $\Delta$ \\
-\hline
-XGBoost, baseline           & 15 & 0.886 & 0.061 & ---    \\
-$+$~spatial $3^3$           & 30 & 0.917 & 0.032 & $+0.031$ \\
-$+$~spatial $5^3$, $7^3$    & 60 & 0.924 & 0.026 & $+0.007$ \\
-$+$~MLP\_sp (equal-weight)  & 60 & \textbf{0.948} & \textbf{0.024} & $+0.024$ \\
-\hline
-\end{tabular}
-\end{table}
-
-\begin{figure}
-\centering
-\includegraphics[width=\columnwidth]{slide6_ablation.png}
-\caption{Progressive improvement in mean leave-one-$\Gzero$-out $\Rsq$
-at each step of the ablation. Bars show the mean; whiskers indicate
-$\pm 1\sigma$ across folds; filled and open dots show individual fold
-$\Rsq$ values (open dots: extrapolation folds $\Gzero = 0.1$ and
-$\Gzero = 0.2$). The $3^3$ spatial step contributes the largest
-single-step gain (+0.030), exceeding the combined effect of all
-subsequent steps.}
-\label{fig:ablation}
-\end{figure}
-
-The largest single-step improvement (+0.031) is the $3^3$ spatial
-features, which exceeds the combined gain from extending to three
-scales (+0.007) and adding the MLP ensemble (+0.024). Neural architecture
-search over three qualitatively distinct MLP designs and tree depth
-search over the range 4--8 produced differences smaller than 0.003,
-confirming that feature engineering is the primary bottleneck, not model
-capacity.
+Table~\ref{tab:main} reports the leave-one-$\Gzero$-out performance of
+all models on the full 15-feature input set (plus 45 spatial features
+where indicated). Spatial features improve every tabular model: XGBoost
+from 0.950 to 0.963 and the MLP from 0.954 to 0.968 in mean $\Rsq$, with
+the largest gains concentrated in the low-$\Gzero$ folds where shielded
+structure is most developed. The Ridge-stacked spatial ensemble is the
+best model at $\Rsq = 0.988 \pm 0.013$ (RMSE 0.25\dex), and outperforms
+the equal-weight ensemble (0.978) in this and every archived repetition
+of the comparison; with only seven folds the advantage is modest but
+consistent. The hardest fold for the tree-based models is the upward
+extrapolation boundary $\Gzero = 6.4$ ($\Rsq = 0.883$ for XGBoost),
+barely helped by spatial features (0.885) but fully compensated in the
+stacked ensemble (0.999), which can lean on the MLP's smooth
+extrapolation where the trees saturate.
 
 \begin{table*}
 \centering
-\caption{Leave-one-$\Gzero$-out performance (log-space $\Rsq$) for all
-evaluated configurations. The best result in each column is bold. The
-3D U-Net results represent the best-performing size variant
-(\textsc{unet\_standard}, 5.8\,M parameters, 150 epochs, no dropout)
-for each fold where a result was obtained; missing entries indicate
-runs that were not completed for that fold variant. The linear
-regression results are shown for context; negative $\Rsq$ values indicate
-performance worse than predicting the fold mean.}
-\label{tab:full}
+\caption{Leave-one-$\Gzero$-out log-space $\Rsq$ for all evaluated
+models on the full feature set. ``Feat.'' gives the input dimension
+(15 local; 60 = 15 local + 45 spatial; vol. = volumetric input at
+$64^3$). The best result in each column is bold. Tabular results are
+from the master comparison run (Section~\ref{sec:repro}); the 3D U-Net
+row is its best training configuration (32 base channels, 150 epochs,
+no dropout). The U-Net operates on $2\times$ downsampled
+volumes, so its comparison to the tabular rows is not at equal
+resolution.}
+\label{tab:main}
 \begin{tabular}{llccccccccc}
 \hline
 Model & Feat. & Mean $\Rsq$ & $\sigma$ &
-  $\Gzero=0.1$ & $\Gzero=0.2$ & $\Gzero=0.4$ &
-  $\Gzero=0.8$ & $\Gzero=1.6$ & $\Gzero=3.2$ & $\Gzero=6.4$ \\
+  $\Gzero{=}0.1$ & $\Gzero{=}0.2$ & $\Gzero{=}0.4$ &
+  $\Gzero{=}0.8$ & $\Gzero{=}1.6$ & $\Gzero{=}3.2$ & $\Gzero{=}6.4$ \\
 \hline
-\enssp{} (XGB$_\mathrm{sp}$ + MLP$_\mathrm{sp}$) & 60 &
-  \textbf{0.948} & \textbf{0.024} &
-  0.908 & 0.915 & 0.953 & 0.962 & \textbf{0.967} & \textbf{0.967} & 0.965 \\
-\textsc{stacked\_sp} & 60 &
-  0.946 & 0.020 &
-  \textbf{0.912} & \textbf{0.916} & \textbf{0.954} & 0.960 & 0.962 & 0.961 & 0.954 \\
-\textsc{xgb\_standard\_sp} & 60 &
-  0.924 & 0.026 &
-  \textbf{0.912} & 0.874 & 0.920 & 0.934 & 0.924 & 0.948 & \textbf{0.959} \\
-\textsc{mlp\_wide\_sp} & 60 &
-  0.913 & 0.034 &
-  0.843 & 0.886 & 0.914 & 0.928 & 0.946 & 0.945 & 0.927 \\
-\textsc{ens\_xgb}+\textsc{mlp} & 15 &
-  0.923 & 0.045 &
-  0.891 & 0.829 & 0.916 & \textbf{0.949} & 0.959 & 0.959 & 0.954 \\
-\textsc{xgb\_standard} & 15 &
-  0.886 & 0.061 &
-  0.891 & 0.751 & 0.866 & 0.902 & 0.910 & 0.932 & 0.952 \\
-\textsc{mlp\_standard} & 15 &
-  0.886 & 0.046 &
-  0.809 & 0.825 & 0.883 & 0.921 & 0.929 & 0.928 & 0.910 \\
-3D U-Net (\textsc{standard}) & vol. &
-  0.803 & 0.172 &
-  0.497 & \multicolumn{5}{c}{---} & 0.591 \\
-Linear regression & 15 &
-  0.230 & --- &
-  $-0.876$ & $-0.237$ & \multicolumn{5}{c}{---} \\
+Ridge-stacked ensemble (spatial) & 60 &
+  \textbf{0.988} & \textbf{0.013} &
+  0.969 & \textbf{0.993} & \textbf{0.995} & 0.965 & \textbf{0.997} & \textbf{0.998} & \textbf{0.999} \\
+Equal-weight ensemble (spatial) & 60 &
+  0.978 & 0.016 &
+  \textbf{0.988} & 0.991 & 0.993 & 0.945 & 0.975 & 0.988 & 0.968 \\
+Wide MLP + spatial & 60 &
+  0.968 & 0.041 &
+  0.979 & 0.986 & 0.988 & 0.871 & 0.963 & 0.996 & 0.996 \\
+XGBoost + spatial & 60 &
+  0.963 & 0.033 &
+  0.976 & 0.982 & 0.985 & 0.982 & 0.975 & 0.955 & 0.885 \\
+Wide MLP & 15 &
+  0.954 & 0.038 &
+  0.943 & 0.957 & 0.911 & 0.890 & 0.988 & 0.992 & 0.993 \\
+XGBoost & 15 &
+  0.950 & 0.029 &
+  0.956 & 0.948 & 0.972 & \textbf{0.972} & 0.969 & 0.951 & 0.883 \\
+3D U-Net (32 ch., best config.) & vol. &
+  0.974 & 0.035 &
+  0.900 & 0.993 & 0.995 & \textbf{0.997} & 0.996 & 0.993 & 0.945 \\
 \hline
 \end{tabular}
 \end{table*}
 
-\subsection{Per-fold analysis and error characterisation}
+\subsection{Dependence on the self-shielding factor}
+\label{sec:ablation_fh2}
+
+Because $\fshield$ is produced by the solver the surrogate aims to
+replace, Table~\ref{tab:fh2} repeats the comparison with $\fshield$
+excluded from both the local features and the spatial averages (14 local
++ 42 spatial features). The baseline XGBoost loses 0.039 in mean $\Rsq$
+(0.950 $\rightarrow$ 0.911) and the wide MLP loses 0.045
+(0.954 $\rightarrow$ 0.909), confirming that $\fshield$ carries
+substantial information not recoverable from the remaining local
+features, while also showing that the
+surrogate degrades gracefully, not catastrophically, when restricted to
+solver-independent inputs: a deployment that estimates shielding only
+approximately (or not at all) retains a usable model. The
+spatial-feature variants recover roughly half of the gap, as expected if
+neighbourhood averages of density and extinction act as crude column
+estimators: the ablation penalty shrinks from 0.039 to 0.022 for XGBoost
+(0.963 $\rightarrow$ 0.941) and from 0.045 to 0.016 for the MLP
+(0.968 $\rightarrow$ 0.953), and the fully solver-independent stacked
+ensemble reaches $\Rsq = 0.977 \pm 0.017$, within 0.011 of its
+with-$\fshield$ counterpart. For the volumetric baseline,
+the available evidence is coarser: a U-Net trained without the density,
+ionisation, extinction, \emph{and} shielding channels (11 inputs) falls
+from 0.974 to 0.874, but this removes four features at once and is
+reported only as an upper bound on the $\fshield$ effect for the CNN.
+
+\begin{table*}
+\centering
+\caption{Ablation of the solver-derived self-shielding factor
+$\fshield$. Each cell gives the mean $\pm$ fold std.\ of log-space
+$\Rsq$ over the seven leave-one-$\Gzero$-out folds. ``With'' rows use
+all 15 local features (60 with spatial); ``without'' rows exclude
+$\fshield$ from the local features and from the spatial averages (14
+local; 56 with spatial). All runs use the identical pipeline, seeds, and
+hyperparameters.}
+\label{tab:fh2}
+\begin{tabular}{lccccc}
+\hline
+Feature set & XGBoost & Wide MLP & XGB + spatial & MLP + spatial & Stacked ensemble \\
+\hline
+With $\fshield$    & $0.950 \pm 0.029$ & $0.954 \pm 0.038$ & $0.963 \pm 0.033$ & $0.968 \pm 0.041$ & $0.988 \pm 0.013$ \\
+Without $\fshield$ & $0.911 \pm 0.033$ & $0.909 \pm 0.057$ & $0.941 \pm 0.029$ & $0.953 \pm 0.027$ & $0.977 \pm 0.017$ \\
+\hline
+\end{tabular}
+\end{table*}
+
+\subsection{The volumetric baseline}
+\label{sec:results_cnn}
+
+The best U-Net configuration (32 base channels, 150 epochs, weight decay
+only) reaches $\Rsq = 0.974 \pm 0.035$: indistinguishable from the
+tabular spatial models on the five interior folds (all
+$\Rsq \geq 0.993$) but weaker at both extrapolation boundaries (0.900 at
+$\Gzero = 0.1$, 0.945 at $\Gzero = 6.4$, versus 0.969/0.999 for the
+stacked ensemble). Two further differences matter in practice. First,
+\emph{configuration sensitivity}: across capacity variants and repeated
+training runs, U-Net mean $\Rsq$ ranged from 0.80 to
+0.97 (16-channel variant 0.824, 64-channel 0.801--0.889, 32-channel
+0.878--0.974 depending on training protocol), whereas XGBoost results
+are bit-identical across runs and MLP variation stays within
+$\sim$0.01. With six training volumes (48 after augmentation) and
+1.5--23\,M parameters, the volumetric models sit in a regime where
+training noise is large. Second, \emph{cost}: a full seven-fold U-Net
+comparison takes hours on an RTX 3090, versus minutes for the tabular
+pipeline including spatial-feature construction. We did not pursue
+CNN-specific remedies (deeper augmentation, pretraining, equal-resolution
+training at $128^3$) and therefore make no claim about the ultimate
+capability of volumetric architectures; the operational conclusion is
+that on a suite of this size the engineered spatial features achieve
+equal or better accuracy with far greater robustness and lower cost.
+
+\subsection{Error analysis of the final model}
 \label{sec:per_fold}
 
-Figure~\ref{fig:summary} provides a three-panel summary of the final
-model analysis. The per-fold $\Rsq$ values for \enssp{} (panel a) follow
-the a-priori difficulty ordering: $\Gzero = 0.1$ (0.908) and $\Gzero =
-0.2$ (0.915) are the hardest; interior folds ($\Gzero = 0.4$--3.2) all
-exceed 0.95; $\Gzero = 6.4$ achieves 0.965. The relative ease of the
-upper boundary reflects a physical asymmetry: at high $\Gzero$, UV
-photodissociation dominates uniformly and the equilibrium $\nHH$ is set
-by a simpler density--UV balance, whereas the low-$\Gzero$ regime
-requires the model to correctly represent the self-shielding runaway that
-creates the high-density molecular phase. The fold-to-fold standard
-deviation ($\sigma = 0.024$) is an order of magnitude smaller than that
-of the best 3D U-Net ($\sigma = 0.172$).
+For per-cell error analysis we use a dedicated prediction run of the
+Ridge-stacked spatial ensemble that saves full $128^3$ prediction
+volumes for each held-out fold (per-fold $\Rsq$ = 0.979, 0.984, 0.982,
+0.954, 0.978, 0.981, 0.915 for $\Gzero$ = 0.1--6.4; mean
+$0.968 \pm 0.023$). This run uses a shorter MLP schedule (30 epochs) for
+the inner stacking stage than the master comparison, and is accordingly
+slightly more conservative than the headline row of
+Table~\ref{tab:main}; we use it because the saved volumes permit the
+spatially resolved analysis below. Figures~\ref{fig:summary}--%
+\ref{fig:spatial} are all derived from these predictions.
 
 \begin{figure*}
 \centering
 \includegraphics[width=\textwidth]{analysis_output/fig1_summary.png}
-\caption{Three-panel summary of the final model (\enssp) performance.
-\emph{(a)} Log-space $\Rsq$ per held-out fold. The two extrapolation
-folds ($\Gzero = 0.1$ and $\Gzero = 6.4$) are the most challenging;
-the dashed line marks the seven-fold mean.
-\emph{(b)} Secondary clipped linear-space $\Rsq$ with predictions
-constrained to $\pm 1\dex$ of the true range before exponentiation; the
-substantially lower values illustrate the difficulty of linear-space
-density prediction over the full dynamic range.
-\emph{(c)} Fraction of cells with absolute log-space residual below
-0.1\dex. The concentration of accurate cells in mid-range folds
-indicates that the low-$\Gzero$ self-shielding-dominated regime is the
-most difficult to emulate accurately.}
+\caption{Summary of the final-model prediction run.
+\emph{(a)} Log-space $\Rsq$ per held-out fold; the upward extrapolation
+fold $\Gzero = 6.4$ is the hardest for this model, followed by
+$\Gzero = 0.8$; the dashed line marks the seven-fold mean.
+\emph{(b)} Clipped linear-space $\Rsq$ (secondary metric;
+Section~\ref{sec:metrics}); the much lower values reflect the dominance
+of the densest cells in linear space.
+\emph{(c)} Fraction of cells with absolute residual below 0.1\dex,
+highest at low $\Gzero$ where the well-predicted shielded population is
+largest.}
 \label{fig:summary}
 \end{figure*}
 
 Figure~\ref{fig:scatter} shows predicted versus true $\logn$ for all
-seven held-out folds. The characteristic bimodal structure of the target
-distribution is reproduced in all panels: the model correctly separates
-UV-exposed gas (lower-left cluster) from shielded molecular gas
-(upper-right cluster) in every fold. Scatter is visibly elevated at
-$\Gzero = 0.1$ and $\Gzero = 0.2$, consistent with the quantitative
-$\Rsq$ values, and is tightest at the mid-range interpolation folds.
+seven folds: the model reproduces the bimodal structure in every fold,
+with scatter concentrated in the diffuse UV-exposed population and a
+tight locus along the identity for the shielded population.
+Figure~\ref{fig:residuals} shows the residual distributions. These are
+narrow (core widths 0.04--0.45\dex, shrinking monotonically with
+$\Gzero$) but \emph{not} centred at zero: the run carries a systematic
+positive bias of $+0.2$ to $+0.5\dex$ at the interior folds, largest at
+$\Gzero = 0.8$, meaning the model over-predicts $\nHH$ by a factor of
+$\sim$2--3 for typical cells in those folds while still ordering cells
+accurately (high $\Rsq$). The bias is a property of this prediction run
+that ensemble recalibration would largely remove; we report it rather
+than hide it, and note that fold-level $\Rsq$ alone would not have
+revealed it.
 
 \begin{figure*}
 \centering
 \includegraphics[width=\textwidth]{analysis_output/fig2_scatter.png}
-\caption{Predicted versus true $\logn$ for all seven held-out folds.
-Each panel is a two-dimensional histogram with colour encoding point
-density on a logarithmic scale; the dashed line marks perfect
-prediction. Per-fold $\Rsq$, RMSE (dex), and MAE (dex) are annotated in
-each panel. Scatter is widest at the two extrapolation folds
-($\Gzero = 0.1$ and $\Gzero = 0.2$) and tightest at the mid-range
-interpolation folds ($\Gzero = 0.8$--3.2).}
+\caption{Predicted versus true $\logn$ per held-out fold
+(two-dimensional histograms, log colour scale; dashed line = identity).
+Per-fold $\Rsq$, RMSE, and MAE are annotated. The bimodal target
+structure is reproduced in every fold; scatter is dominated by the
+diffuse UV-exposed population.}
 \label{fig:scatter}
 \end{figure*}
-
-Figure~\ref{fig:residuals} shows the per-fold residual distributions
-(predicted $-$ true, in dex). All seven distributions are approximately
-Gaussian and centred near zero, confirming low bias. The distribution
-width narrows monotonically from the boundary folds to the interior
-folds. A mild systematic positive bias at $\Gzero = 0.1$ indicates that
-the model slightly over-predicts $\nHH$ in the shielded regime under
-downward extrapolation, consistent with the expectation that the
-self-shielding runaway at very low $\Gzero$ is harder to extrapolate
-below the training range.
 
 \begin{figure*}
 \centering
 \includegraphics[width=\textwidth]{analysis_output/fig3_error_dist.png}
-\caption{Residual distributions (prediction $-$ truth, in dex) for all
-seven held-out folds. Histograms show the empirical distribution; curves
-show the best-fit normal $\mathcal{N}(\mu, \sigma)$ with parameters
-annotated. The distributions are approximately Gaussian and near-zero
-centred in all folds; the width decreases from the boundary folds
-($\Gzero = 0.1$ and $\Gzero = 0.2$) to the interior folds ($\Gzero =
-1.6$--3.2).}
+\caption{Residual distributions (predicted $-$ true, dex) per fold, with
+best-fit normal curves and their $(\mu, \sigma)$ annotated. Distribution
+widths decrease monotonically with $\Gzero$. Note the systematic
+positive bias at the interior folds (up to $+0.5\dex$ at
+$\Gzero = 0.8$) and the multi-modal structure at several folds: the
+Gaussian curves summarise location and scale only and should not be read
+as a claim of normality.}
 \label{fig:residuals}
 \end{figure*}
 
-Figure~\ref{fig:stratified} reveals the density dependence of the
-remaining errors. Panel (a) shows that restricting evaluation to
-progressively denser subsets universally improves $\Rsq$, with
-performance approaching unity for the densest 10 per cent of cells in
-all folds. Panel (c) shows that errors peak in the second-lowest density
-decile, at the sharp H/H$_2$ transition between fully dissociated and
-partially shielded gas. Panel (d) confirms that even the densest 1 per
-cent of cells --- the most deeply shielded molecular cores --- are
-predicted with $\Rsq > 0.9$ in all but the hardest folds.
+Figure~\ref{fig:stratified} stratifies the errors by gas density. The
+largest mean absolute errors occur in the \emph{low}-density deciles of
+the low-$\Gzero$ folds (up to $\sim$0.8\dex{} in decile 3 of
+$\Gzero = 0.1$), where small shielding-column differences move cells
+across the steep atomic-to-molecular transition. Conversely, restricting
+the evaluation to the densest cells \emph{lowers} $\Rsq$ (panels a and
+d) even though absolute errors there are small: within the shielded
+cores the target variance is small, so $\Rsq$ --- a variance-normalised
+metric --- is a harsh statistic in the high-density tail. Both views are
+shown to avoid the misleading impression either one gives alone.
+Figure~\ref{fig:distributions} compares predicted and true marginal
+distributions per fold; the bimodal shape and peak locations are
+reproduced, with the positive bias visible as a slight rightward shift
+of the predicted distribution at interior folds.
 
 \begin{figure*}
 \centering
 \includegraphics[width=\textwidth]{analysis_output/fig4_stratified.png}
-\caption{Density-stratified performance analysis for \enssp.
-\emph{(a)} $\Rsq$ evaluated on cells above a minimum-density percentile; restricting to denser cells universally improves accuracy. \emph{(b)} Fraction of cells with absolute residuals below thresholds of 0.05, 0.10, 0.20, and 0.50\dex{} as a function of $\Gzero$. \emph{(c)} MAE per density decile (decile 1 = lowest density); errors peak in decile 2, at the sharp H/H$_2$ phase transition. \emph{(d)} $\Rsq$ within the top-$M$ per cent highest-density cells; even the densest 1 per cent are predicted with $\Rsq > 0.9$ for most folds.}
+\caption{Density-stratified error analysis.
+\emph{(a)} $\Rsq$ on the subset of cells above a minimum-density
+percentile: $\Rsq$ \emph{decreases} toward the dense tail because the
+within-subset target variance shrinks faster than the errors.
+\emph{(b)} Fraction of cells with absolute residual below fixed
+thresholds versus $\Gzero$; the dip at $\Gzero = 0.8$ reflects that
+fold's $+0.5\dex$ bias.
+\emph{(c)} MAE per true-density decile: errors peak in the low-density
+deciles of the low-$\Gzero$ folds, at the steep atomic-to-molecular
+transition; high-$\Gzero$ folds are flat at $\sim$0.2\dex.
+\emph{(d)} $\Rsq$ within the top-$N$ per cent densest cells.}
 \label{fig:stratified}
 \end{figure*}
-
-Figure~\ref{fig:distributions} overlays predicted and true marginal
-distributions of $\logn$ per fold. The ensemble reproduces the
-multi-modal structure in all folds, placing the UV-exposed and shielded
-populations correctly. Minor discrepancies in the height of the shielded
-peak at $\Gzero = 0.1$ and $\Gzero = 0.2$ are consistent with the
-positive bias in the residuals.
 
 \begin{figure*}
 \centering
 \includegraphics[width=\textwidth]{analysis_output/fig6_distributions.png}
-\caption{Marginal distributions of $\logn$: true (blue, filled) and
-predicted (red, dashed outline) for each held-out fold. The ensemble
-accurately reproduces the bimodal structure at low $\Gzero$ and the
-narrower UV-dominated distribution at high $\Gzero$. Per-fold $\Rsq$,
-KL divergence, and MAE are annotated in each panel.}
+\caption{True (filled) versus predicted (outline) marginal distributions
+of $\logn$ per fold, with $\Rsq$, KL divergence
+$D_{\mathrm{KL}}(P_{\mathrm{true}} \,\Vert\, P_{\mathrm{pred}})$
+(computed from equal-width histograms over the common support), and MAE
+annotated. The bimodal structure and peak positions are reproduced; the
+interior-fold positive bias appears as a small rightward shift of the
+predicted distribution.}
 \label{fig:distributions}
 \end{figure*}
 
-\subsection{Ensemble comparison}
-\label{sec:results_ensemble}
-
-The equal-weight ensemble \enssp{} (mean $\Rsq = 0.948$) marginally but
-consistently outperforms the Ridge meta-learner \textsc{stacked\_sp}
-(0.946). With only seven training folds, the meta-learner does not have
-sufficient meta-training signal to learn combination weights that
-transfer reliably to every held-out fold; equal averaging is the more
-robust choice in this low-fold-count regime. Including the 3D U-Net in
-any ensemble consistently \emph{lowers} the mean $\Rsq$: the
-\textsc{ens\_xgb+cnn} configuration achieves 0.897, worse than
-\textsc{xgb\_standard\_sp} alone (0.924), because in the folds where
-the CNN predicts $\Rsq < 0$, averaging with a well-calibrated tabular
-predictor degrades the result.
-
-\subsection{Spatial structure of predictions}
-\label{sec:spatial_preds}
-
-Figure~\ref{fig:spatial} shows representative 2D slices of the
-$\logn$ field. At low $\Gzero$ the field displays rich filamentary
-spatial structure driven by self-shielding, with sharp transitions at
-cloud boundaries; at high $\Gzero$ the field is nearly uniform and
-residuals are minimal. This contrast explains the asymmetric difficulty
-of the boundary folds: the low-$\Gzero$ self-shielding morphology
-involves spatial gradients absent from the mid-range training cubes,
-while the high-$\Gzero$ UV-dominated morphology is a smooth continuation
-of the trend visible across the training range.
+Figure~\ref{fig:spatial} shows mid-plane slices of truth, prediction,
+and absolute error. At low $\Gzero$ the field is rich in filamentary
+shielded structure and the residuals concentrate at cloud boundaries; at
+high $\Gzero$ the field is nearly uniform and residuals are small and
+unstructured.
 
 \begin{figure*}
 \centering
 \includegraphics[width=\textwidth,height=0.85\textheight,keepaspectratio]{analysis_output/fig5_spatial.png}
-\caption{Representative 2D mid-plane slices of the $\logn$ field across
-all seven $\Gzero$ values. Each row shows the ground truth, prediction,
-and absolute error (columns) for one fold. At low $\Gzero$ (top rows)
-the field has rich filamentary structure and residuals are elevated at
-cloud boundaries. At high $\Gzero$ (bottom rows) the field is nearly
-uniform and residuals are small. Colour encodes $\logn$ on a common
-scale.}
+\caption{Mid-plane slices of the $\logn$ field for each $\Gzero$
+(rows): ground truth, prediction, and absolute error (columns). At low
+$\Gzero$ residuals trace the boundaries of shielded filaments; at high
+$\Gzero$ the field is nearly uniform. Colour scale is shared within each
+row.}
 \label{fig:spatial}
 \end{figure*}
 
@@ -720,244 +772,286 @@ scale.}
 \section{Supplementary experiments}
 \label{sec:supp}
 
-\subsection{Single-cube extrapolation: knowledge transfer across \texorpdfstring{$\Gzero$}{G0}}
+\subsection{Single-cube transfer across \texorpdfstring{$\Gzero$}{G0}}
 \label{sec:single_cube}
 
-To quantify the information content of a single simulation and validate
-the cross-validation design, we train \textsc{stacked\_sp} on each
-individual cube and predict all seven, producing a $7 \times 7$ matrix
-of log-space $\Rsq$ values in which rows index training cubes and columns
-index test cubes.
-
-Figure~\ref{fig:heatmap} shows these matrices for XGBoost, MLP, and the
-stacked ensemble. The diagonal elements (in-sample fit) reach $\Rsq
-\approx 0.99$. Off-diagonal elements decay monotonically with $\Gzero$
-distance: one geometric step apart ($\times 2$ in $\Gzero$), $\Rsq
-\approx 0.97$; two steps, $\approx 0.96$; three steps, $\approx 0.88$;
-four steps, $\approx 0.75$; five steps, $\approx 0.45$; six steps
-(i.e.\ $\Gzero = 0.1$ to $\Gzero = 6.4$), $\Rsq \approx 0.15$. The mean
-off-diagonal $\Rsq$ across all 42 transfer pairs is approximately 0.78.
+To measure how far the learned mapping transfers across the UV
+parameter, we train the stacked spatial ensemble on each individual cube
+and predict all seven, producing a $7 \times 7$ matrix of log-space
+$\Rsq$ (Figure~\ref{fig:heatmap}). In-sample (diagonal) fits average
+$\Rsq = 0.997$. Transfer degrades systematically with $\Gzero$
+separation: averaged over the matrix, one geometric step
+($\times 2$ in $\Gzero$) gives $\Rsq = 0.966$, two steps 0.888, three
+steps 0.729, four steps 0.452, five steps 0.158, and the full 64-fold
+separation 0.006, with substantial spread between directions and cube
+pairs at the larger separations. The mean off-diagonal $\Rsq$ is 0.706.
+The learned local mapping is thus approximately universal within a
+factor of $\sim$2--4 in $\Gzero$ and degrades beyond it, which
+(i) validates leave-one-$\Gzero$-out as a non-trivial protocol --- each
+held-out cube is one step from its nearest training neighbour, so single-cube
+knowledge alone would cap performance near 0.97, below what the six-cube
+training sets achieve --- and (ii) confirms that none of the seven
+$\Gzero$ values is redundant in the training set.
 
 \begin{figure*}
 \centering
 \includegraphics[width=\textwidth]{logs/single_cube_extrapolation/heatmap_20260313_022129.png}
-\caption{Single-cube extrapolation: $7 \times 7$ log-space $\Rsq$
-matrices for XGBoost (\emph{left}), MLP (\emph{centre}), and stacked
-ensemble (\emph{right}). Rows index training cubes; columns index test
-cubes; the diagonal (bold outline) gives in-sample fit ($\Rsq \approx
-0.99$). Colours range from red ($\Rsq < 0$) through white (0.5) to
-green ($\Rsq > 0.9$). Off-diagonal values decay monotonically with
-$\Gzero$ distance: chemical knowledge transfers well within $\times 4$
-in $\Gzero$ but degrades rapidly at larger separations.}
+\caption{Single-cube transfer: log-space $\Rsq$ for models trained on
+one cube (rows) and evaluated on each cube (columns), for XGBoost
+(\emph{left}), MLP (\emph{centre}), and the stacked ensemble
+(\emph{right}). Diagonal cells are in-sample fits. Transfer quality
+decays with $\Gzero$ separation; values for separations of four or more
+geometric steps are poor and can be strongly negative.}
 \label{fig:heatmap}
 \end{figure*}
 
-The local chemical equilibrium --- the mapping from density, temperature,
-and shielding proxies to $\nHH$ --- is approximately universal within a
-$\Gzero$ ratio of 4--8 but breaks down over larger factors. This is
-consistent with the physical picture that the H$_2$ formation and
-photodissociation rate functions are universal; what changes across
-$\Gzero$ is the equilibrium balance point. The result validates the
-leave-one-$\Gzero$-out design by showing that a single-cube model is
-qualitatively weaker than the six-cube training ensemble, and that none
-of the 64-fold UV range is redundant in the training set.
-
-\subsection{Intra-cube spatial section: observational survey design}
+\subsection{Within-cube sampling geometry}
 \label{sec:intra_cube}
 
-We ask whether the \enssp{} surrogate can reconstruct the $\nHH$ field
-within a single simulation from partial spatial coverage, and whether the
-\emph{geometry} of the observed fraction matters more than its volume.
-For each of the seven $\Gzero$ cubes, we train \textsc{stacked\_sp} on a
-spatial subset of cells and evaluate on the complement, testing three
-sampling geometries at varying coverage fractions.
+We next ask how reconstruction of a \emph{single} cube's $\nHH$ field
+depends on which cells are used for training --- a question about
+sampling geometry in the simulation volume, not (we emphasise) a claim
+about observational survey design, since real observations deliver
+projected, beam-convolved, noisy quantities rather than simulation
+fields, and $\fshield$ is not an observable. For each cube we train the
+stacked spatial ensemble on a subset of cells and evaluate on the
+complement, comparing uniformly random subsets (1--75 per cent),
+contiguous half-cube slabs along each axis, and compact cubic
+sub-regions (1--50 per cent).
 
-In the \emph{random} configuration, cells are sampled uniformly at
-random, preserving the statistical distribution of local physical
-conditions across the training set. In the \emph{contiguous slab}
-configuration, all cells from one spatial half of the cube along a
-coordinate axis are used for training. In the \emph{contiguous box}
-configuration, a compact cubic sub-region of specified volume fraction is
-used.
+In these experiments the spatial features must respect the partial
+coverage. Field volumes are masked before filtering: cells outside the
+training subset are set to zero, and the box filter of
+equation~(\ref{eq:boxfilter}) is applied to the masked volume,
+\begin{equation}
+  \bar{f}^{\mathrm{obs}}_{\bm{i},k} = \frac{1}{k^3}
+    \sum_{\bm{j} \in \mathcal{N}_k(\bm{i})} m_{\bm{j}} f_{\bm{j}},
+  \qquad
+  m_{\bm{j}} =
+  \begin{cases}
+    1 & \bm{j} \in \text{training subset},\\
+    0 & \text{otherwise},
+  \end{cases}
+  \label{eq:maskedfilter}
+\end{equation}
+with \emph{no} renormalisation by the local sample count
+$\sum_j m_j$: a neighbourhood with no sampled cells yields zero, and a
+sparsely sampled neighbourhood yields its sampled-cell sum diluted by
+the full kernel volume. The local (unfiltered) features of test cells
+use their true values; only the target labels and the neighbourhood
+context are restricted to the training subset. This convention treats
+the surrounding field values as unknown wherever they were not sampled,
+and its dilution property matters for interpreting the sparse-coverage
+results below.
 
-Figure~\ref{fig:intra_cube} shows the test $\Rsq$ as a function of
-geometry and coverage fraction for all seven $\Gzero$ cubes. The results
-are striking. A randomly sampled 1 per cent of cells ($\approx$21\,000
-cells) achieves test $\Rsq = 0.897$ on the remaining 99 per cent.
-Increasing the fraction to 5, 10, 25, and 50 per cent yields $\Rsq$ of
-0.952, 0.963, 0.970, and 0.980 respectively. By contrast, a contiguous
-slab covering 50 per cent of the volume --- 23 times as many cells as
-the 1 per cent random sample --- yields test $\Rsq = -0.394$ (x-axis
-slab), $-2.689$ (y-axis), and $-1.389$ (z-axis).
+Figure~\ref{fig:intra_cube} and the run statistics give a consistent
+picture across all seven cubes. Uniformly random coverage of 10 per cent
+or more reconstructs the field accurately (test $\Rsq$ mean over cubes:
+0.977 at 10 per cent, 0.982 at 25, 0.986 at 50); 5 per cent gives 0.902.
+At 1 per cent random coverage the expected number of sampled cells
+inside even a $7^3$ kernel is only $\sim$3.4, the diluted spatial
+features carry little signal, and the outcome is unstable: mean $\Rsq$
+of $+0.24$ with a range of $-1.74$ to $+0.90$ across cubes. Contiguous
+geometries show the opposite failure mode: a half-cube slab --- 50 per
+cent of the volume --- fails on every axis (mean $\Rsq$ of $-0.65$,
+$-0.25$, $-0.25$ for $x$, $y$, $z$ slabs, with minima as low as $-5.1$),
+because the unsampled half contains physical regimes entirely absent
+from training. Compact boxes are intermediate and nearly flat in
+coverage (mean $\Rsq \approx 0.76$--0.86 from 1 to 50 per cent).
+Notably, at 1 per cent coverage a compact box \emph{outperforms} random
+sampling (0.76 versus 0.24): inside the box the masked spatial features
+are exact, whereas under sparse random sampling they are uniformly
+diluted. Geometry, not volume, is the controlling variable, and the
+best geometry depends on the coverage budget: contiguous regions win
+when coverage is very sparse, uniform sampling wins everywhere above a
+few per cent.
 
 \begin{figure*}
 \centering
 \includegraphics[width=\textwidth]{logs/intra_cube_section/run_20260313_142443_heatmap.png}
-\caption{Intra-cube spatial section: test $\Rsq$ as a function of
-training geometry (columns) and source $\Gzero$ (rows) for XGBoost
-(\emph{left}), MLP (\emph{centre}), and stacked ensemble (\emph{right}).
-Random sampling at 1 per cent achieves $\Rsq \approx 0.90$ (green);
-contiguous slabs at 50 per cent coverage achieve $\Rsq \ll 0$ (red),
-worse than predicting the training mean at every test cell. Contiguous
-boxes are intermediate. The pattern is consistent across all seven
-$\Gzero$ values.}
+\caption{Within-cube sampling geometry: test $\Rsq$ per training
+geometry (columns) and cube (rows) for XGBoost (\emph{left}), MLP
+(\emph{centre}), and the stacked ensemble (\emph{right}). Random
+coverage $\geq$5--10 per cent reconstructs the held-out cells well in
+every cube; 50 per cent contiguous slabs fail in every cube; compact
+boxes are intermediate; 1 per cent random coverage is unstable, varying
+from $\Rsq \approx 0.9$ to strongly negative between cubes.}
 \label{fig:intra_cube}
 \end{figure*}
-
-The mechanism is the behaviour of the spatial neighbourhood features
-under different geometries. With random sampling, every test cell has
-training cells nearby in all three spatial dimensions; the box-filter
-neighbourhood features, computed from training cells, provide meaningful
-local averages for each test cell even at 1 per cent coverage. With
-contiguous-slab training, the model is trained exclusively on the
-UV-illuminated surface of the cloud and cannot correctly predict the
-shielded interior: the feature distributions of interior cells fall
-entirely outside the training distribution, and the model defaults to an
-extrapolated mean that is systematically wrong. The z-axis slab is less
-catastrophic than the transverse slabs (z $\Rsq = -1.4$ versus $-2.7$
-for y) because the UV illumination direction along z produces a smoother
-gradient from surface to interior, making the half-cube feature
-distribution slightly more representative.
-
-The practical consequence for observational astronomy is that an H$_2$
-density field can be reconstructed from a sparse set of uniformly
-distributed sight-line observations --- the kind obtainable from an
-integral field unit (IFU) spectrograph with a sparse sampling grid ---
-with $\Rsq \approx 0.90$ at only 1 per cent spatial coverage. Deep,
-contiguous mapping of a single region consumes far more observing time
-while providing negligible reconstruction accuracy. Efficient H$_2$
-density surveys should prioritise coverage uniformity over observational
-depth.
 
 % ============================================================
 \section{Discussion}
 \label{sec:discussion}
 
-\subsection{Feature engineering versus architecture search}
+\subsection{Feature engineering versus architecture}
 
-The central methodological lesson of this work is that feature
-engineering dominates model architecture as a source of performance gain.
-The +0.031 $\Rsq$ improvement from the $3^3$ spatial features is larger
-than any architecture change, and the full multi-scale extension to
-three kernel sizes (+0.038 combined) exceeds the ensemble gain (+0.024).
-This is consistent with the finding of \citet{Grinsztajn2022} that
-tree-based models with engineered features routinely outperform deep
-learning on tabular regression problems when training data volume is
-limited. The specific features chosen here --- uniform box-filter means
---- are the simplest possible representation of spatial context; more
-sophisticated descriptors (local gradients, anisotropic kernels aligned
-with the UV illumination axis) could in principle improve accuracy
-further, particularly for the extrapolation folds.
+On this suite, input representation dominates architecture choice among
+the tabular models. The spatial features add $+0.013$ and $+0.015$ mean
+$\Rsq$ to XGBoost and the MLP respectively --- several times larger than any
+architecture variation we tested (tree depth, MLP width and depth,
+residual connections, all $\la 0.01$ with no consistent ordering) ---
+and stacking adds a further $+0.02$ over the best single model. This is
+consistent with the broader observation that tree-based models with
+appropriate features remain highly competitive on tabular problems
+\citep{Grinsztajn2022}. The box-filter means are a deliberately minimal
+spatial representation; anisotropic kernels aligned with the
+illumination axis, or cumulative sums along it (a discrete column
+integral), are natural refinements that we have not exhausted. A
+physics-based reference point --- an analytic molecular-fraction
+prescription \citep[e.g.][]{Krumholz2009,Gnedin2011,Bialy2016} evaluated
+cell-by-cell on the suite --- would usefully anchor the ML numbers;
+published formulae predict equilibrium molecular fractions from
+column-averaged quantities under geometric assumptions the cell-level
+task does not satisfy, so a fair comparison requires a calibration step
+that we leave to future work.
 
 \subsection{Volumetric versus per-cell representations}
 
-The 3D U-Net has the nominally correct inductive bias for a spatially
-correlated field: its hierarchical receptive field should, in principle,
-learn to aggregate the shielding column density in a physically
-meaningful way. In practice, the mismatch between volumetric sample count
-(48 augmented cubes) and model parameters (5.8\,M for
-\textsc{unet\_standard}) prevents the development of generalizable
-spatial representations, and the additional resolution loss from
-downsampling ($128^3 \to 64^3$) discards the fine-scale gradients at
-cloud boundaries where $\nHH$ varies most sharply. This identifies a
-general principle for simulation emulation with limited data: the choice
-between volumetric and per-cell approaches should be governed by the
-training sample-to-parameter ratio, not the nominal spatial nature of
-the problem. Volumetric models become competitive when dozens to hundreds
-of high-fidelity simulation volumes are available.
+The 3D U-Net is not categorically worse here --- at its best
+configuration it matches the tabular models on every interpolation fold
+--- but it is less robust in two specific senses: its accuracy falls
+off at both extrapolation boundaries, and its mean performance varies by
+$\sim$0.2 in $\Rsq$ across capacity and training configurations, a
+variance the tabular models simply do not exhibit. With 48 augmented
+training volumes against millions of parameters, this is the expected
+signature of an under-constrained estimator, and we caution against
+reading the comparison as a general statement about volumetric networks:
+at equal input resolution, with more independent simulations, or with
+pretraining, the ranking could change. What the comparison does
+establish is a practical default for limited-data suites: engineered
+neighbourhood features capture the dominant spatial signal at a small
+fraction of the cost, and they do so deterministically.
 
-\subsection{Regularisation in the limited-parameter regime}
+\subsection{Deployability and the shielding factor}
+\label{sec:deploy}
 
-The catastrophic failure of dropout in the extrapolation folds reflects a
-tension between standard regularisation wisdom and the requirements of
-physical extrapolation. Dropout prevents overfitting by forcing redundant
-feature representations, which is beneficial when the model is
-memorising noise. In this problem, where the model must form coherent
-representations of a physical process over only six discrete $\Gzero$
-training values, dropout prevents the \emph{structure} of the learned
-representation from being preserved under extrapolation. This finding may
-be relevant to other simulation emulation contexts where training covers
-only a small number of discrete parameter values.
+The ablation of Section~\ref{sec:ablation_fh2} addresses the most
+delicate methodological question in this study: whether the surrogate's
+accuracy is borrowed from the solver through $\fshield$. The answer is
+quantitative. $\fshield$ is genuinely informative (worth 0.039--0.045 in
+mean $\Rsq$ to the baseline models) but not load-bearing: both baseline
+models retain $\Rsq \approx 0.91$ without it, and the spatial-feature
+ensemble retains 0.977, because neighbourhood averages of the deployable
+column-type fields substitute for much of the shielding
+information. Deployment therefore has a
+spectrum of options: with a cheap approximate shielding estimate (e.g.\
+from extinction), accuracy should fall between the two rows of
+Table~\ref{tab:fh2}; with no shielding estimate at all, the
+without-$\fshield$ row applies directly. What our data cannot quantify
+is the effect of using an \emph{inconsistent} shielding estimator (one
+with different systematics from the solver's), which would require
+forward-modelling the estimator itself.
 
 \subsection{Limitations}
+\label{sec:limitations}
 
-Several limitations apply. The UV-only suite models chemistry under a
-spatially uniform, time-steady UV field; real molecular clouds experience
-anisotropic and time-varying radiation from nearby massive stars. The
-$z$-preserving augmentation strategy would require modification for
-simulations with different illumination geometries. The feature set
-includes $\log\fshield$, a non-local quantity computed from the full 3D
-H$_2$ column density; in a deployment scenario where $\nHH$ is unknown,
-$\fshield$ would need to be estimated from other tracers, and that
-uncertainty would propagate into the $\nHH$ prediction. Finally, the
-data set represents a single turbulent ISM realisation at each $\Gzero$
-value; generalisation across different initial conditions, magnetic field
-strengths, and density regimes remains to be quantified.
+\textit{Dataset scope.} The seven simulations grow from one turbulent
+initial realisation and differ only in their imposed $\Gzero$, so their
+structures are strongly correlated even though the evolved fields are
+not identical (Section~\ref{sec:suite}). All generalisation claims are
+therefore claims about the UV-field axis; transfer across turbulence
+realisations, metallicities, dust models, or resolutions is untested and
+plausibly harder. The suite is also quasi-equilibrium and uniformly
+illuminated; time-dependent or anisotropic radiation fields would
+invalidate the $z$-preserving augmentation and may change the role of
+the spatial features.
+
+\textit{Simulation provenance.} This paper characterises surrogate
+methodology on a controlled private suite, and its conclusions are
+internal to that suite (relative model performance, feature ablations,
+sampling geometry). Application of the trained surrogate to scientific
+inference requires the full simulation specification --- code, chemical
+network, box size, resolution, metallicity, dust-to-gas ratio, driving
+--- which is not part of this study.
+
+\textit{CNN comparison.} The U-Net was trained at $2\times$ reduced
+resolution for memory reasons and was not exhaustively tuned; the
+configuration-sensitivity result is itself evidence that any single
+U-Net number should be read with a wide error bar.
+
+\textit{Final-model bias.} The per-cell analysis run carries a
+systematic positive bias of up to $+0.5\dex$ at interior folds
+(Section~\ref{sec:per_fold}). Applications sensitive to absolute
+calibration rather than ranking should recalibrate per-$\Gzero$ or
+include a bias-correction stage, which fold-level $\Rsq$ alone would not
+reveal.
 
 % ============================================================
 \section{Conclusions}
 \label{sec:conc}
 
-We have developed and systematically evaluated ML surrogates for the
-molecular hydrogen number density in 3D ISM simulations, using
-leave-one-$\Gzero$-out cross-validation to measure out-of-distribution
-generalisation across the dominant physical parameter. Our main
-conclusions are as follows.
+We evaluated machine-learning surrogates for the molecular hydrogen
+number density in a controlled suite of seven $128^3$ UV-only ISM
+chemistry simulations under leave-one-$\Gzero$-out cross-validation.
+The main conclusions are:
 
-(i) An equal-weight ensemble of XGBoost and a wide MLP, each trained on
-a 60-dimensional feature vector combining 15 local physical fields with
-45 multi-scale spatial neighbourhood averages (kernel sizes $3^3$, $5^3$,
-$7^3$), achieves a mean log-space $\Rsq$ of $0.948 \pm 0.024$ across
-seven leave-one-$\Gzero$-out folds, with a minimum per-fold $\Rsq$ of
-0.908 at the hardest extrapolation fold ($\Gzero = 0.1$).
+(i) Multi-scale box-filter neighbourhood features (kernel widths 3, 5, 7
+voxels; $\approx$30\,s to compute for the full suite) improve every
+tabular model: XGBoost from $\Rsq = 0.950$ to 0.963 and a wide MLP from
+0.954 to 0.968. A Ridge-stacked ensemble of the two spatial-feature
+models reaches $\Rsq = 0.988 \pm 0.013$ (RMSE 0.25\dex) and is the best
+model in every experiment.
 
-(ii) The single largest performance improvement (+0.031) comes from
-adding $3^3$ spatial neighbourhood features, not from any model
-architecture change. Neural architecture search (three MLP designs, three
-XGBoost depths) yields differences smaller than 0.003.
+(ii) The solver-derived self-shielding factor is highly
+informative but not indispensable: excluding it costs the baseline
+trees 0.039 in mean $\Rsq$ (0.950 $\rightarrow$ 0.911) and the wide MLP
+0.045 (0.954 $\rightarrow$ 0.909); the spatial features halve the
+penalty, and the fully solver-independent stacked ensemble retains
+$\Rsq = 0.977 \pm 0.017$ (versus 0.988 with $\fshield$). The surrogate
+is therefore usable with solver-independent inputs alone, at a small
+and quantified accuracy cost.
 
-(iii) A 3D U-Net CNN achieves a best mean $\Rsq$ of $0.803 \pm 0.172$
-with an order of magnitude greater fold-to-fold variance, owing to the
-mismatch between volumetric training sample count (48 augmented cubes)
-and model parameters (5.8\,M). Including the CNN in any ensemble reduces
-the mean $\Rsq$.
+(iii) The best 3D U-Net configuration ($\Rsq = 0.974 \pm 0.035$) matches
+the tabular models on all interpolation folds but degrades at both
+extrapolation boundaries and varies by $\sim$0.2 in mean $\Rsq$ across
+training configurations, at roughly two orders of magnitude higher
+training cost. On suites of this size, engineered spatial context is the
+more robust default; this is not a claim about volumetric architectures
+in data-rich regimes.
 
-(iv) Dropout regularisation catastrophically degrades extrapolation to
-unseen $\Gzero$ values when training covers only six discrete UV field
-strengths. L2 weight decay is the appropriate regulariser in this regime.
+(iv) The learned local mapping transfers across a factor of
+$\sim$2--4 in $\Gzero$ (single-cube transfer $\Rsq = 0.966$ at one
+geometric step, 0.888 at two) and degrades beyond it, validating
+leave-one-$\Gzero$-out as a non-trivial protocol and confirming that
+none of the seven simulations is redundant.
 
-(v) Per-fold target normalisation (standardisation of $\logn$ per
-training fold) is essential for CNN stability: without it, $\Rsq < 0$;
-with it, $\Rsq = 0.775$ immediately.
+(v) Within a cube, reconstruction quality is controlled by sampling
+geometry rather than sample volume: 10 per cent uniformly random
+coverage achieves $\Rsq = 0.977$ while 50 per cent contiguous slabs fail
+($\Rsq < 0$), and at very sparse coverage ($\sim$1 per cent) compact
+contiguous regions outperform random sampling because the masked spatial
+features remain exact inside them. These are simulation-space results;
+translating them to observational survey design would require forward
+modelling of observables.
 
-(vi) Single-cube extrapolation experiments confirm that chemical
-knowledge transfers well over $\Gzero$ ratios up to $\sim\!4$--$8\times$
-($\Rsq > 0.88$) but degrades rapidly over larger factors, validating the
-leave-one-$\Gzero$-out protocol.
-
-(vii) Intra-cube spatial sampling experiments demonstrate that 1 per cent
-uniform random coverage reconstructs the $\nHH$ field with $\Rsq =
-0.897$, while 50 per cent contiguous-slab coverage yields $\Rsq = -0.394$.
-Coverage uniformity is the critical design parameter for observational
-H$_2$ density surveys; surveys targeting molecular cloud sight-lines
-should prioritise spatial uniformity over contiguous depth.
-
-The \enssp{} surrogate predicts $\nHH$ at all 2,097,152 cells of a
-$128^3$ cube in seconds on a single GPU, with accuracy within
-\(\sim\!0.1\)--\(0.2\)\,dex of the self-consistent simulation value across a
-64-fold UV field range.
+The full tabular pipeline --- feature construction, training, and
+prediction for all seven folds --- runs in minutes on a single consumer
+GPU, and the trained surrogate predicts all 2,097,152 cells of a new
+cube in seconds.
 
 % ============================================================
 \section*{Acknowledgements}
 
-The author thanks the developers of XGBoost, PyTorch, NumPy, SciPy, and
-Matplotlib for the open-source tools on which this work depends.
+The author thanks the developers of the open-source scientific Python
+ecosystem on which this work depends.
+
+\section*{Software}
+
+Python 3.14.5; PyTorch 2.12 \citep{Paszke2019}; XGBoost 3.2
+\citep{Chen2016}; NumPy 2.4 \citep{Harris2020}; SciPy 1.17
+\citep{Virtanen2020}; scikit-learn 1.8 \citep{Pedregosa2011};
+Matplotlib 3.10 \citep{Hunter2007}. All experiments were run on a single
+NVIDIA GeForce RTX 3090. Random seeds are fixed per fold; every
+experiment writes a timestamped JSON log containing its full
+configuration, per-fold metrics, software environment, and a SHA-256
+fingerprint of the input data.
 
 \section*{Data availability}
 
-All trained model outputs, prediction arrays, and experimental logs are
-archived as timestamped JSON and \texttt{.npz} files. The full pipeline
-is deterministic and runs end-to-end on a single consumer GPU.
+All experiment logs, trained-model outputs, and prediction volumes are
+archived as timestamped JSON and \texttt{.npz} files and are available
+from the author on request. The simulation suite is not yet public;
+requests for data access may be directed to the corresponding author.
 
 % ============================================================
 \bibliographystyle{mnras}

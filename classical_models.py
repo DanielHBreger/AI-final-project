@@ -13,6 +13,7 @@ A secondary R2_lin metric is computed in original nH2 space with clipped
 predictions to prevent exponential explosion from outlier neural-net outputs.
 """
 
+import random
 import numpy as np
 import torch
 import torch.nn as nn
@@ -22,6 +23,19 @@ from sklearn.metrics import r2_score, mean_squared_error, mean_absolute_error
 import xgboost as xgb
 
 from data_loader import load_all_cubes, get_X_y, get_g0_values, FEATURE_COLS
+
+_SEED = 67
+
+
+def _set_fold_seed(fold: int) -> None:
+    seed = _SEED + fold
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
 
 
 # ── Metrics ──────────────────────────────────────────────────────────────────
@@ -120,6 +134,7 @@ def run_xgboost(X: np.ndarray, y: np.ndarray,
     models = []
     n_folds = len(g0_values)
     for fold in range(n_folds):
+        _set_fold_seed(fold)
         train_mask = folds != fold
         X_tr, y_tr = X[train_mask], y[train_mask]
         X_va, y_va = X[~train_mask], y[~train_mask]
@@ -132,7 +147,7 @@ def run_xgboost(X: np.ndarray, y: np.ndarray,
             colsample_bytree=0.8,
             tree_method='hist',   # works for both CPU and CUDA
             device=_device,
-            random_state=42,
+            random_state=67,
             verbosity=0,
         )
         model.fit(X_tr, y_tr,
@@ -179,6 +194,7 @@ def run_mlp(X: np.ndarray, y: np.ndarray,
     n_folds = len(g0_values)
 
     for fold in range(n_folds):
+        _set_fold_seed(fold)
         train_mask = folds != fold
         X_tr, y_tr = X[train_mask], y[train_mask]
         X_va, y_va = X[~train_mask], y[~train_mask]
