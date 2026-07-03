@@ -312,11 +312,12 @@ def main() -> None:
         'spatial_kernels': args.spatial_kernels,
         'g0_values':      g0_vals,
         'source_folds':   source_folds,
+        # Full metric dicts (xgb_metrics / mlp_metrics / stacked_metrics) are
+        # kept so every recorded value is preserved in the log.
         'results': [
             [
                 {k: (float(v) if isinstance(v, (np.floating, float)) else v)
-                 for k, v in rec.items()
-                 if k not in ('xgb_metrics', 'mlp_metrics', 'stacked_metrics')}
+                 for k, v in rec.items()}
                 for rec in recs
             ]
             for recs in all_records

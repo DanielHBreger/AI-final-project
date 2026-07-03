@@ -35,9 +35,6 @@
 \citation{Ioffe2015}
 \citation{Kingma2015}
 \citation{He2016}
-\citation{Ronneberger2015,Cicek2016}
-\citation{Ulyanov2017}
-\citation{Srivastava2014}
 \@writefile{toc}{\contentsline {subsection}{\numberline {2.3}Target distribution}{3}{subsection.2.3}\protected@file@percent }
 \newlabel{sec:target}{{2.3}{3}{}{subsection.2.3}{}}
 \@writefile{toc}{\contentsline {section}{\numberline {3}Evaluation protocol}{3}{section.3}\protected@file@percent }
@@ -63,6 +60,9 @@
 \newlabel{fig:histograms}{{1}{4}{Distribution of $\logn $ across six UV field strengths. The seventh cube, $\Gzero = 0.2$, closely resembles $\Gzero = 0.1$ and is omitted from this figure only to avoid visual redundancy; it is included in all quantitative analyses. The bimodal structure at low $\Gzero $ (UV-exposed and self-shielded populations) collapses to a single UV-dominated mode as $\Gzero $ increases. Dashed lines mark per-cube means. All modelling is performed in log-space}{figure.1}{}}
 \@writefile{lof}{\contentsline {figure}{\numberline {2}{\ignorespaces Schematic comparison of per-cell modelling (\emph  {left}) and the multi-scale spatial neighbourhood representation used here (\emph  {right}). Note that the 15-feature baseline already includes one non-local quantity, the solver-computed self-shielding factor $f_{\mathrm  {H_2}}$; what the spatial features add is explicit neighbourhood context for \emph  {all} fields, including the directly observable ones, at three nested scales.}}{4}{figure.2}\protected@file@percent }
 \newlabel{fig:diagram}{{2}{4}{Schematic comparison of per-cell modelling (\emph {left}) and the multi-scale spatial neighbourhood representation used here (\emph {right}). Note that the 15-feature baseline already includes one non-local quantity, the solver-computed self-shielding factor $\fshield $; what the spatial features add is explicit neighbourhood context for \emph {all} fields, including the directly observable ones, at three nested scales}{figure.2}{}}
+\citation{Ronneberger2015,Cicek2016}
+\citation{Ulyanov2017}
+\citation{Srivastava2014}
 \@writefile{toc}{\contentsline {subsubsection}{\numberline {4.2.3}3D U-Net}{5}{subsubsection.4.2.3}\protected@file@percent }
 \newlabel{sec:cnn}{{4.2.3}{5}{}{subsubsection.4.2.3}{}}
 \@writefile{toc}{\contentsline {subsection}{\numberline {4.3}Ensembles}{5}{subsection.4.3}\protected@file@percent }
@@ -75,12 +75,12 @@
 \newlabel{sec:ablation_fh2}{{5.2}{5}{}{subsection.5.2}{}}
 \@writefile{toc}{\contentsline {subsection}{\numberline {5.3}The volumetric baseline}{5}{subsection.5.3}\protected@file@percent }
 \newlabel{sec:results_cnn}{{5.3}{5}{}{subsection.5.3}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {5.4}Error analysis of the final model}{5}{subsection.5.4}\protected@file@percent }
-\newlabel{sec:per_fold}{{5.4}{5}{}{subsection.5.4}{}}
 \@writefile{lot}{\contentsline {table}{\numberline {2}{\ignorespaces Leave-one-$G_0$-out log-space $R^2$ for all evaluated models on the full feature set. ``Feat.'' gives the input dimension (15 local; 60 = 15 local + 45 spatial; vol. = volumetric input at $64^3$). The best result in each column is bold. Tabular results are from the master comparison run (Section~\ref {sec:repro}); the 3D U-Net row is its best training configuration (32 base channels, 150 epochs, no dropout). The U-Net operates on $2\times $ downsampled volumes, so its comparison to the tabular rows is not at equal resolution.}}{6}{table.2}\protected@file@percent }
 \newlabel{tab:main}{{2}{6}{Leave-one-$\Gzero $-out log-space $\Rsq $ for all evaluated models on the full feature set. ``Feat.'' gives the input dimension (15 local; 60 = 15 local + 45 spatial; vol. = volumetric input at $64^3$). The best result in each column is bold. Tabular results are from the master comparison run (Section~\ref {sec:repro}); the 3D U-Net row is its best training configuration (32 base channels, 150 epochs, no dropout). The U-Net operates on $2\times $ downsampled volumes, so its comparison to the tabular rows is not at equal resolution}{table.2}{}}
 \@writefile{lot}{\contentsline {table}{\numberline {3}{\ignorespaces Ablation of the solver-derived self-shielding factor $f_{\mathrm  {H_2}}$. Each cell gives the mean $\pm $ fold std.\ of log-space $R^2$ over the seven leave-one-$G_0$-out folds. ``With'' rows use all 15 local features (60 with spatial); ``without'' rows exclude $f_{\mathrm  {H_2}}$ from the local features and from the spatial averages (14 local; 56 with spatial). All runs use the identical pipeline, seeds, and hyperparameters.}}{6}{table.3}\protected@file@percent }
 \newlabel{tab:fh2}{{3}{6}{Ablation of the solver-derived self-shielding factor $\fshield $. Each cell gives the mean $\pm $ fold std.\ of log-space $\Rsq $ over the seven leave-one-$\Gzero $-out folds. ``With'' rows use all 15 local features (60 with spatial); ``without'' rows exclude $\fshield $ from the local features and from the spatial averages (14 local; 56 with spatial). All runs use the identical pipeline, seeds, and hyperparameters}{table.3}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.4}Error analysis of the final model}{6}{subsection.5.4}\protected@file@percent }
+\newlabel{sec:per_fold}{{5.4}{6}{}{subsection.5.4}{}}
 \@writefile{toc}{\contentsline {section}{\numberline {6}Supplementary experiments}{6}{section.6}\protected@file@percent }
 \newlabel{sec:supp}{{6}{6}{}{section.6}{}}
 \@writefile{toc}{\contentsline {subsection}{\numberline {6.1}Single-cube transfer across $G_0$}{6}{subsection.6.1}\protected@file@percent }
@@ -112,47 +112,47 @@
 \citation{Virtanen2020}
 \citation{Pedregosa2011}
 \citation{Hunter2007}
-\bibstyle{mnras}
+\bibstyle{rasti}
 \bibdata{references}
-\bibcite{Bialy2016}{{1}{2016}{{Bialy \& Sternberg}}{{Bialy \& Sternberg}}}
+\bibcite{Bialy2016}{{1}{2016}{{Bialy \& Sternberg}}{{}}}
 \@writefile{lof}{\contentsline {figure}{\numberline {7}{\ignorespaces True (filled) versus predicted (outline) marginal distributions of $\log _{10}(n_{\mathrm  {H_2}})$ per fold, with $R^2$, KL divergence $D_{\mathrm  {KL}}(P_{\mathrm  {true}} \,\Vert \, P_{\mathrm  {pred}})$ (computed from equal-width histograms over the common support), and MAE annotated. The bimodal structure and peak positions are reproduced; the interior-fold positive bias appears as a small rightward shift of the predicted distribution.}}{10}{figure.7}\protected@file@percent }
 \newlabel{fig:distributions}{{7}{10}{True (filled) versus predicted (outline) marginal distributions of $\logn $ per fold, with $\Rsq $, KL divergence $D_{\mathrm {KL}}(P_{\mathrm {true}} \,\Vert \, P_{\mathrm {pred}})$ (computed from equal-width histograms over the common support), and MAE annotated. The bimodal structure and peak positions are reproduced; the interior-fold positive bias appears as a small rightward shift of the predicted distribution}{figure.7}{}}
 \@writefile{toc}{\contentsline {section}{\numberline {8}Conclusions}{10}{section.8}\protected@file@percent }
 \newlabel{sec:conc}{{8}{10}{}{section.8}{}}
-\bibcite{Branca2024}{{2}{2024}{{Branca \& Pallottini}}{{Branca \& Pallottini}}}
-\bibcite{Cazaux2004}{{3}{2004}{{Cazaux \& Tielens}}{{Cazaux \& Tielens}}}
-\bibcite{Chen2016}{{4}{2016}{{Chen \& Guestrin}}{{Chen \& Guestrin}}}
-\bibcite{Cicek2016}{{5}{2016}{{{\c {C}}i{\c {c}}ek et~al.}}{{{\c {C}}i{\c {c}}ek, Abdulkadir, Lienkamp, Brox \& Ronneberger}}}
+\bibcite{Branca2024}{{2}{2024}{{Branca \& Pallottini}}{{}}}
+\bibcite{Cazaux2004}{{3}{2004}{{Cazaux \& Tielens}}{{}}}
+\bibcite{Chen2016}{{4}{2016}{{Chen \& Guestrin}}{{}}}
 \@writefile{lof}{\contentsline {figure}{\numberline {8}{\ignorespaces Mid-plane slices of the $\log _{10}(n_{\mathrm  {H_2}})$ field for each $G_0$ (rows): ground truth, prediction, and absolute error (columns). At low $G_0$ residuals trace the boundaries of shielded filaments; at high $G_0$ the field is nearly uniform. Colour scale is shared within each row.}}{11}{figure.8}\protected@file@percent }
 \newlabel{fig:spatial}{{8}{11}{Mid-plane slices of the $\logn $ field for each $\Gzero $ (rows): ground truth, prediction, and absolute error (columns). At low $\Gzero $ residuals trace the boundaries of shielded filaments; at high $\Gzero $ the field is nearly uniform. Colour scale is shared within each row}{figure.8}{}}
-\bibcite{Draine1996}{{6}{1996}{{Draine \& Bertoldi}}{{Draine \& Bertoldi}}}
-\bibcite{Glover2007}{{7}{2007}{{Glover \& Mac~Low}}{{Glover \& Mac~Low}}}
-\bibcite{Glover2010}{{8}{2010}{{Glover et~al.}}{{Glover, Federrath, Mac~Low \& Klessen}}}
-\bibcite{Gnedin2011}{{9}{2011}{{Gnedin \& Kravtsov}}{{Gnedin \& Kravtsov}}}
-\bibcite{Grassi2014}{{10}{2014}{{Grassi et~al.}}{{Grassi, Bovino, Schleicher, Prieto, Seifried, Simoncini \& Gianturco}}}
-\bibcite{Grassi2022}{{11}{2022}{{Grassi et~al.}}{{Grassi, Nauman, Ramsey, Bovino, Picogna \& Ercolano}}}
-\bibcite{Grinsztajn2022}{{12}{2022}{{Grinsztajn et~al.}}{{Grinsztajn, Oyallon \& Varoquaux}}}
-\bibcite{Habing1968}{{13}{1968}{{Habing}}{{Habing}}}
-\bibcite{Harris2020}{{14}{2020}{{Harris et~al.}}{{Harris, Millman, van~der Walt et~al.}}}
-\bibcite{He2016}{{15}{2016}{{He et~al.}}{{He, Zhang, Ren \& Sun}}}
-\bibcite{Holdship2021}{{16}{2021}{{Holdship et~al.}}{{Holdship, Viti, Haworth \& Ilee}}}
-\bibcite{Hunter2007}{{17}{2007}{{Hunter}}{{Hunter}}}
-\bibcite{Ioffe2015}{{18}{2015}{{Ioffe \& Szegedy}}{{Ioffe \& Szegedy}}}
-\bibcite{Kingma2015}{{19}{2015}{{Kingma \& Ba}}{{Kingma \& Ba}}}
-\bibcite{Krumholz2009}{{20}{2009}{{Krumholz et~al.}}{{Krumholz, McKee \& Tumlinson}}}
-\bibcite{Narayanan2012}{{21}{2012}{{Narayanan et~al.}}{{Narayanan, Krumholz, Ostriker \& Hernquist}}}
-\bibcite{Paszke2019}{{22}{2019}{{Paszke et~al.}}{{Paszke, Gross, Massa et~al.}}}
-\bibcite{Pedregosa2011}{{23}{2011}{{Pedregosa et~al.}}{{Pedregosa, Varoquaux, Gramfort et~al.}}}
-\bibcite{Ronneberger2015}{{24}{2015}{{Ronneberger et~al.}}{{Ronneberger, Fischer \& Brox}}}
-\bibcite{Srivastava2014}{{25}{2014}{{Srivastava et~al.}}{{Srivastava, Hinton, Krizhevsky, Sutskever \& Salakhutdinov}}}
-\bibcite{Sternberg2014}{{26}{2014}{{Sternberg et~al.}}{{Sternberg, Le~Petit, Roueff \& Le~Bourlot}}}
-\bibcite{Ulyanov2017}{{27}{2017}{{Ulyanov et~al.}}{{Ulyanov, Vedaldi \& Lempitsky}}}
-\bibcite{Virtanen2020}{{28}{2020}{{Virtanen et~al.}}{{Virtanen, Gommers, Oliphant et~al.}}}
-\bibcite{Wolcott-Green2011}{{29}{2011}{{Wolcott-Green et~al.}}{{Wolcott-Green, Haiman \& Bryan}}}
-\bibcite{deMijolla2019}{{30}{2019}{{de~Mijolla et~al.}}{{de Mijolla, Viti, Holdship, Manolopoulou \& Yates}}}
+\bibcite{Cicek2016}{{5}{2016}{{{\c {C}}i{\c {c}}ek et~al.}}{{{\c {C}}i{\c {c}}ek, Abdulkadir, Lienkamp, Brox, \& Ronneberger}}}
+\bibcite{deMijolla2019}{{6}{2019}{{de~Mijolla et~al.}}{{de~Mijolla, Viti, Holdship, Manolopoulou, \& Yates}}}
+\bibcite{Draine1996}{{7}{1996}{{Draine \& Bertoldi}}{{}}}
+\bibcite{Glover2007}{{8}{2007}{{Glover \& Mac~Low}}{{}}}
+\bibcite{Glover2010}{{9}{2010}{{Glover et~al.}}{{Glover, Federrath, Mac~Low, \& Klessen}}}
+\bibcite{Gnedin2011}{{10}{2011}{{Gnedin \& Kravtsov}}{{}}}
+\bibcite{Grassi2014}{{11}{2014}{{Grassi et~al.}}{{Grassi, Bovino, Schleicher, Prieto, Seifried, Simoncini, \& Gianturco}}}
+\bibcite{Grassi2022}{{12}{2022}{{Grassi et~al.}}{{Grassi, Nauman, Ramsey, Bovino, Picogna, \& Ercolano}}}
+\bibcite{Grinsztajn2022}{{13}{2022}{{Grinsztajn et~al.}}{{Grinsztajn, Oyallon, \& Varoquaux}}}
+\bibcite{Habing1968}{{14}{1968}{{Habing}}{{}}}
+\bibcite{Harris2020}{{15}{2020}{{Harris et~al.}}{{Harris, Millman, van~der Walt, et~al.}}}
+\bibcite{He2016}{{16}{2016}{{He et~al.}}{{He, Zhang, Ren, \& Sun}}}
+\bibcite{Holdship2021}{{17}{2021}{{Holdship et~al.}}{{Holdship, Viti, Haworth, \& Ilee}}}
+\bibcite{Hunter2007}{{18}{2007}{{Hunter}}{{}}}
+\bibcite{Ioffe2015}{{19}{2015}{{Ioffe \& Szegedy}}{{}}}
+\bibcite{Kingma2015}{{20}{2015}{{Kingma \& Ba}}{{}}}
+\bibcite{Krumholz2009}{{21}{2009}{{Krumholz et~al.}}{{Krumholz, McKee, \& Tumlinson}}}
+\bibcite{Narayanan2012}{{22}{2012}{{Narayanan et~al.}}{{Narayanan, Krumholz, Ostriker, \& Hernquist}}}
+\bibcite{Paszke2019}{{23}{2019}{{Paszke et~al.}}{{Paszke, Gross, Massa, et~al.}}}
 \@writefile{lof}{\contentsline {figure}{\numberline {9}{\ignorespaces Single-cube transfer: log-space $R^2$ for models trained on one cube (rows) and evaluated on each cube (columns), for XGBoost (\emph  {left}), MLP (\emph  {centre}), and the stacked ensemble (\emph  {right}). Diagonal cells are in-sample fits. Transfer quality decays with $G_0$ separation; values for separations of four or more geometric steps are poor and can be strongly negative.}}{12}{figure.9}\protected@file@percent }
 \newlabel{fig:heatmap}{{9}{12}{Single-cube transfer: log-space $\Rsq $ for models trained on one cube (rows) and evaluated on each cube (columns), for XGBoost (\emph {left}), MLP (\emph {centre}), and the stacked ensemble (\emph {right}). Diagonal cells are in-sample fits. Transfer quality decays with $\Gzero $ separation; values for separations of four or more geometric steps are poor and can be strongly negative}{figure.9}{}}
 \@writefile{lof}{\contentsline {figure}{\numberline {10}{\ignorespaces Within-cube sampling geometry: test $R^2$ per training geometry (columns) and cube (rows) for XGBoost (\emph  {left}), MLP (\emph  {centre}), and the stacked ensemble (\emph  {right}). Random coverage $\geq $5--10 per cent reconstructs the held-out cells well in every cube; 50 per cent contiguous slabs fail in every cube; compact boxes are intermediate; 1 per cent random coverage is unstable, varying from $R^2\approx 0.9$ to strongly negative between cubes.}}{12}{figure.10}\protected@file@percent }
 \newlabel{fig:intra_cube}{{10}{12}{Within-cube sampling geometry: test $\Rsq $ per training geometry (columns) and cube (rows) for XGBoost (\emph {left}), MLP (\emph {centre}), and the stacked ensemble (\emph {right}). Random coverage $\geq $5--10 per cent reconstructs the held-out cells well in every cube; 50 per cent contiguous slabs fail in every cube; compact boxes are intermediate; 1 per cent random coverage is unstable, varying from $\Rsq \approx 0.9$ to strongly negative between cubes}{figure.10}{}}
-\newlabel{lastpage}{{8}{12}{}{section.8}{}}
-\gdef \@abspage@last{12}
+\bibcite{Pedregosa2011}{{24}{2011}{{Pedregosa et~al.}}{{Pedregosa, Varoquaux, Gramfort, et~al.}}}
+\bibcite{Ronneberger2015}{{25}{2015}{{Ronneberger et~al.}}{{Ronneberger, Fischer, \& Brox}}}
+\bibcite{Srivastava2014}{{26}{2014}{{Srivastava et~al.}}{{Srivastava, Hinton, Krizhevsky, Sutskever, \& Salakhutdinov}}}
+\bibcite{Sternberg2014}{{27}{2014}{{Sternberg et~al.}}{{Sternberg, Le~Petit, Roueff, \& Le~Bourlot}}}
+\bibcite{Ulyanov2017}{{28}{2017}{{Ulyanov et~al.}}{{Ulyanov, Vedaldi, \& Lempitsky}}}
+\bibcite{Virtanen2020}{{29}{2020}{{Virtanen et~al.}}{{Virtanen, Gommers, Oliphant, et~al.}}}
+\bibcite{Wolcott-Green2011}{{30}{2011}{{Wolcott-Green et~al.}}{{Wolcott-Green, Haiman, \& Bryan}}}
+\newlabel{lastpage}{{8}{13}{}{section.8}{}}
+\gdef \@abspage@last{13}

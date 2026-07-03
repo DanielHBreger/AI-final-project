@@ -11,12 +11,15 @@ the held-out cube, and display a 3-panel interactive 3D comparison:
 Best model from run 231200: stacked_sp R2=0.9911, R2_lin=0.616
 4-run average: stacked_sp R2=0.988 +/- 0.002
 
-Mass-budget recalibration (on by default): the stacked predictions carry a
-G0-dependent positive bias (~+0.2 dex in the molecular phase) that compounds
-to a x1.6-1.9 error in the predicted total H2 mass.  The per-training-cube
-OOF bias of the Ridge meta-learner is fitted against log10(G0) and the value
-at the held-out G0 is subtracted — training-cube quantities only, no leakage.
-Both raw and recalibrated volumes are saved.  Disable with --no-recalibrate.
+Mass-budget recalibration (--recal-mode, default 'mass'): the stacked
+predictions carry a G0-dependent, density-dependent error that shows up in
+the predicted total H2 mass even when the cell-mean log bias is ~0.  The
+per-training-cube *mass-weighted* OOF residual of the Ridge meta-learner is
+fitted against log10(G0) and the value at the held-out G0 is subtracted —
+training-cube quantities only, no leakage.  'mean' restores the legacy
+unweighted (cell-mean) correction; 'off' (or --no-recalibrate) disables it.
+Both raw and recalibrated volumes are saved; both fits are recorded in the
+npz either way.
 
 Usage
 -----
@@ -35,6 +38,7 @@ Usage
 
 import argparse
 import datetime
+import json
 import os
 import sys
 import numpy as np
@@ -54,7 +58,7 @@ from data_loader import (
 from classical_models import compute_metrics
 from model_helpers import (
     _XGB_CFG, FlexMLP, _compute_spatial_X, _compute_weights, _preds_to_volume,
-    fit_g0_bias_correction, predict_bias,
+    fit_g0_bias_correction, predict_bias, mass_weighted_bias,
 )
 
 # ── Training functions ─────────────────────────────────────────────────────────
@@ -115,7 +119,7 @@ def _train_mlp(X_tr: np.ndarray, y_tr: np.ndarray,
             model.eval()
             with torch.no_grad():
                 y_vp = model(torch.from_numpy(X_va_s).to(device)).float().cpu().numpy()
-            m = compute_metrics(y_va, y_vp)
+            m = compute_metrics(y_va, y_vp, fast=True)
             print(f"    ep {ep+1:3d}/{epochs}  R2={m['R2']:.4f}")
 
     model.eval()
@@ -130,7 +134,7 @@ def _train_mlp(X_tr: np.ndarray, y_tr: np.ndarray,
 def _run_fold(fold: int, g0_val: float,
               X_sp: np.ndarray, y: np.ndarray, fold_labels: np.ndarray,
               cubes: list, g0_vals: list, mlp_epochs: int, spatial_kernels: list,
-              recalibrate: bool = True) -> None:
+              recal_mode: str = 'mass') -> None:
     """Train stacked_sp on N-1 cubes, predict on the held-out fold.
 
     Stacking procedure:
@@ -140,12 +144,17 @@ def _run_fold(fold: int, g0_val: float,
       3. Final base models are trained on all 6 training cubes; Ridge meta
          is applied to their predictions on the held-out cube.
 
-    Mass-budget recalibration (recalibrate=True): the Ridge intercept zeroes
-    the pooled OOF residual, but a G0-dependent bias survives and inflates
-    the predicted total H2 mass.  The per-training-cube OOF bias of the
-    stacked model is fitted against log10(G0) and the fitted value at the
-    held-out G0 is subtracted from the predictions (leakage-free).
+    Mass-budget recalibration (recal_mode): the per-training-cube OOF bias of
+    the stacked model is fitted against log10(G0) and the fitted value at the
+    held-out G0 is subtracted from the predictions (training-cube quantities
+    only — leakage-free).  The per-cube bias is computed as
+      'mass'  mass-weighted mean residual (weights 10**y_true) — centres the
+              total-H2-mass budget (default; the cell-mean correction cannot
+              move a density-dependent error)
+      'mean'  unweighted mean residual — centres the cell-mean log bias only
+      'off'   no correction applied (both fits still recorded in the npz)
     """
+    assert recal_mode in ('mass', 'mean', 'off'), recal_mode
     train_folds = [f for f in np.unique(fold_labels).tolist() if f != fold]
 
     # ── Step 1: Nested OOF predictions for Ridge meta-learner ─────────────────
@@ -168,18 +177,27 @@ def _run_fold(fold: int, g0_val: float,
     meta.fit(X_meta, y_meta)
 
     # ── Mass-budget recalibration: per-cube stacked-OOF bias vs log10(G0) ─────
+    oof_preds = [meta.predict(np.column_stack([xgb_j, mlp_j]))
+                 for xgb_j, mlp_j in zip(meta_xgb, meta_mlp)]
     per_cube_bias = np.array([
-        float(np.mean(meta.predict(np.column_stack([xgb_j, mlp_j])) - yt_j))
-        for yt_j, xgb_j, mlp_j in zip(meta_yt, meta_xgb, meta_mlp)
+        float(np.mean(pp - yt_j)) for pp, yt_j in zip(oof_preds, meta_yt)
     ])
-    bias_slope, bias_intercept = fit_g0_bias_correction(
-        per_cube_bias, np.array([g0_vals[j] for j in train_folds]))
-    bias_offset = (predict_bias(bias_slope, bias_intercept, g0_val)
-                   if recalibrate else 0.0)
-    print(f"\n  OOF bias per training cube (dex): "
+    per_cube_bias_mw = np.array([
+        mass_weighted_bias(pp, yt_j) for pp, yt_j in zip(oof_preds, meta_yt)
+    ])
+    g0_train = np.array([g0_vals[j] for j in train_folds])
+    bias_slope, bias_intercept = fit_g0_bias_correction(per_cube_bias, g0_train)
+    mw_slope,   mw_intercept   = fit_g0_bias_correction(per_cube_bias_mw, g0_train)
+    offset_mean = predict_bias(bias_slope, bias_intercept, g0_val)
+    offset_mass = predict_bias(mw_slope,   mw_intercept,   g0_val)
+    bias_offset = {'mass': offset_mass, 'mean': offset_mean, 'off': 0.0}[recal_mode]
+    print(f"\n  OOF bias per training cube (dex):      "
           f"{np.array2string(per_cube_bias, precision=3)}")
-    print(f"  Fitted bias(G0={g0_val}) = {bias_offset:+.3f} dex "
-          f"({'applied' if recalibrate else 'NOT applied'})")
+    print(f"  OOF mass-wtd bias per training cube:   "
+          f"{np.array2string(per_cube_bias_mw, precision=3)}")
+    print(f"  Fitted bias(G0={g0_val}): mean={offset_mean:+.3f}  "
+          f"mass={offset_mass:+.3f} dex  ->  applying {recal_mode} "
+          f"({bias_offset:+.3f})")
 
     # ── Step 2: Final base models on all 6 training cubes ─────────────────────
     mask = fold_labels != fold
@@ -209,6 +227,10 @@ def _run_fold(fold: int, g0_val: float,
     print(f"           stacked_sp (cal)  R2={m_stacked['R2']:.4f}  "
           f"R2_lin={m_stacked['R2_lin']:.4f}  RMSE={m_stacked['RMSE']:.4f}  "
           f"bias={m_stacked['bias']:+.3f}  massRatio={m_stacked['mass_ratio']:.3f}")
+    print(f"           stacked_sp (cal)  f0.1={m_stacked['frac_01']:.3f}  "
+          f"f0.3={m_stacked['frac_03']:.3f}  CCC={m_stacked['CCC']:.4f}  "
+          f"W1={m_stacked['W1']:.3f}  R2_mol={m_stacked['R2_mol']:.4f}  "
+          f"R2_dif={m_stacked['R2_dif']:.4f}")
     print(f"  Ridge weights: XGB={meta.coef_[0]:.3f}  MLP={meta.coef_[1]:.3f}  "
           f"intercept={meta.intercept_:.3f}")
 
@@ -220,10 +242,20 @@ def _run_fold(fold: int, g0_val: float,
     os.makedirs('predictions', exist_ok=True)
     timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
     save_path = f'predictions/pred_g0_{g0_val}_{timestamp}.npz'
+    # Full metric dicts for all four models, JSON-encoded so every recorded
+    # value survives in the .npz (read back with json.loads(str(d['metrics_json'])))
+    metrics_json = json.dumps({
+        'xgb_sp':      m_xgb,
+        'mlp_sp':      m_mlp,
+        'stacked_raw': m_raw,
+        'stacked_cal': m_stacked,   # delivered prediction (per recal_mode)
+        'recal_mode':  recal_mode,
+    })
     np.savez_compressed(
         save_path,
         pred_vol         = pred_vol,
         pred_vol_raw     = pred_vol_raw,
+        metrics_json     = metrics_json,
         g0               = np.float64(g0_val),
         r2_xgb           = np.float32(m_xgb['R2']),
         r2_mlp           = np.float32(m_mlp['R2']),
@@ -231,10 +263,16 @@ def _run_fold(fold: int, g0_val: float,
         r2_stacked_raw   = np.float32(m_raw['R2']),
         mass_ratio       = np.float32(m_stacked['mass_ratio']),
         mass_ratio_raw   = np.float32(m_raw['mass_ratio']),
-        bias_offset      = np.float32(bias_offset),
-        bias_slope       = np.float32(bias_slope),
+        recal_mode       = np.str_(recal_mode),
+        bias_offset      = np.float32(bias_offset),      # applied offset
+        bias_offset_mean = np.float32(offset_mean),
+        bias_offset_mass = np.float32(offset_mass),
+        bias_slope       = np.float32(bias_slope),       # mean-residual fit
         bias_intercept   = np.float32(bias_intercept),
+        mw_slope         = np.float32(mw_slope),         # mass-weighted fit
+        mw_intercept     = np.float32(mw_intercept),
         per_cube_bias    = per_cube_bias.astype(np.float32),
+        per_cube_bias_mw = per_cube_bias_mw.astype(np.float32),
         meta_coef        = np.array(meta.coef_,    dtype=np.float32),
         meta_intercept   = np.float32(meta.intercept_),
         spatial_kernels  = np.array(spatial_kernels, dtype=np.int32),
@@ -257,13 +295,19 @@ def main() -> None:
                         help='Spatial filter kernel sizes (default: 3 5 7)')
     parser.add_argument('--all', action='store_true',
                         help='Run all 7 G0 folds and save a prediction file for each')
+    parser.add_argument('--recal-mode', choices=['mass', 'mean', 'off'],
+                        default=None,
+                        help="G0-linear bias recalibration: 'mass' fits the "
+                             'mass-weighted per-cube OOF residual (closes the '
+                             "H2 mass budget; default), 'mean' the unweighted "
+                             'residual (legacy cell-mean correction), '
+                             "'off' saves raw stacked predictions as pred_vol.")
     parser.add_argument('--no-recalibrate', action='store_false', dest='recalibrate',
-                        help='Disable the G0-dependent bias recalibration '
-                             '(mass-budget fix); raw stacked predictions are '
-                             'then saved as pred_vol.')
+                        help="Deprecated alias for --recal-mode off.")
     parser.set_defaults(recalibrate=True)
     add_drop_args(parser)
     args = parser.parse_args()
+    recal_mode = args.recal_mode or ('mass' if args.recalibrate else 'off')
 
     feat_cols = get_feature_cols(build_drop_set(args))
 
@@ -294,7 +338,7 @@ def main() -> None:
             print(f"\n{'='*60}\nFold {fold+1}/{len(g0_vals)}  G0={g0_val}\n{'='*60}")
             _run_fold(fold, g0_val, X_sp, y, fold_labels, cubes, g0_vals,
                       args.mlp_epochs, args.spatial_kernels,
-                      recalibrate=args.recalibrate)
+                      recal_mode=recal_mode)
     else:
         if args.g0 not in g0_vals:
             print(f"ERROR: G0={args.g0} not found. Available: {g0_vals}", file=sys.stderr)
@@ -305,7 +349,7 @@ def main() -> None:
               f"Validating on 1 cube (G0={args.g0})")
         _run_fold(fold, args.g0, X_sp, y, fold_labels, cubes, g0_vals,
                   args.mlp_epochs, args.spatial_kernels,
-                  recalibrate=args.recalibrate)
+                  recal_mode=recal_mode)
 
 
 if __name__ == '__main__':

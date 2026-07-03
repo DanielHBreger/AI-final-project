@@ -209,21 +209,30 @@ def run_cube_split(cube, g0: float, split_name: str,
     meta_te = np.column_stack([xgb_te, mlp_te])
     stk_te = ridge.predict(meta_te).astype(np.float32)
 
-    # ── Compute R2 ────────────────────────────────────────────────────────────
-    def r2(y_true, y_pred):
-        return float(compute_metrics(y_true, y_pred)['R2'])
+    # ── Compute metrics ───────────────────────────────────────────────────────
+    # Full metric suite on the held-out test cells; fast R2-only on the
+    # (in-sample) training cells.
+    def r2_fast(y_true, y_pred):
+        return float(compute_metrics(y_true, y_pred, fast=True)['R2'])
+
+    m_xgb_te = compute_metrics(y_te, xgb_te)
+    m_mlp_te = compute_metrics(y_te, mlp_te)
+    m_stk_te = compute_metrics(y_te, stk_te)
 
     return {
         'g0':               float(g0),
         'split':            split_name,
         'n_train':          int(mask_tr.sum()),
         'n_test':           int(mask_te.sum()),
-        'xgb_train_r2':     r2(y_tr, xgb_tr),
-        'xgb_test_r2':      r2(y_te, xgb_te),
-        'mlp_train_r2':     r2(y_tr, mlp_tr),
-        'mlp_test_r2':      r2(y_te, mlp_te),
-        'stacked_train_r2': r2(y_tr, stk_tr),
-        'stacked_test_r2':  r2(y_te, stk_te),
+        'xgb_train_r2':     r2_fast(y_tr, xgb_tr),
+        'xgb_test_r2':      float(m_xgb_te['R2']),
+        'mlp_train_r2':     r2_fast(y_tr, mlp_tr),
+        'mlp_test_r2':      float(m_mlp_te['R2']),
+        'stacked_train_r2': r2_fast(y_tr, stk_tr),
+        'stacked_test_r2':  float(m_stk_te['R2']),
+        'xgb_test_metrics':     m_xgb_te,
+        'mlp_test_metrics':     m_mlp_te,
+        'stacked_test_metrics': m_stk_te,
     }
 
 

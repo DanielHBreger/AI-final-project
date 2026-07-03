@@ -68,16 +68,19 @@ def _get_feature_cols(args: argparse.Namespace) -> list[str]:
 from augmentation   import get_symmetry_ops
 from cnn_model      import UNet3D, count_parameters
 from classical_models import compute_metrics, print_results
+from model_helpers  import normalize_channels_inplace, normalize_targets_inplace
 
 
 # ── Dataset ───────────────────────────────────────────────────────────────────
 
 class CubeDataset(Dataset):
-    """Augment, stack, and downsample 128³ cubes to 64³ at construction time."""
+    """Augment and stack 128³ cubes at construction time; pool=True
+    average-pools to 64³ (legacy behaviour for constrained VRAM)."""
     def __init__(self, cube_vols: list[dict],
                  ops: list[np.ndarray] | None,
                  augment: bool = True,
-                 input_cols: list[str] | None = None):
+                 input_cols: list[str] | None = None,
+                 pool: bool = False):
         _cols = input_cols if input_cols is not None else FEATURE_COLS
         self.xs: list[torch.Tensor] = []
         self.ys: list[torch.Tensor] = []
@@ -92,10 +95,11 @@ class CubeDataset(Dataset):
                 tgt_t   = torch.from_numpy(
                               aug[LOG_TARGET_COL][None]
                           ).unsqueeze(0).float()                          # (1, 1, 128, 128, 128)
-                self.xs.append(torch.nan_to_num(
-                    F.avg_pool3d(ch_t,  2, 2).squeeze(0)))                # (C, 64, 64, 64)
-                self.ys.append(torch.nan_to_num(
-                    F.avg_pool3d(tgt_t, 2, 2).squeeze(0)))                # (1, 64, 64, 64)
+                if pool:
+                    ch_t  = F.avg_pool3d(ch_t,  2, 2)
+                    tgt_t = F.avg_pool3d(tgt_t, 2, 2)
+                self.xs.append(torch.nan_to_num(ch_t.squeeze(0)))
+                self.ys.append(torch.nan_to_num(tgt_t.squeeze(0)))
 
     def __len__(self) -> int:               return len(self.xs)
     def __getitem__(self, i: int):          return self.xs[i], self.ys[i]
@@ -123,27 +127,21 @@ def _run_fold(train_vols: list[dict], val_vols: list[dict],
               input_cols: list[str],
               dropout: float = 0.0,
               warmup_epochs: int = 0,
-              seed: int = 0) -> tuple[dict, list[dict]]:
+              seed: int = 0,
+              pool: bool = False) -> tuple[dict, list[dict]]:
     """Train one CV fold, return (metrics, per-epoch history)."""
     torch.manual_seed(seed)
     np.random.seed(seed)
 
-    train_ds = CubeDataset(train_vols, ops,      augment=True,  input_cols=input_cols)
-    val_ds   = CubeDataset(val_vols,   ops=None, augment=False, input_cols=input_cols)
+    train_ds = CubeDataset(train_vols, ops,      augment=True,
+                           input_cols=input_cols, pool=pool)
+    val_ds   = CubeDataset(val_vols,   ops=None, augment=False,
+                           input_cols=input_cols, pool=pool)
 
-    # Per-channel input normalisation — training stats only
-    all_x   = torch.stack(train_ds.xs)
-    ch_mean = all_x.mean(dim=(0, 2, 3, 4), keepdim=True).squeeze(0)
-    ch_std  = all_x.std( dim=(0, 2, 3, 4), keepdim=True).squeeze(0).clamp(min=1e-6)
-    train_ds.xs = [(x - ch_mean) / ch_std for x in train_ds.xs]
-    val_ds.xs   = [(x - ch_mean) / ch_std for x in val_ds.xs]
-
-    # Per-fold target normalisation
-    all_y  = torch.stack(train_ds.ys)
-    y_mean = all_y.mean()
-    y_std  = all_y.std().clamp(min=1e-6)
-    train_ds.ys = [(y - y_mean) / y_std for y in train_ds.ys]
-    val_ds.ys   = [(y - y_mean) / y_std for y in val_ds.ys]
+    # Fold-safe normalisation (training stats only), streaming + in place —
+    # a full-dataset stack would be a ~6 GB temporary at 128³
+    normalize_channels_inplace(train_ds.xs, val_ds.xs)
+    y_mean, y_std = normalize_targets_inplace(train_ds.ys, val_ds.ys)
 
     pin_mem  = device.type == 'cuda'
     train_dl = DataLoader(train_ds, batch_size=1, shuffle=True,
@@ -205,14 +203,13 @@ def _run_fold(train_vols: list[dict], val_vols: list[dict],
     # Restore best checkpoint, evaluate in original log_nH2 space
     model.load_state_dict(best_state)
     model.eval()
-    y_mean_np, y_std_np = y_mean.item(), y_std.item()
     y_true_parts, y_pred_parts = [], []
     with torch.no_grad():
         for xb, yb in val_dl:
             y_pred_parts.append(model(xb.to(device)).float().cpu().numpy().ravel())
             y_true_parts.append(yb.numpy().ravel())
-    y_true = np.concatenate(y_true_parts) * y_std_np + y_mean_np
-    y_pred = np.concatenate(y_pred_parts) * y_std_np + y_mean_np
+    y_true = np.concatenate(y_true_parts) * y_std + y_mean
+    y_pred = np.concatenate(y_pred_parts) * y_std + y_mean
 
     return compute_metrics(y_true, y_pred), history
 
@@ -222,7 +219,8 @@ def _run_fold(train_vols: list[dict], val_vols: list[dict],
 def run_variant(name: str, config: dict,
                 all_vols: list[dict], g0_vals: list[float],
                 ops: list[np.ndarray], device: torch.device,
-                epochs: int, input_cols: list[str]) -> dict:
+                epochs: int, input_cols: list[str],
+                pool: bool = False) -> dict:
     base_ch   = config['base_ch']
     dropout   = config.get('dropout', 0.0)
     warmup_ep = config.get('warmup_epochs', 0)
@@ -231,7 +229,8 @@ def run_variant(name: str, config: dict,
                                         base_ch=base_ch, dropout=dropout))
     print(f"\n{'='*62}")
     print(f"  {name}  base_ch={base_ch}  dropout={dropout}  "
-          f"warmup={warmup_ep}  lr={lr}  params={n_params:,}")
+          f"warmup={warmup_ep}  lr={lr}  params={n_params:,}  "
+          f"grid={64 if pool else 128}^3")
     print(f"{'='*62}")
 
     fold_metrics: list[dict] = []
@@ -245,7 +244,7 @@ def run_variant(name: str, config: dict,
         metrics, history = _run_fold(
             train_vols, val_vols, ops, device, epochs, lr, base_ch,
             input_cols=input_cols, dropout=dropout,
-            warmup_epochs=warmup_ep, seed=fold)
+            warmup_epochs=warmup_ep, seed=fold, pool=pool)
 
         fold_metrics.append(metrics)
         log_folds.append({
@@ -286,6 +285,10 @@ def main() -> None:
                         help=f'Variants to run. Choices: {all_names}')
     parser.add_argument('--log', type=str, default=None,
                         help='JSON output path (default: cnn_test_TIMESTAMP.json)')
+    parser.add_argument('--downsample', action='store_true',
+                        help='Average-pool volumes 128^3 -> 64^3 (legacy '
+                             'behaviour for constrained VRAM; default trains '
+                             'at native 128^3)')
     _add_drop_args(parser)
     args = parser.parse_args()
 
@@ -316,7 +319,8 @@ def main() -> None:
     for name in args.variants:
         results[name] = run_variant(
             name, CNN_VARIANTS[name], all_vols, g0_vals, ops, device,
-            epochs=args.epochs, input_cols=input_cols)
+            epochs=args.epochs, input_cols=input_cols,
+            pool=args.downsample)
 
     # Final comparison table
     print(f"\n{'Variant':<20}  {'R2 mean':>8}  {'+-':>6}  {'R2_lin mean':>11}  {'MAE mean':>9}")
@@ -332,6 +336,7 @@ def main() -> None:
         'timestamp':  datetime.datetime.now().isoformat(timespec='seconds'),
         'device':     str(device),
         'epochs':     args.epochs,
+        'grid_size':  64 if args.downsample else 128,
         'input_cols': input_cols,
         'g0_values':  g0_vals,
         'variants':   results,

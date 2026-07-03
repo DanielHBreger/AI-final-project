@@ -13,6 +13,9 @@ Figures produced
   fig4_stratified.png      -- density-stratified R2 curves + error-threshold lines
   fig5_spatial.png         -- 2-D mean|error| projections (xy / xz / yz) per G0
   fig6_distributions.png   -- truth vs prediction density histograms per G0
+  fig7_massbudget.png      -- mass ratio + bias (raw vs recalibrated) and
+                              phase-conditional R2 per G0
+  fig8_slices.png          -- mid-plane truth | prediction | |error| slices per G0
 
 Usage
 -----
@@ -42,6 +45,7 @@ warnings.filterwarnings('ignore')
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
 from model_helpers import _preds_to_volume
+from classical_models import PHASE_SPLIT
 from data_loader import load_single_cube
 from viz_common import load_prediction
 
@@ -151,7 +155,38 @@ def _stats_box(ax: plt.Axes, r: dict) -> None:
 
 
 def _find_npz(directory: str) -> list[str]:
-    return sorted(glob.glob(os.path.join(directory, '*.npz')))
+    """Stacked-ensemble prediction files in `directory`.
+
+    Files without a 'pred_vol' array (e.g. CNN predictions, which store
+    'pred_cnn_vol') are skipped.  When several files exist for the same G0
+    (pred_g0_<G0>_<timestamp>.npz), only the most recent is kept so reruns
+    don't mix old and new volumes."""
+    import re
+    paths = sorted(glob.glob(os.path.join(directory, '*.npz')))
+    by_g0: dict[str, str] = {}
+    others: list[str] = []
+    skipped = 0
+    for p in paths:
+        try:
+            with np.load(p) as d:
+                if 'pred_vol' not in d.files:
+                    skipped += 1
+                    continue
+        except Exception:
+            skipped += 1
+            continue
+        m = re.search(r'pred_g0_([\d.]+)_\d', os.path.basename(p))
+        if m:
+            by_g0[m.group(1)] = p   # sorted() + timestamped names -> last = latest
+        else:
+            others.append(p)
+    kept = sorted(by_g0.values()) + others
+    n_dup = len(paths) - len(kept) - skipped
+    if skipped:
+        print(f'  ({skipped} non-ensemble .npz file(s) without pred_vol skipped)')
+    if n_dup > 0:
+        print(f'  ({n_dup} older prediction file(s) for duplicate G0 values ignored)')
+    return kept
 
 
 def _choose_directory() -> str:
@@ -217,12 +252,31 @@ def _compute_record(truth_vol: np.ndarray,
             bin_mae[i] = float(np.mean(np.abs(err[mask])))
         bin_label.append(f'{bin_edges[i]:.1f}')
 
+    # Mass budget (clipped, as in compute_metrics) and phase-conditional R2
+    mass_ratio = float(np.sum(10.0 ** np.clip(y_p, lo, hi))
+                       / np.sum(10.0 ** y_t))
+    mol = y_t > PHASE_SPLIT
+    r2_mol = (float(r2_score(y_t[mol], y_p[mol]))
+              if mol.sum() >= 10 else np.nan)
+    r2_dif = (float(r2_score(y_t[~mol], y_p[~mol]))
+              if (~mol).sum() >= 10 else np.nan)
+    bias_mol = float(np.mean(err[mol])) if mol.sum() >= 10 else np.nan
+
+    # Mid-plane slices (z = N/2) for the truth | prediction | error figure
+    z_mid = truth_vol.shape[2] // 2
+    slice_t = truth_vol[:, :, z_mid].astype(np.float32)
+    slice_p = pred_vol[:, :, z_mid].astype(np.float32)
+
     return dict(
         r2=r2, rmse=rmse, mae=mae, bias=bias, r2_lin=r2_lin, corr=corr,
         n_cells=len(y_t),
         truth_mean=float(y_t.mean()), truth_std=float(y_t.std()),
         pred_mean=float(y_p.mean()),  pred_std=float(y_p.std()),
         frac=frac,
+        mass_ratio=mass_ratio,
+        r2_mol=r2_mol, r2_dif=r2_dif, bias_mol=bias_mol,
+        f_mol=float(np.mean(mol)),
+        slice_t=slice_t, slice_p=slice_p,
         strat_pcts=strat_pcts, strat_r2=strat_r2,
         pxy=pxy, pxz=pxz, pyz=pyz,
         bin_mae=bin_mae, bin_label=bin_label,
@@ -650,6 +704,132 @@ def fig6_distributions(recs: list[dict], save_dir: str) -> None:
     _save_fig(fig, os.path.join(save_dir, 'fig6_distributions.png'))
 
 
+# ── Figure 7: Mass budget and phase-conditional accuracy ──────────────────────
+
+def fig7_massbudget(recs: list[dict], save_dir: str) -> None:
+    """
+    (a) Total H2 mass ratio (predicted/true) per G0, raw stacked prediction
+        vs recalibrated, log y-axis with the ideal ratio 1 marked.
+    (b) Mean residual (bias, dex) per G0, raw vs recalibrated.
+    (c) Phase-conditional R2 (molecular / diffuse split at PHASE_SPLIT) and
+        overall R2 per G0.
+    Raw-prediction series are drawn only for .npz files that contain
+    pred_vol_raw (predictions saved after the 2026-07 recalibration fix).
+    """
+    g0s     = np.array([r['g0'] for r in recs])
+    has_raw = any(r.get('raw') is not None for r in recs)
+    # Without a raw volume (pre-2026-07 prediction files) the delivered
+    # pred_vol may itself be uncalibrated — label it neutrally.
+    lbl_cal = 'recalibrated' if has_raw else 'delivered prediction'
+
+    fig, axes = plt.subplots(1, 3, figsize=(10.8, 3.3))
+
+    def _logx(ax):
+        ax.set_xscale('log')
+        ax.set_xticks(g0s)
+        ax.set_xticklabels([f'{g:g}' for g in g0s], fontsize=6.5)
+        ax.xaxis.set_minor_formatter(ticker.NullFormatter())
+        ax.set_xlabel(r'UV field strength $G_0$')
+
+    # (a) mass ratio
+    ax = axes[0]
+    if has_raw:
+        raw_mr = [r['raw']['mass_ratio'] if r.get('raw') else np.nan for r in recs]
+        ax.plot(g0s, raw_mr, color='0.55', marker='o', ls='--',
+                label='raw stacked')
+    ax.plot(g0s, [r['mass_ratio'] for r in recs], color=_C_PRED,
+            marker='D', ls='-', label=lbl_cal)
+    ax.axhline(1.0, color='0.3', lw=0.7, ls=':')
+    ax.set_yscale('log')
+    ax.yaxis.set_major_formatter(ticker.FormatStrFormatter('%g'))
+    ax.set_ylabel(r'$M_{\rm H_2}^{\rm pred} / M_{\rm H_2}^{\rm true}$')
+    ax.set_title('Total H$_2$ mass budget')
+    ax.legend(fontsize=6.5)
+    _logx(ax)
+    _panel(ax, 0)
+
+    # (b) bias
+    ax = axes[1]
+    if has_raw:
+        raw_b = [r['raw']['bias'] if r.get('raw') else np.nan for r in recs]
+        ax.plot(g0s, raw_b, color='0.55', marker='o', ls='--',
+                label='raw stacked')
+    ax.plot(g0s, [r['bias'] for r in recs], color=_C_PRED,
+            marker='D', ls='-', label=lbl_cal)
+    ax.axhline(0.0, color='0.3', lw=0.7, ls=':')
+    ax.set_ylabel(r'Mean residual $\langle\hat{y}-y\rangle$  (dex)')
+    ax.set_title('Log-space bias')
+    ax.legend(fontsize=6.5)
+    _logx(ax)
+    _panel(ax, 1)
+
+    # (c) phase-conditional R2
+    ax = axes[2]
+    ax.plot(g0s, [r['r2'] for r in recs], color='0.25', marker='o', ls='-',
+            label='all cells')
+    ax.plot(g0s, [r['r2_mol'] for r in recs], color=_C_TRUTH, marker='s',
+            ls='--', label=rf'molecular ($y > {PHASE_SPLIT:g}$)')
+    ax.plot(g0s, [r['r2_dif'] for r in recs], color=_C_PRED, marker='^',
+            ls='--', label=rf'diffuse ($y \leq {PHASE_SPLIT:g}$)')
+    ax.set_ylabel(r'$R^2$')
+    ax.set_title('Phase-conditional accuracy')
+    ax.legend(fontsize=6.5, loc='lower left')
+    _logx(ax)
+    _panel(ax, 2)
+
+    fig.tight_layout()
+    _save_fig(fig, os.path.join(save_dir, 'fig7_massbudget.png'))
+
+
+# ── Figure 8: Mid-plane slices ─────────────────────────────────────────────────
+
+def fig8_slices(recs: list[dict], save_dir: str) -> None:
+    """
+    Mid-plane (z = N/2) slices for each G0 (rows): ground truth, prediction,
+    and absolute error (columns).  Truth and prediction share one colour
+    scale per row; the error column has its own scale per row.
+    """
+    n   = len(recs)
+    fig = plt.figure(figsize=(9.6, n * 2.9))
+    gs  = gridspec.GridSpec(n, 3, figure=fig, hspace=0.32, wspace=0.30)
+
+    for row, r in enumerate(recs):
+        s_t, s_p = r['slice_t'], r['slice_p']
+        s_e      = np.abs(s_p - s_t)
+        vmin = float(min(s_t.min(), s_p.min()))
+        vmax = float(max(s_t.max(), s_p.max()))
+        emax = float(np.percentile(s_e, 99))
+
+        panels = [
+            (s_t, 'viridis', vmin, vmax, 'Ground truth'),
+            (s_p, 'viridis', vmin, vmax, 'Prediction'),
+            (s_e, 'inferno', 0.0,  emax, r'$|\epsilon|$'),
+        ]
+        for col, (img, cmap, lo, hi, col_title) in enumerate(panels):
+            ax = fig.add_subplot(gs[row, col])
+            im = ax.imshow(img.T, origin='lower', aspect='equal',
+                           cmap=cmap, vmin=lo, vmax=hi,
+                           extent=[0, img.shape[0], 0, img.shape[1]],
+                           rasterized=True)
+            if row == 0:
+                ax.set_title(col_title, fontsize=9)
+            ax.set_xticks([0, img.shape[0] // 2, img.shape[0]])
+            ax.set_yticks([0, img.shape[1] // 2, img.shape[1]])
+            ax.tick_params(labelsize=6.5)
+            ax.set_xlabel('$i_x$', fontsize=7.5)
+            ax.set_ylabel(
+                (rf'$G_0={r["g0"]:.1f}$' + '\n' + '$i_y$') if col == 0 else '$i_y$',
+                fontsize=7.5)
+            cb = fig.colorbar(im, ax=ax, fraction=0.046, pad=0.03)
+            cb.ax.tick_params(labelsize=6)
+            if col < 2:
+                cb.set_label(r'$\log_{10}(n_{\rm H_2})$', fontsize=6.5)
+            else:
+                cb.set_label(r'$|\epsilon|$ (dex)', fontsize=6.5)
+
+    _save_fig(fig, os.path.join(save_dir, 'fig8_slices.png'))
+
+
 # ── Text summary table ─────────────────────────────────────────────────────────
 
 def _print_table(recs: list[dict]) -> None:
@@ -698,6 +878,11 @@ def main() -> None:
     for npz in npz_files:
         pred_vol, g0, r2_xgb, r2_mlp, r2_stacked, kernels, epochs = \
             load_prediction(npz)
+        # Raw (pre-recalibration) volume, present in predictions saved after
+        # the 2026-07 mass-budget fix
+        with np.load(npz) as d:
+            pred_vol_raw = (d['pred_vol_raw'] if 'pred_vol_raw' in d.files
+                            else None)
         print(f'\n  G0={g0:.1f}  loading ground truth ...')
         cube_df   = load_single_cube(g0)
         y_true    = cube_df['log_nH2'].values.astype(np.float32)
@@ -706,9 +891,22 @@ def main() -> None:
         print(f'  G0={g0:.1f}  computing statistics ...')
         rec = _compute_record(truth_vol, pred_vol)
         rec.update(g0=g0, r2_xgb=r2_xgb, r2_mlp=r2_mlp, r2_stacked=r2_stacked)
+        if pred_vol_raw is not None and not np.allclose(pred_vol_raw, pred_vol):
+            y_t = truth_vol.flatten().astype(np.float64)
+            y_r = pred_vol_raw.flatten().astype(np.float64)
+            lo, hi = float(y_t.min()) - 1.0, float(y_t.max()) + 1.0
+            rec['raw'] = {
+                'bias': float(np.mean(y_r - y_t)),
+                'mass_ratio': float(np.sum(10.0 ** np.clip(y_r, lo, hi))
+                                    / np.sum(10.0 ** y_t)),
+                'r2': float(r2_score(y_t, y_r)),
+            }
+        else:
+            rec['raw'] = None
         recs.append(rec)
         print(f'  R2={rec["r2"]:.4f}  MAE={rec["mae"]:.4f}  '
-              f'bias={rec["bias"]:+.4f}  <0.1dex={rec["frac"][0.1]*100:.1f}%')
+              f'bias={rec["bias"]:+.4f}  massR={rec["mass_ratio"]:.3f}  '
+              f'<0.1dex={rec["frac"][0.1]*100:.1f}%')
 
     recs.sort(key=lambda r: r['g0'])
     _print_table(recs)
@@ -720,6 +918,8 @@ def main() -> None:
     fig4_stratified(recs, args.save_dir)
     fig5_spatial(recs, args.save_dir)
     fig6_distributions(recs, args.save_dir)
+    fig7_massbudget(recs, args.save_dir)
+    fig8_slices(recs, args.save_dir)
 
     print('\nDone.')
 

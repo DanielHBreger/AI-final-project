@@ -6,15 +6,31 @@ Read-only analysis for the scientific-merit review.
 """
 
 import glob
+import re
 import numpy as np
 from data_loader import load_single_cube, cube_to_volumes
+from classical_models import PHASE_SPLIT   # log10(nH2) diffuse/molecular split
 
-PHASE_SPLIT = -4.0   # log10(nH2) threshold separating UV-exposed / molecular
+
+def latest_per_g0(pattern: str = 'predictions/pred_g0_*.npz') -> list[str]:
+    """Return the most recent stacked-ensemble prediction file for each G0
+    (filenames are pred_g0_<G0>_<timestamp>.npz, so lexical max = latest).
+    Files without a 'pred_vol' array (e.g. CNN predictions) are skipped."""
+    by_g0: dict[str, str] = {}
+    for path in sorted(glob.glob(pattern)):
+        with np.load(path) as d:
+            if 'pred_vol' not in d.files:
+                continue
+        m = re.search(r'pred_g0_([\d.]+)_', path)
+        if m:
+            by_g0[m.group(1)] = path
+    return [by_g0[k] for k in sorted(by_g0, key=float)]
+
 
 print(f"{'G0':>4} {'massRatio':>9} {'R2_mol':>7} {'RMSE_mol':>8} {'bias_mol':>8} "
       f"{'R2_diff':>8} {'RMSE_diff':>9} {'MAE_mw':>7} {'f_mol%':>6}")
 
-for path in sorted(glob.glob('predictions/pred_g0_*_20260312_*.npz')):
+for path in latest_per_g0():
     d = np.load(path)
     g0 = float(d['g0'])
     pred = d['pred_vol'].astype(np.float64).ravel()

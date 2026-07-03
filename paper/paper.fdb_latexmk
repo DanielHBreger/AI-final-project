@@ -1,13 +1,13 @@
 # Fdb version 4
-["bibtex paper"] 1782941226.84163 "paper.aux" "paper.bbl" "paper" 1782941888.06916 0
+["bibtex paper"] 1783092639.1401 "paper.aux" "paper.bbl" "paper" 1783092645.29678 0
+  "./rasti.bst" 1734527431 34137 817f91bd5901f7e3d76ebb88d13af665 ""
   "./references.bib" 1782935792 8712 e193f7cbabd5b1b643c96372742fb373 ""
-  "c:/texlive/2026/texmf-dist/bibtex/bst/mnras/mnras.bst" 1775912446 43376 8463aa2cc1948e346d5641ca59bb4619 ""
-  "paper.aux" 1782941886 22742 e469a54a13ca3e5758b809147fec661c "pdflatex"
+  "paper.aux" 1783092644 22597 dceb1fd17dc56cf5d5556610749f6fc2 "pdflatex"
   (generated)
   "paper.bbl"
   "paper.blg"
   (rewritten before read)
-["pdflatex"] 1782941882.29238 "paper.tex" "paper.pdf" "paper" 1782941888.0701 0
+["pdflatex"] 1783092639.54119 "paper.tex" "paper.pdf" "paper" 1783092645.2975 0
   "../analysis_output/fig1_summary.png" 1777287728 114503 8d11221fc6fe463ab57be31663bfe33e ""
   "../analysis_output/fig2_scatter.png" 1777287728 326511 53f26907f7bb556e98f12d99f09b274f ""
   "../analysis_output/fig3_error_dist.png" 1777287728 280009 ce8b7205e8945db45709281c0906b220 ""
@@ -21,7 +21,6 @@
   "c:/texlive/2026/texmf-dist/fonts/enc/dvips/newtx/ntx-ot1-tlf.enc" 1775912880 2083 60e36f8eac802fcaf19eabe2633b406e ""
   "c:/texlive/2026/texmf-dist/fonts/enc/dvips/tex-gyre/q-ts1.enc" 1775916563 3124 3813fd4c981d99822890a2861b0d274c ""
   "c:/texlive/2026/texmf-dist/fonts/map/fontname/texfonts.map" 1775908784 3524 cb3e574dea2d1052e39280babc910dc8 ""
-  "c:/texlive/2026/texmf-dist/fonts/tfm/jknappen/ec/ecrm0900.tfm" 1775907673 3584 d3d8ac8b25ca19c0a40b86a5db1e8ccc ""
   "c:/texlive/2026/texmf-dist/fonts/tfm/public/amsfonts/cmextra/cmmib5.tfm" 1775904084 1496 c79f6914c6d39ffb3759967363d1be79 ""
   "c:/texlive/2026/texmf-dist/fonts/tfm/public/amsfonts/cmextra/cmmib6.tfm" 1775904084 1516 a3bf6a5e7ec4401b1f52092dfaaed242 ""
   "c:/texlive/2026/texmf-dist/fonts/tfm/public/amsfonts/cmextra/cmmib7.tfm" 1775904084 1508 6e807ff901c35a5f1fde0ca275533df8 ""
@@ -147,7 +146,6 @@
   "c:/texlive/2026/texmf-dist/tex/latex/l3kernel/expl3.sty" 1775910738 6558 f72ebe51bdca4990db99e72c8133397c ""
   "c:/texlive/2026/texmf-dist/tex/latex/l3packages/xparse/xparse.sty" 1775910752 10176 c2fc1c663b3f3899ddac6e6ed3fb1d7e ""
   "c:/texlive/2026/texmf-dist/tex/latex/latexconfig/epstopdf-sys.cfg" 1775910972 678 4792914a8f45be57bb98413425e4c7af ""
-  "c:/texlive/2026/texmf-dist/tex/latex/mnras/mnras.cls" 1775912446 62657 c7103ca873381fd5dd8e90a96fb68a77 ""
   "c:/texlive/2026/texmf-dist/tex/latex/mweights/mweights.sty" 1775912730 4953 67f29a12ea26221103fce6bae3433e60 ""
   "c:/texlive/2026/texmf-dist/tex/latex/natbib/natbib.sty" 1775912786 45456 1c8843383c0bd05870c45fa0ebea6cc2 ""
   "c:/texlive/2026/texmf-dist/tex/latex/newtx/lmsntxsy.fd" 1775912880 1140 ee5963b0c88b5c4f92fed61a27034b79 ""
@@ -156,6 +154,7 @@
   "c:/texlive/2026/texmf-dist/tex/latex/newtx/newtxtext.sty" 1775912880 30156 0a19c9edb32312a6fb89020d05f0976d ""
   "c:/texlive/2026/texmf-dist/tex/latex/newtx/omlntxmi.fd" 1775912880 1919 e9d8f2f584e8bea3fa98fd6a074cab36 ""
   "c:/texlive/2026/texmf-dist/tex/latex/newtx/ot1minntx.fd" 1775912880 2498 5cbe11c7caf802a0127dc4515daf85ea ""
+  "c:/texlive/2026/texmf-dist/tex/latex/newtx/t1minntx.fd" 1775912880 2488 56fe13a519248e783dbce3ab1995ea4e ""
   "c:/texlive/2026/texmf-dist/tex/latex/newtx/t1ntxtlf.fd" 1775912880 2211 2794559346df5bbb0dbf1a757c3cc21f ""
   "c:/texlive/2026/texmf-dist/tex/latex/newtx/t1ntxtt.fd" 1775912880 1500 76616326ae68ec568910194063e7101c ""
   "c:/texlive/2026/texmf-dist/tex/latex/newtx/ts1ntxtlf.fd" 1775912880 1219 06811c362a6c86c10e17f80577d8ceee ""
@@ -180,10 +179,11 @@
   "c:/texlive/2026/texmf-var/web2c/pdftex/pdflatex.fmt" 1775918869 3648464 f5d0d39dc2a579f705dfd6ee709a0d5c ""
   "c:/texlive/2026/texmf.cnf" 1775918767 713 e69b156964470283e0530f5060668171 ""
   "fig_method_diagram.png" 1777287730 93095 ecda681dc3828b385cefe947d42873e6 ""
-  "paper.aux" 1782941886 22742 e469a54a13ca3e5758b809147fec661c "pdflatex"
-  "paper.bbl" 1782941227 6850 4851de4dc45afa54778a7f6db77ef66b "bibtex paper"
-  "paper.out" 1782941886 4333 3387971fc59b772b40535f0e8b0abd99 "pdflatex"
-  "paper.tex" 1782941774 53558 53ba7e90cffe202d20249bc5d482ca76 ""
+  "paper.aux" 1783092644 22597 dceb1fd17dc56cf5d5556610749f6fc2 "pdflatex"
+  "paper.bbl" 1783092639 7966 e7b1c643f12a1e53103a27a5a4968a64 "bibtex paper"
+  "paper.out" 1783092644 4333 3387971fc59b772b40535f0e8b0abd99 "pdflatex"
+  "paper.tex" 1783092541 53606 7c3dceac25aba2ad23bbf4db4dc840f0 ""
+  "rasti.cls" 1734527431 62977 3a18086d13989cda17d6ae57c5e20575 ""
   (generated)
   "paper.aux"
   "paper.log"

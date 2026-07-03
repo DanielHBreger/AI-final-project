@@ -136,6 +136,55 @@ def _compute_spatial_X(cubes: list, all_vols: list[dict], feature_cols: list[str
     return np.concatenate(parts, axis=0)
 
 
+# ── CNN volume normalisation ───────────────────────────────────────────────────
+
+def normalize_channels_inplace(train_xs: list[torch.Tensor],
+                               val_xs: list[torch.Tensor]) -> None:
+    """Per-channel standardisation of lists of (C, D, H, W) tensors, in place.
+
+    Statistics come from the training list only (fold-safe) and are
+    accumulated in float64 one volume at a time: at native 128^3 resolution,
+    stacking the full augmented training set for a single .mean()/.std()
+    call would allocate a ~6 GB temporary."""
+    n_ch = train_xs[0].shape[0]
+    s  = torch.zeros(n_ch, dtype=torch.float64)
+    s2 = torch.zeros(n_ch, dtype=torch.float64)
+    n  = 0
+    for x in train_xs:
+        xd = x.double()
+        s  += xd.sum(dim=(1, 2, 3))
+        s2 += (xd * xd).sum(dim=(1, 2, 3))
+        n  += x[0].numel()
+    mean = s / n
+    std  = (s2 / n - mean * mean).clamp(min=0.0).sqrt()
+    mean_f = mean.float().view(-1, 1, 1, 1)
+    std_f  = std.float().clamp(min=1e-6).view(-1, 1, 1, 1)
+    for x in train_xs:
+        x.sub_(mean_f).div_(std_f)
+    for x in val_xs:
+        x.sub_(mean_f).div_(std_f)
+
+
+def normalize_targets_inplace(train_ys: list[torch.Tensor],
+                              val_ys: list[torch.Tensor]) -> tuple[float, float]:
+    """Scalar standardisation of target volumes, in place (training stats
+    only).  Returns (mean, std) for inverse-transforming predictions."""
+    s = s2 = 0.0
+    n = 0
+    for y in train_ys:
+        yd = y.double()
+        s  += float(yd.sum())
+        s2 += float((yd * yd).sum())
+        n  += y.numel()
+    mean = s / n
+    std  = max(max(s2 / n - mean * mean, 0.0) ** 0.5, 1e-6)
+    for y in train_ys:
+        y.sub_(mean).div_(std)
+    for y in val_ys:
+        y.sub_(mean).div_(std)
+    return float(mean), float(std)
+
+
 # ── Density-weighted sample weights ────────────────────────────────────────────
 
 def _compute_weights(y_tr: np.ndarray,
@@ -175,6 +224,13 @@ def _preds_to_volume(cube_df, y_pred_log: np.ndarray) -> np.ndarray:
 # fits the per-training-cube OOF bias as a linear function of log10(G0) and
 # subtracts the value interpolated/extrapolated at the held-out G0.  Only
 # training-cube quantities are used: leakage-free.
+#
+# The per-cube bias can be computed two ways: unweighted mean residual
+# (centres the cell-mean log bias; 'mean'/'_cal') or mass-weighted via
+# mass_weighted_bias below (centres the total-H2-mass budget;
+# 'mass'/'_mwcal').  The 2026-07-03 runs showed the two disagree: the
+# stacked models are cell-mean unbiased yet under-recover mass at high G0,
+# so only the mass-weighted variant addresses the mass budget.
 
 def fit_g0_bias_correction(per_cube_bias: np.ndarray,
                            g0_train: np.ndarray) -> tuple[float, float]:
@@ -196,6 +252,19 @@ def fit_g0_bias_correction(per_cube_bias: np.ndarray,
 def predict_bias(slope: float, intercept: float, g0: float) -> float:
     """Evaluate the fitted bias correction at a G0 value (dex offset)."""
     return slope * float(np.log10(g0)) + intercept
+
+
+def mass_weighted_bias(y_pred: np.ndarray, y_true: np.ndarray) -> float:
+    """Mass-weighted mean residual (dex): weights 10**y_true (linear nH2).
+
+    Unlike the unweighted mean residual, this is the quantity whose
+    subtraction (as a constant dex offset) centres the predicted total H2
+    mass on the true mass — dense cells dominate both the weights and the
+    mass budget."""
+    yt = np.asarray(y_true, dtype=np.float64)
+    w  = 10.0 ** yt
+    r  = np.asarray(y_pred, dtype=np.float64) - yt
+    return float((w * r).sum() / w.sum())
 
 
 # ── Fit / predict helpers (single-model, return model for reuse) ───────────────
@@ -269,7 +338,7 @@ def _fit_mlp(X_tr: np.ndarray, y_tr: np.ndarray,
             model.eval()
             with torch.no_grad():
                 y_tr_p = model(X_tr_t).float().cpu().numpy()
-            m = compute_metrics(y_tr, y_tr_p)
+            m = compute_metrics(y_tr, y_tr_p, fast=True)
             print(f"    ep {ep+1:3d}/{epochs}  train-R2={m['R2']:.4f}")
 
     model.eval()

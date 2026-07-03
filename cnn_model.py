@@ -13,7 +13,8 @@ Architecture (encoder-decoder with skip connections):
 Each ResConvBlock has a residual skip connection (with 1×1 projection when
 channel counts differ) for stable gradient flow.
 
-Input grid is expected to be 64×64×64 (downsampled from 128×128×128).
+Fully convolutional: works at any grid size divisible by 8. Trained at
+native 128×128×128 by default (64×64×64 with the legacy --downsample flag).
 """
 
 import torch

@@ -61,9 +61,12 @@ def save_results_log(all_results: dict[str, list[dict]],
             for i, (g0, m) in enumerate(zip(g0_values, fold_metrics))
         ]
         summary = {}
-        for metric in ('R2', 'R2_lin', 'RMSE', 'MAE'):
+        # nan-safe over all recorded metrics (phase-conditional values are
+        # NaN when a phase has fewer than 10 cells in a fold)
+        for metric in fold_metrics[0].keys():
             vals = [m[metric] for m in fold_metrics]
-            summary[metric] = {'mean': float(np.mean(vals)), 'std': float(np.std(vals))}
+            summary[metric] = {'mean': float(np.nanmean(vals)),
+                               'std':  float(np.nanstd(vals))}
         models_log[name] = {'folds': fold_entries, 'summary': summary}
 
     log = {'run_config': run_config, 'g0_values': g0_values, 'models': models_log}

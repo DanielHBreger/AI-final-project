@@ -1,11 +1,50 @@
 """
 viz_common.py
 =============
-Shared helpers for viewer scripts (load_and_compare, slice_compare).
+Shared helpers for viewer scripts (load_and_compare, slice_compare) and
+figure scripts (plot_model_comparison, plot_feature_importance).
 """
 
 import os
 import numpy as np
+
+
+def apply_journal_style() -> None:
+    """ApJ / MNRAS / RASTI figure conventions: serif STIX fonts, box axes
+    with inward ticks on all four sides, minor ticks, no grid, 300 dpi.
+    Mirrors statistical_analysis._apply_journal_style so standalone figure
+    scripts produce visually consistent output."""
+    import matplotlib.pyplot as plt
+    plt.rcParams.update({
+        'font.family':         'serif',
+        'font.serif':          ['STIXGeneral', 'Times New Roman', 'DejaVu Serif'],
+        'mathtext.fontset':    'stix',
+        'font.size':           8,
+        'axes.titlesize':      8,
+        'axes.labelsize':      8,
+        'xtick.labelsize':     7,
+        'ytick.labelsize':     7,
+        'legend.fontsize':     7,
+        'figure.facecolor':    'white',
+        'axes.facecolor':      'white',
+        'axes.linewidth':      0.6,
+        'axes.grid':           False,
+        'xtick.direction':     'in',
+        'ytick.direction':     'in',
+        'xtick.top':           True,
+        'ytick.right':         True,
+        'xtick.minor.visible': True,
+        'ytick.minor.visible': True,
+        'lines.linewidth':     1.0,
+        'lines.markersize':    3.5,
+        'legend.frameon':      True,
+        'legend.framealpha':   0.92,
+        'legend.edgecolor':    '0.75',
+        'legend.fancybox':     False,
+        'savefig.dpi':         300,
+        'savefig.bbox':        'tight',
+        'savefig.pad_inches':  0.03,
+    })
 
 
 def select_prediction_file() -> str | None:

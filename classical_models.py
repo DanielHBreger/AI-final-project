@@ -7,19 +7,23 @@ Train and evaluate three pointwise baseline models with leave-one-G0-out CV:
 
 All models predict log10(nH2) from FEATURE_COLS.
 
-Primary metrics (R2, RMSE, MAE) are computed in log10(nH2) space — the
-natural evaluation space for data spanning many orders of magnitude.
-A secondary R2_lin metric is computed in original nH2 space with clipped
-predictions to prevent exponential explosion from outlier neural-net outputs.
+Primary metrics (RMSE decomposed into bias + scatter, mass_ratio) are
+computed in log10(nH2) space — the natural evaluation space for data
+spanning many orders of magnitude.  Secondary metrics include log-space R2,
+threshold accuracies (fraction within 0.1/0.3/0.5 dex), phase-conditional
+errors (diffuse vs molecular at PHASE_SPLIT), and a clipped linear-space
+R2_lin.  Optional agreement metrics: Lin's concordance correlation (CCC)
+and the 1-D Wasserstein distance between marginal distributions (W1, dex).
 """
 
 import random
 import numpy as np
 import torch
 import torch.nn as nn
+from scipy.stats import wasserstein_distance
 from sklearn.linear_model import LinearRegression
 from sklearn.preprocessing import StandardScaler
-from sklearn.metrics import r2_score, mean_squared_error, mean_absolute_error
+from sklearn.metrics import r2_score
 import xgboost as xgb
 
 from data_loader import load_all_cubes, get_X_y, get_g0_values, FEATURE_COLS
@@ -40,69 +44,158 @@ def _set_fold_seed(fold: int) -> None:
 
 # ── Metrics ──────────────────────────────────────────────────────────────────
 
-def compute_metrics(y_true_log: np.ndarray, y_pred_log: np.ndarray) -> dict:
+# log10(nH2) threshold separating the UV-exposed (diffuse) and self-shielded
+# (molecular) populations — same split as merit_metrics.py.
+PHASE_SPLIT = -4.0
+
+
+def compute_metrics(y_true_log: np.ndarray, y_pred_log: np.ndarray,
+                    fast: bool = False) -> dict:
     """
-    Compute metrics for nH2 prediction.
+    Compute metrics for nH2 prediction.  Inputs are log10(nH2) arrays.
 
-    Primary metrics (R2, RMSE, MAE): computed in log10(nH2) space.
-    This is the natural evaluation space for data spanning many orders of
-    magnitude -- measures accuracy in dex (orders of magnitude).
+    Primary metrics (log space, dex):
+      RMSE, decomposed as RMSE^2 = bias^2 + scatter^2 where 'bias' is the
+      mean residual (pred - true) and 'scatter' the residual std; MAE; and
+      'mass_ratio' = predicted / true total nH2 (uniform grid, so the
+      cell-volume factor cancels and this equals the H2 mass ratio).  R2 is
+      insensitive to a small uniform offset against the 16-dex target range,
+      but that offset compounds exponentially in the mass budget — bias and
+      mass_ratio expose it.
 
-    Secondary metric (R2_lin): R2 in original nH2 space, with predictions
-    clipped to [min_true - 1 dex, max_true + 1 dex] before exponentiation
-    to prevent numerical explosion from outlier neural-net predictions.
+    Secondary metrics:
+      R2 (log space; fold-variance-normalised, kept for literature
+      comparability), threshold accuracies frac_01/frac_03/frac_05
+      (fraction of cells with |residual| below 0.1/0.3/0.5 dex),
+      phase-conditional R2/RMSE/bias for the molecular (true > PHASE_SPLIT)
+      and diffuse populations, f_mol (molecular cell fraction), MAE_mw
+      (H2-mass-weighted MAE, dex), and R2_lin: R2 in original nH2 space with
+      predictions clipped to [min_true - 1 dex, max_true + 1 dex] before
+      exponentiation to prevent numerical explosion from outlier
+      neural-net predictions.
 
-    Mass-budget metrics: 'bias' is the mean log-space residual (pred - true,
-    dex); 'mass_ratio' is predicted / true total nH2 (uniform grid, so the
-    cell-volume factor cancels and this equals the H2 mass ratio), computed
-    from the same clipped predictions as R2_lin.  R2 is insensitive to a
-    small uniform offset against the 16-dex target range, but that offset
-    compounds exponentially in the mass budget — these two numbers expose it.
+    Agreement metrics:
+      CCC — Lin's concordance correlation coefficient (agreement with the
+      identity line; penalises bias and scale errors that R2 forgives);
+      W1 — 1-D Wasserstein distance between the true and predicted marginal
+      distributions (dex).
 
-    Inputs are log10(nH2) arrays.
+    Skill scores against a reference model are cross-model quantities and
+    are added at the comparison level (see compare_architectures.py).
+
+    fast=True computes only the cheap log-space metrics (R2, RMSE, MAE,
+    bias, scatter) — for in-training progress logging.
+
+    Phase-conditional values are NaN when a phase has fewer than 10 cells;
+    aggregate with np.nanmean/np.nanstd.
     """
-    # Primary: log-space metrics
-    r2   = float(r2_score(y_true_log, y_pred_log))
-    rmse = float(np.sqrt(mean_squared_error(y_true_log, y_pred_log)))
-    mae  = float(mean_absolute_error(y_true_log, y_pred_log))
-    bias = float(np.mean(np.asarray(y_pred_log, dtype=np.float64)
-                         - np.asarray(y_true_log, dtype=np.float64)))
+    yt = np.asarray(y_true_log, dtype=np.float64).ravel()
+    yp = np.asarray(y_pred_log, dtype=np.float64).ravel()
+    resid = yp - yt
 
-    # Secondary: linear-space R2 with clipped predictions
-    clip_lo = float(y_true_log.min()) - 1.0
-    clip_hi = float(y_true_log.max()) + 1.0
-    y_pred_clip = np.clip(y_pred_log, clip_lo, clip_hi)
-    y_true_lin = 10.0 ** np.asarray(y_true_log, dtype=np.float64)
-    y_pred_lin = 10.0 ** np.asarray(y_pred_clip, dtype=np.float64)
-    r2_lin = float(r2_score(y_true_lin, y_pred_lin))
+    # Primary: log-space metrics (RMSE^2 = bias^2 + scatter^2)
+    r2      = float(r2_score(yt, yp))
+    rmse    = float(np.sqrt(np.mean(resid ** 2)))
+    mae     = float(np.mean(np.abs(resid)))
+    bias    = float(np.mean(resid))
+    scatter = float(np.std(resid))
 
-    mass_ratio = float(y_pred_lin.sum() / y_true_lin.sum())
-
-    return {
-        'R2':         r2,
-        'RMSE':       rmse,
-        'MAE':        mae,
-        'R2_lin':     r2_lin,
-        'bias':       bias,
-        'mass_ratio': mass_ratio,
+    out = {
+        'R2':      r2,
+        'RMSE':    rmse,
+        'MAE':     mae,
+        'bias':    bias,
+        'scatter': scatter,
     }
+    if fast:
+        return out
+
+    # Linear-space R2 and mass budget (clipped predictions)
+    clip_lo = float(yt.min()) - 1.0
+    clip_hi = float(yt.max()) + 1.0
+    y_pred_clip = np.clip(yp, clip_lo, clip_hi)
+    y_true_lin  = 10.0 ** yt
+    y_pred_lin  = 10.0 ** y_pred_clip
+    r2_lin      = float(r2_score(y_true_lin, y_pred_lin))
+    mass_ratio  = float(y_pred_lin.sum() / y_true_lin.sum())
+
+    # Threshold accuracies and mass-weighted MAE
+    ae      = np.abs(resid)
+    frac_01 = float(np.mean(ae < 0.1))
+    frac_03 = float(np.mean(ae < 0.3))
+    frac_05 = float(np.mean(ae < 0.5))
+    mae_mw  = float(np.sum(y_true_lin * ae) / np.sum(y_true_lin))
+
+    # Lin's concordance correlation coefficient
+    mt, mp = float(np.mean(yt)), float(np.mean(yp))
+    vt, vp = float(np.var(yt)), float(np.var(yp))
+    cov    = float(np.mean((yt - mt) * (yp - mp)))
+    ccc    = 2.0 * cov / (vt + vp + (mt - mp) ** 2)
+
+    # 1-D Wasserstein distance between marginal distributions (dex)
+    w1 = float(wasserstein_distance(yt, yp))
+
+    # Phase-conditional metrics (diffuse vs molecular at PHASE_SPLIT)
+    def _phase_metrics(mask: np.ndarray) -> tuple[float, float, float]:
+        if mask.sum() < 10:
+            return float('nan'), float('nan'), float('nan')
+        t, r = yt[mask], resid[mask]
+        ss = float(np.sum((t - t.mean()) ** 2))
+        r2_ph = 1.0 - float(np.sum(r ** 2)) / ss if ss > 0 else float('nan')
+        return r2_ph, float(np.sqrt(np.mean(r ** 2))), float(np.mean(r))
+
+    mol = yt > PHASE_SPLIT
+    r2_mol, rmse_mol, bias_mol = _phase_metrics(mol)
+    r2_dif, rmse_dif, bias_dif = _phase_metrics(~mol)
+
+    out.update({
+        'R2_lin':     r2_lin,
+        'mass_ratio': mass_ratio,
+        'MAE_mw':     mae_mw,
+        'frac_01':    frac_01,
+        'frac_03':    frac_03,
+        'frac_05':    frac_05,
+        'CCC':        ccc,
+        'W1':         w1,
+        'R2_mol':     r2_mol,
+        'RMSE_mol':   rmse_mol,
+        'bias_mol':   bias_mol,
+        'R2_dif':     r2_dif,
+        'RMSE_dif':   rmse_dif,
+        'bias_dif':   bias_dif,
+        'f_mol':      float(np.mean(mol)),
+    })
+    return out
 
 
 def print_results(name: str, fold_metrics: list[dict], g0_values: list[float]) -> None:
-    print(f"\n{'='*60}")
+    cols = [
+        # (header, key, format-width.precision, signed)
+        ('R2',    'R2',         '8.4f'),
+        ('RMSE',  'RMSE',       '8.4f'),
+        ('MAE',   'MAE',        '8.4f'),
+        ('bias',  'bias',       '+8.3f'),
+        ('scat',  'scatter',    '8.3f'),
+        ('massR', 'mass_ratio', '8.3f'),
+        ('f0.3',  'frac_03',    '8.3f'),
+        ('CCC',   'CCC',        '8.4f'),
+        ('W1',    'W1',         '8.3f'),
+    ]
+    width = 10 + 9 * len(cols)
+    print(f"\n{'='*width}")
     print(f"  {name}")
-    print(f"{'='*60}")
-    print(f"  {'G0':<8} {'R2_log':>8} {'R2_lin':>8} {'RMSE':>10} {'MAE':>10}")
-    print(f"  {'-'*48}")
+    print(f"{'='*width}")
+    hdr = ''.join(f" {h:>8}" for h, _, _ in cols)
+    print(f"  {'G0':<8}{hdr}")
+    print(f"  {'-'*(width - 4)}")
     for g0, m in zip(g0_values, fold_metrics):
-        print(f"  {g0:<8.1f} {m['R2']:>8.4f} {m['R2_lin']:>8.4f} {m['RMSE']:>10.4f} {m['MAE']:>10.4f}")
-    r2s     = [m['R2']     for m in fold_metrics]
-    r2_lins = [m['R2_lin'] for m in fold_metrics]
-    rmses   = [m['RMSE']   for m in fold_metrics]
-    maes    = [m['MAE']    for m in fold_metrics]
-    print(f"  {'-'*48}")
-    print(f"  {'Mean':<8} {np.mean(r2s):>8.4f} {np.mean(r2_lins):>8.4f} {np.mean(rmses):>10.4f} {np.mean(maes):>10.4f}")
-    print(f"  {'Std':<8} {np.std(r2s):>8.4f} {np.std(r2_lins):>8.4f} {np.std(rmses):>10.4f} {np.std(maes):>10.4f}")
+        row = ''.join(f" {m[k]:>{fmt}}" for _, k, fmt in cols)
+        print(f"  {g0:<8.1f}{row}")
+    print(f"  {'-'*(width - 4)}")
+    for label, agg in (('Mean', np.nanmean), ('Std', np.nanstd)):
+        row = ''.join(
+            f" {agg([m[k] for m in fold_metrics]):>{fmt}}" for _, k, fmt in cols)
+        print(f"  {label:<8}{row}")
 
 
 # ── Linear Regression ─────────────────────────────────────────────────────────

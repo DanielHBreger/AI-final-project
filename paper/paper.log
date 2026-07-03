@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.29 (TeX Live 2026) (preloaded format=pdflatex 2026.4.11)  2 JUL 2026 00:38
+This is pdfTeX, Version 3.141592653-2.6-1.40.29 (TeX Live 2026) (preloaded format=pdflatex 2026.4.11)  3 JUL 2026 18:30
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -6,9 +6,9 @@ entering extended mode
 (./paper.tex
 LaTeX2e <2025-11-01>
 L3 programming layer <2026-03-20>
-(c:/texlive/2026/texmf-dist/tex/latex/mnras/mnras.cls
-Document Class: mnras 2023/07/20\ v3.2\ LaTeX2e MNRAS document class
-MNRAS document style v3.2, released 2023/07/20
+(./rasti.cls
+Document Class: rasti 2021/11/12\ v3.0\ LaTeX2e RASTI document class
+RASTI document style v3.0, released 2021/11/12
 (c:/texlive/2026/texmf-dist/tex/latex/geometry/geometry.sty
 Package: geometry 2026/03/07 v6.0 Page Geometry
 
@@ -187,9 +187,6 @@ LaTeX Info: Redefining \cite on input line 694.
 )
 \c@table=\count296
 \c@figure=\count297
-)
-(c:/texlive/2026/texmf-dist/tex/latex/base/fontenc.sty
-Package: fontenc 2025/07/18 v2.1d Standard LaTeX package
 )
 (c:/texlive/2026/texmf-dist/tex/latex/newtx/newtxtext.sty
 Package: newtxtext 2024/04/01 v1.744(Michael Sharpe) latex and unicode latex su
@@ -398,9 +395,9 @@ LaTeX Font Info:    Overwriting math alphabet `\mathit' in version `bold'
 (Font)                  OT1/cmr/bx/it --> OT1/minntx/m/it on input line 419.
 LaTeX Font Info:    Redeclaring math alphabet \mathtt on input line 420.
 LaTeX Font Info:    Overwriting math alphabet `\mathtt' in version `normal'
-(Font)                  OT1/cmtt/m/n --> T1/ntxtt/m/n on input line 420.
+(Font)                  OT1/cmtt/m/n --> OT1/ntxtt/m/n on input line 420.
 LaTeX Font Info:    Overwriting math alphabet `\mathtt' in version `bold'
-(Font)                  OT1/cmtt/m/n --> T1/ntxtt/m/n on input line 420.
+(Font)                  OT1/cmtt/m/n --> OT1/ntxtt/m/n on input line 420.
 LaTeX Font Info:    Redeclaring math alphabet \mathbf on input line 422.
 LaTeX Font Info:    Overwriting math alphabet `\mathbf' in version `normal'
 (Font)                  OT1/cmr/bx/n --> OT1/minntx/b/n on input line 422.
@@ -409,7 +406,7 @@ LaTeX Font Info:    Overwriting math alphabet `\mathbf' in version `bold'
 LaTeX Font Info:    Overwriting math alphabet `\mathit' in version `bold'
 (Font)                  OT1/minntx/m/it --> OT1/minntx/b/it on input line 423.
 LaTeX Font Info:    Overwriting math alphabet `\mathtt' in version `bold'
-(Font)                  T1/ntxtt/m/n --> T1/ntxtt/b/n on input line 426.
+(Font)                  OT1/ntxtt/m/n --> OT1/ntxtt/b/n on input line 426.
 LaTeX Font Info:    Redeclaring symbol font `letters' on input line 534.
 LaTeX Font Info:    Overwriting symbol font `letters' in version `normal'
 (Font)                  OML/cmm/m/it --> OML/ntxmi/m/it on input line 534.
@@ -475,7 +472,18 @@ LaTeX Font Info:    Redeclaring math accent \ddot on input line 992.
 LaTeX Font Info:    Redeclaring math accent \vec on input line 2057.
 LaTeX Info: Redefining \Bbbk on input line 2847.
 LaTeX Info: Redefining \not on input line 2995.
-) (c:/texlive/2026/texmf-dist/tex/latex/graphics/graphicx.sty
+) (c:/texlive/2026/texmf-dist/tex/latex/base/fontenc.sty
+Package: fontenc 2025/07/18 v2.1d Standard LaTeX package
+LaTeX Font Info:    Trying to load font information for T1+minntx on input line
+ 116.
+
+(c:/texlive/2026/texmf-dist/tex/latex/newtx/t1minntx.fd
+File: t1minntx.fd 2023/09/09 v1.1 font definition file for T1/minntx
+)
+LaTeX Font Info:    Font shape `T1/minntx/m/n' will be
+(Font)              scaled to size 9.0pt on input line 116.
+)
+(c:/texlive/2026/texmf-dist/tex/latex/graphics/graphicx.sty
 Package: graphicx 2024/12/31 v1.2e Enhanced LaTeX Graphics (DPC,SPQR)
 
 (c:/texlive/2026/texmf-dist/tex/latex/graphics/graphics.sty
@@ -967,17 +975,17 @@ LaTeX Font Info:    Font shape `T1/ntxtlf/m/it' will be
 Underfull \vbox (badness 10000) has occurred while \output is active []
 
 LaTeX Font Info:    Font shape `T1/ntxtlf/b/n' will be
-(Font)              scaled to size 8.0pt on input line 136.
+(Font)              scaled to size 8.0pt on input line 127.
 LaTeX Font Info:    Font shape `T1/ntxtlf/m/n' will be
-(Font)              scaled to size 6.0pt on input line 136.
+(Font)              scaled to size 6.0pt on input line 127.
 LaTeX Font Info:    Trying to load font information for TS1+ntxtlf on input lin
-e 136.
+e 127.
 
 (c:/texlive/2026/texmf-dist/tex/latex/newtx/ts1ntxtlf.fd
 File: ts1ntxtlf.fd 2015/01/18 v1.0 fd file for TS1/ntxtlf
 )
 LaTeX Font Info:    Font shape `TS1/ntxtlf/m/n' will be
-(Font)              scaled to size 8.0pt on input line 136.
+(Font)              scaled to size 8.0pt on input line 127.
  [1{c:/texlive/2026/texmf-var/fonts/map/pdftex/updmap/pdftex.map}{c:/texlive/20
 26/texmf-dist/fonts/enc/dvips/newtx/ntx-ec-tlf.enc}{c:/texlive/2026/texmf-dist/
 fonts/enc/dvips/newtx/ntx-ot1-tlf.enc}
@@ -1035,14 +1043,17 @@ pdfTeX warning (ext4): destination with the same identifier (name{figure.1}) ha
 s been already used, duplicate ignored
 <argument> ...shipout:D \box_use:N \l_shipout_box 
                                                   \__shipout_drop_firstpage_...
-l.478 
+l.452 
       
 pdfTeX warning (ext4): destination with the same identifier (name{figure.2}) ha
 s been already used, duplicate ignored
 <argument> ...shipout:D \box_use:N \l_shipout_box 
                                                   \__shipout_drop_firstpage_...
-l.478 
-       <../nH2_histograms.png> <./fig_method_diagram.png>] [5]
+l.452 
+       <../nH2_histograms.png> <./fig_method_diagram.png>]
+Underfull \vbox (badness 2384) has occurred while \output is active []
+
+ [5]
 <../analysis_output/fig1_summary.png, id=293, 934.2102pt x 234.6366pt>
 File: ../analysis_output/fig1_summary.png Graphic file (type png)
 <use ../analysis_output/fig1_summary.png>
@@ -1158,9 +1169,9 @@ pdfTeX warning (ext4): destination with the same identifier (name{figure.7}) ha
 s been already used, duplicate ignored
 <argument> ...shipout:D \box_use:N \l_shipout_box 
                                                   \__shipout_drop_firstpage_...
-l.25   Pallottini}{2024}]{Branca2024}
-                                      <../analysis_output/fig6_distributions.pn
-g>]
+l.9 ...tem[Branca \& Pallottini(2024)]{Branca2024}
+                                                   <../analysis_output/fig6_dis
+tributions.png>]
 Underfull \vbox (badness 10000) has occurred while \output is active []
 
 
@@ -1171,31 +1182,30 @@ pdfTeX warning (ext4): destination with the same identifier (name{figure.8}) ha
 s been already used, duplicate ignored
 <argument> ...shipout:D \box_use:N \l_shipout_box 
                                                   \__shipout_drop_firstpage_...
-l.45   Bertoldi}{1996}]{Draine1996}
-                                    <../analysis_output/fig5_spatial.png>]
-Underfull \vbox (badness 8189) has occurred while \output is active []
+l.26   Brox, \& Ronneberger]{Cicek2016}
+                                        <../analysis_output/fig5_spatial.png>]
+Underfull \vbox (badness 10000) has occurred while \output is active []
 
 
-Underfull \hbox (badness 2662) in paragraph at lines 139--141
-[]\T1/ntxtlf/m/n/8 Ulyanov D., Vedaldi A., Lem-pit-sky V., 2017, arXiv e-prints
-, p.
- []
+Underfull \vbox (badness 10000) has occurred while \output is active []
 
-) [12
+ [12
 pdfTeX warning (ext4): destination with the same identifier (name{figure.9}) ha
 s been already used, duplicate ignored
 <argument> ...shipout:D \box_use:N \l_shipout_box 
                                                   \__shipout_drop_firstpage_...
-l.1061 \end{document}
-                     
+l.134   et~al.]{Pedregosa2011}
+                              
 pdfTeX warning (ext4): destination with the same identifier (name{figure.10}) h
 as been already used, duplicate ignored
 <argument> ...shipout:D \box_use:N \l_shipout_box 
                                                   \__shipout_drop_firstpage_...
-l.1061 \end{document}
-                      <../logs/single_cube_extrapolation/heatmap_20260313_02212
-9.png> <../logs/intra_cube_section/run_20260313_142443_heatmap.png>]
-(./paper.aux)
+l.134   et~al.]{Pedregosa2011}
+                               <../logs/single_cube_extrapolation/heatmap_20260
+313_022129.png> <../logs/intra_cube_section/run_20260313_142443_heatmap.png>])
+[13
+
+] (./paper.aux)
  ***********
 LaTeX2e <2025-11-01>
 L3 programming layer <2020/03/25>
@@ -1209,13 +1219,13 @@ Package rerunfilecheck Info: File `paper.out' has not changed.
 (rerunfilecheck)             Checksum: 3387971FC59B772B40535F0E8B0ABD99;4333.
  ) 
 Here is how much of TeX's memory you used:
- 19454 strings out of 467349
- 352224 string characters out of 5419862
- 757259 words of memory out of 5000000
- 48155 multiletter control sequences out of 15000+600000
- 755180 words of font info for 227 fonts, out of 8000000 for 9000
+ 19474 strings out of 467349
+ 352513 string characters out of 5419862
+ 760582 words of memory out of 5000000
+ 48173 multiletter control sequences out of 15000+600000
+ 754415 words of font info for 226 fonts, out of 8000000 for 9000
  1141 hyphenation exceptions out of 8191
- 90i,15n,93p,805b,1098s stack positions out of 10000i,1000n,20000p,200000b,200000s
+ 90i,15n,93p,805b,1123s stack positions out of 10000i,1000n,20000p,200000b,200000s
 
 pdfTeX warning (dest): name{Hfootnote.1} has been referenced but does not exist
 , replaced by a fixed one
@@ -1231,10 +1241,10 @@ nts/type1/public/newtx/txmiaX.pfb><c:/texlive/2026/texmf-dist/fonts/type1/publi
 c/newtx/txsys.pfb><c:/texlive/2026/texmf-dist/fonts/type1/public/newtx/ztmb.pfb
 ><c:/texlive/2026/texmf-dist/fonts/type1/public/newtx/ztmr.pfb><c:/texlive/2026
 /texmf-dist/fonts/type1/public/newtx/ztmri.pfb>
-Output written on paper.pdf (12 pages, 3055705 bytes).
+Output written on paper.pdf (13 pages, 3060517 bytes).
 PDF statistics:
- 487 PDF objects out of 1000 (max. 8388607)
- 418 compressed objects within 5 object streams
- 92 named destinations out of 1000 (max. 500000)
+ 493 PDF objects out of 1000 (max. 8388607)
+ 423 compressed objects within 5 object streams
+ 93 named destinations out of 1000 (max. 500000)
  267 words of extra memory for PDF output out of 10000 (max. 10000000)
 

@@ -82,7 +82,8 @@ from augmentation import augment_cube, get_symmetry_ops
 from model_helpers import (
     GLOBAL_SEED, _set_seeds, _get_env_info,
     _XGB_CFG, FlexMLP, _compute_spatial_X, _compute_weights, _preds_to_volume,
-    fit_g0_bias_correction, predict_bias,
+    fit_g0_bias_correction, predict_bias, mass_weighted_bias,
+    normalize_channels_inplace, normalize_targets_inplace,
 )
 
 
@@ -130,15 +131,18 @@ CNN_VARIANTS: dict[str, dict] = {
 # ── Shared CubeDataset ────────────────────────────────────────────────────────
 
 class CubeDataset(Dataset):
-    """Pre-computes all augmented, pooled, and normalised tensors at init time.
+    """Pre-computes all augmented (and optionally pooled) tensors at init time.
 
+    pool=True average-pools 128^3 volumes to 64^3 (the legacy behaviour, for
+    constrained VRAM); the default keeps native 128^3 resolution.
     Accepts an optional input_cols list to support the guided CNN variant
     (15-channel input with XGBoost prediction prepended).
     """
     def __init__(self, cube_vols: list[dict],
                  ops: list[np.ndarray] | None,
                  augment: bool = True,
-                 input_cols: list[str] | None = None):
+                 input_cols: list[str] | None = None,
+                 pool: bool = False):
         _cols = input_cols if input_cols is not None else CNN_INPUT_COLS
         self.xs: list[torch.Tensor] = []
         self.ys: list[torch.Tensor] = []
@@ -162,10 +166,11 @@ class CubeDataset(Dataset):
                 target   = aug[CNN_TARGET_COL][None]
                 ch_t     = torch.from_numpy(channels).unsqueeze(0)
                 tgt_t    = torch.from_numpy(target).unsqueeze(0)
-                ch_t     = F.avg_pool3d(ch_t,  kernel_size=2, stride=2).squeeze(0).float()
-                tgt_t    = F.avg_pool3d(tgt_t, kernel_size=2, stride=2).squeeze(0).float()
-                self.xs.append(torch.nan_to_num(ch_t))
-                self.ys.append(torch.nan_to_num(tgt_t))
+                if pool:
+                    ch_t  = F.avg_pool3d(ch_t,  kernel_size=2, stride=2)
+                    tgt_t = F.avg_pool3d(tgt_t, kernel_size=2, stride=2)
+                self.xs.append(torch.nan_to_num(ch_t.squeeze(0).float()))
+                self.ys.append(torch.nan_to_num(tgt_t.squeeze(0).float()))
 
     def __len__(self) -> int:
         return len(self.xs)
@@ -213,19 +218,23 @@ def run_xgb_cv(variant_name: str,
                g0_values: list[float],
                cubes: list,
                weighted: bool = False,
-               ) -> tuple[list[dict], list[np.ndarray], list[np.ndarray], list[np.ndarray]]:
+               ) -> tuple[list[dict], list[np.ndarray], list[np.ndarray],
+                          list[np.ndarray], list[list[float]]]:
     """7-fold leave-one-G0-out CV for one XGBoost config.
 
-    Returns (fold_metrics, y_true_folds, y_pred_folds, xgb_vols_128).
-    xgb_vols_128[i] is the 128^3 log_nH2 prediction volume for cube i from the
-    fold where it was held out — fully OOB, no data leakage.
+    Returns (fold_metrics, y_true_folds, y_pred_folds, xgb_vols_128,
+    importances) where importances[fold] is the model's per-feature gain
+    importance vector (recorded in the run log for the feature-importance
+    figure).  xgb_vols_128[i] is the 128^3 log_nH2 prediction volume for
+    cube i from the fold where it was held out — fully OOB, no data leakage.
     """
     _dev = 'cuda' if torch.cuda.is_available() else 'cpu'
     cfg  = {**config, 'device': _dev}
-    fold_metrics: list[dict]       = []
-    y_true_folds: list[np.ndarray] = []
-    y_pred_folds: list[np.ndarray] = []
-    xgb_vols:     list[np.ndarray] = []
+    fold_metrics: list[dict]        = []
+    y_true_folds: list[np.ndarray]  = []
+    y_pred_folds: list[np.ndarray]  = []
+    xgb_vols:     list[np.ndarray]  = []
+    importances:  list[list[float]] = []
     for fold in range(len(g0_values)):
         _set_seeds(GLOBAL_SEED + fold)
         mask   = fold_labels != fold
@@ -241,9 +250,10 @@ def run_xgb_cv(variant_name: str,
         y_true_folds.append(y_va.astype(np.float32))
         y_pred_folds.append(y_pred)
         xgb_vols.append(_preds_to_volume(cubes[fold], y_pred))
+        importances.append([float(v) for v in model.feature_importances_])
         print(f"  {variant_name:<16}  fold={fold} (G0={g0_values[fold]:.1f})  "
               f"R2={fold_metrics[-1]['R2']:.4f}")
-    return fold_metrics, y_true_folds, y_pred_folds, xgb_vols
+    return fold_metrics, y_true_folds, y_pred_folds, xgb_vols, importances
 
 
 def _build_mlp(config: dict, in_dim: int) -> nn.Module:
@@ -348,9 +358,13 @@ def _train_cnn_fold(train_vols: list[dict],
                     seed: int = 0,
                     dropout: float = 0.0,
                     warmup_epochs: int = 0,
+                    pool: bool = False,
                     ) -> tuple[dict, np.ndarray, np.ndarray]:
     """Single CNN fold.  Mirrors train_cnn.train_one_fold but parametrizes
     base_ch, dropout, and accepts an optional input_cols list.
+
+    pool=True trains on 64^3 average-pooled volumes (legacy behaviour);
+    the default is native 128^3.
 
     seed fixes torch/numpy randomness so results are reproducible across runs.
     Pass fold index as seed to get deterministic but fold-varied initialisation.
@@ -359,22 +373,15 @@ def _train_cnn_fold(train_vols: list[dict],
     """
     _set_seeds(GLOBAL_SEED + seed)
     _cols    = input_cols if input_cols is not None else CNN_INPUT_COLS
-    train_ds = CubeDataset(train_vols, ops, augment=True,  input_cols=_cols)
-    val_ds   = CubeDataset(val_vols,   ops=None, augment=False, input_cols=_cols)
+    train_ds = CubeDataset(train_vols, ops, augment=True,  input_cols=_cols,
+                           pool=pool)
+    val_ds   = CubeDataset(val_vols,   ops=None, augment=False, input_cols=_cols,
+                           pool=pool)
 
-    # Per-channel input normalisation (training stats only)
-    all_x   = torch.stack(train_ds.xs)
-    ch_mean = all_x.mean(dim=(0, 2, 3, 4), keepdim=True).squeeze(0)
-    ch_std  = all_x.std( dim=(0, 2, 3, 4), keepdim=True).squeeze(0).clamp(min=1e-6)
-    train_ds.xs = [(x - ch_mean) / ch_std for x in train_ds.xs]
-    val_ds.xs   = [(x - ch_mean) / ch_std for x in val_ds.xs]
-
-    # Per-fold target normalisation (balanced log_nH2 loss)
-    all_y  = torch.stack(train_ds.ys)
-    y_mean = all_y.mean()
-    y_std  = all_y.std().clamp(min=1e-6)
-    train_ds.ys = [(y - y_mean) / y_std for y in train_ds.ys]
-    val_ds.ys   = [(y - y_mean) / y_std for y in val_ds.ys]
+    # Fold-safe normalisation, streaming + in place (a full-dataset stack
+    # would be a ~6 GB temporary at 128^3)
+    normalize_channels_inplace(train_ds.xs, val_ds.xs)
+    y_mean, y_std = normalize_targets_inplace(train_ds.ys, val_ds.ys)
 
     pin_mem  = device.type == 'cuda'
     train_dl = DataLoader(train_ds, batch_size=1, shuffle=True,
@@ -433,10 +440,8 @@ def _train_cnn_fold(train_vols: list[dict],
             y_pred_parts.append(model(xb.to(device)).float().cpu().numpy().ravel())
             y_true_parts.append(yb.numpy().ravel())
 
-    y_std_np  = y_std.item()
-    y_mean_np = y_mean.item()
-    y_true = np.concatenate(y_true_parts) * y_std_np + y_mean_np
-    y_pred = np.concatenate(y_pred_parts) * y_std_np + y_mean_np
+    y_true = np.concatenate(y_true_parts) * y_std + y_mean
+    y_pred = np.concatenate(y_pred_parts) * y_std + y_mean
     return compute_metrics(y_true, y_pred), y_true.astype(np.float32), y_pred.astype(np.float32)
 
 
@@ -448,6 +453,8 @@ def run_cnn_cv_variant(variant_name: str,
                        ops: list[np.ndarray],
                        epochs: int = 200,
                        lr: float = 5e-4,
+                       pool: bool = False,
+                       input_cols: list[str] | None = None,
                        ) -> tuple[list[dict], list[np.ndarray], list[np.ndarray]]:
     """7-fold CV for one CNN config variant.
     Returns (fold_metrics, y_true_folds, y_pred_folds).
@@ -455,9 +462,11 @@ def run_cnn_cv_variant(variant_name: str,
     base_ch      = config['base_ch']
     dropout      = config.get('dropout', 0.0)
     warmup_ep    = config.get('warmup_epochs', 0)
-    n_params = count_parameters(UNet3D(n_channels=len(CNN_INPUT_COLS),
+    _cols        = input_cols if input_cols is not None else CNN_INPUT_COLS
+    n_params = count_parameters(UNet3D(n_channels=len(_cols),
                                        base_ch=base_ch, dropout=dropout))
-    print(f"  {variant_name}  base_ch={base_ch}  dropout={dropout}  params={n_params:,}")
+    print(f"  {variant_name}  base_ch={base_ch}  dropout={dropout}  "
+          f"params={n_params:,}  grid={64 if pool else 128}^3")
     fold_metrics: list[dict]       = []
     y_true_folds: list[np.ndarray] = []
     y_pred_folds: list[np.ndarray] = []
@@ -467,7 +476,8 @@ def run_cnn_cv_variant(variant_name: str,
         val_vols   = [all_vols[fold]]
         metrics, y_true, y_pred = _train_cnn_fold(
             train_vols, val_vols, ops, device, epochs, lr, base_ch,
-            seed=fold, dropout=dropout, warmup_epochs=warmup_ep)
+            input_cols=_cols, seed=fold, dropout=dropout,
+            warmup_epochs=warmup_ep, pool=pool)
         fold_metrics.append(metrics)
         y_true_folds.append(y_true)
         y_pred_folds.append(y_pred)
@@ -476,32 +486,43 @@ def run_cnn_cv_variant(variant_name: str,
     return fold_metrics, y_true_folds, y_pred_folds
 
 
-def _normalize_preds_to_64(all_preds: dict,
-                            cubes: list,
-                            g0_values: list[float]) -> dict:
-    """Return a copy of all_preds where every model's predictions are in 64³
-    raveled space (262 144 values per fold).
+def _align_preds(all_preds: dict,
+                 cubes: list,
+                 g0_values: list[float],
+                 force_pool: bool = False) -> dict:
+    """Return a copy of all_preds with every model's per-fold predictions in
+    one common, cell-aligned raveled-volume space.
 
-    XGBoost/MLP produce flat 128³ row-ordered predictions.  They are mapped
-    back to a 128³ volume via _preds_to_volume, then avg_pool3d to 64³.
-    CNN models already predict in 64³ and are passed through unchanged.
+    CNN variants (names starting with 'unet_') predict in raveled-volume
+    order: 64^3 when trained with --cnn-downsample, otherwise native 128^3.
+    XGBoost/MLP predictions are flat 128^3 vectors in DataFrame row order;
+    they are mapped to volumes via _preds_to_volume so that per-cell
+    alignment is guaranteed before predictions are averaged or stacked, and
+    avg-pooled to 64^3 only when some model lives in the pooled space (or
+    force_pool=True).
     """
-    cnn_size = 64 ** 3   # 262 144
+    n64 = 64 ** 3   # 262 144
+    to_pooled = force_pool or any(len(yp[0]) == n64
+                                  for _, yp in all_preds.values())
     out = {}
     for name, (yt_folds, yp_folds) in all_preds.items():
-        if len(yp_folds[0]) == cnn_size:
+        vol_order = name.startswith('unet_')   # already raveled-volume order
+        if len(yp_folds[0]) == n64 or (vol_order and not to_pooled):
             out[name] = (yt_folds, yp_folds)
         else:
-            yt64, yp64 = [], []
+            yt_c, yp_c = [], []
             for fold in range(len(g0_values)):
-                def _pool(flat, fold=fold):
-                    vol = torch.from_numpy(
-                        _preds_to_volume(cubes[fold], flat)
-                    ).unsqueeze(0).unsqueeze(0)   # (1,1,128,128,128)
-                    return F.avg_pool3d(vol, kernel_size=2, stride=2).numpy().ravel()
-                yt64.append(_pool(yt_folds[fold]))
-                yp64.append(_pool(yp_folds[fold]))
-            out[name] = (yt64, yp64)
+                def _conv(flat, fold=fold):
+                    vol = (flat.reshape(128, 128, 128) if vol_order
+                           else _preds_to_volume(cubes[fold], flat))
+                    if not to_pooled:
+                        return vol.ravel()
+                    t = torch.from_numpy(
+                        np.ascontiguousarray(vol)).unsqueeze(0).unsqueeze(0)
+                    return F.avg_pool3d(t, kernel_size=2, stride=2).numpy().ravel()
+                yt_c.append(_conv(yt_folds[fold]))
+                yp_c.append(_conv(yp_folds[fold]))
+            out[name] = (yt_c, yp_c)
     return out
 
 
@@ -512,8 +533,8 @@ def run_ensemble_cv(ensemble_name: str,
     """Equal-weight average ensemble of per-fold predictions from listed models.
 
     all_preds[name] = (y_true_folds, y_pred_folds) in log_nH2 space.
-    All prediction arrays must have the same length per fold (call
-    _normalize_preds_to_64 first when mixing pointwise and CNN models).
+    All prediction arrays must be cell-aligned with the same length per fold
+    (call _align_preds first when mixing pointwise and CNN models).
     y_true is taken from the first model (all val cubes share the same target).
     """
     fold_metrics: list[dict] = []
@@ -529,67 +550,83 @@ def run_ensemble_cv(ensemble_name: str,
 
 def run_stacked_ensemble_cv(ensemble_name: str,
                              model_names: list[str],
-                             all_preds_64: dict[str, tuple[list, list]],
+                             aligned_preds: dict[str, tuple[list, list]],
                              g0_values: list[float]) -> dict[str, list[dict]]:
     """Ridge-regression stacked ensemble trained on OOF predictions (no leakage).
 
     For each held-out fold i:
       - Meta-train: stack per-cell OOF predictions from the 6 other folds.
-        X_meta_tr shape (6 * 262_144, n_models); y_meta_tr = ground-truth log_nH2.
+        X_meta_tr shape (6 * n_cells, n_models); y_meta_tr = ground-truth log_nH2.
       - Fit Ridge(alpha=1.0) on meta-train, then predict on fold i's predictions.
       - Reported weights show which model dominates for each fold.
 
-    Mass-budget recalibration: the Ridge intercept zeroes the *pooled* OOF
-    residual, but a G0-dependent bias survives and compounds to a large error
-    in the predicted total H2 mass.  For each fold we therefore also fit the
-    per-training-cube OOF bias as a linear function of log10(G0)
-    (fit_g0_bias_correction) and subtract its value at the held-out G0 —
-    training-cube quantities only, so no leakage.
+    G0-linear recalibration, two flavours (both leakage-free — fitted on
+    per-training-cube OOF biases vs log10(G0), evaluated at the held-out G0):
+      '_cal'    unweighted per-cube mean residual — centres the *cell-mean*
+                log bias.  The Ridge intercept already zeroes the pooled OOF
+                residual, so this mostly corrects the G0 trend of the mean.
+      '_mwcal'  mass-weighted per-cube residual (mass_weighted_bias) —
+                centres the *total-H2-mass* budget, which the cell-mean
+                correction cannot move when the surviving error is
+                density-dependent (dense cells under-predicted at high G0).
 
-    Returns {ensemble_name: fold_metrics, ensemble_name + '_cal': fold_metrics}
-    for the raw and recalibrated predictions respectively.
+    Returns {ensemble_name, ensemble_name + '_cal', ensemble_name + '_mwcal'}
+    -> fold_metrics for the raw and recalibrated predictions respectively.
 
-    all_preds_64 must already be normalized to 64^3 space (call
-    _normalize_preds_to_64 first).
+    aligned_preds must already be in a common cell-aligned volume space
+    (call _align_preds first).
     """
     n_folds = len(g0_values)
-    fold_metrics:     list[dict] = []
-    fold_metrics_cal: list[dict] = []
+    fold_metrics:       list[dict] = []
+    fold_metrics_cal:   list[dict] = []
+    fold_metrics_mwcal: list[dict] = []
     for fold in range(n_folds):
-        y_true_val = all_preds_64[model_names[0]][0][fold]
+        y_true_val = aligned_preds[model_names[0]][0][fold]
 
         X_meta_tr_parts, y_meta_tr_parts, g0_tr = [], [], []
         for j in range(n_folds):
             if j == fold:
                 continue
-            yt_j = all_preds_64[model_names[0]][0][j]
-            yp_j = np.stack([all_preds_64[m][1][j] for m in model_names], axis=1)
+            yt_j = aligned_preds[model_names[0]][0][j]
+            yp_j = np.stack([aligned_preds[m][1][j] for m in model_names], axis=1)
             X_meta_tr_parts.append(yp_j)
             y_meta_tr_parts.append(yt_j)
             g0_tr.append(g0_values[j])
 
-        X_meta_tr  = np.concatenate(X_meta_tr_parts, axis=0)   # (6*262144, n_models)
-        y_meta_tr  = np.concatenate(y_meta_tr_parts, axis=0)   # (6*262144,)
-        X_meta_val = np.stack([all_preds_64[m][1][fold] for m in model_names], axis=1)
+        X_meta_tr  = np.concatenate(X_meta_tr_parts, axis=0)   # (6*n_cells, n_models)
+        y_meta_tr  = np.concatenate(y_meta_tr_parts, axis=0)   # (6*n_cells,)
+        X_meta_val = np.stack([aligned_preds[m][1][fold] for m in model_names], axis=1)
 
         meta = Ridge(alpha=1.0, fit_intercept=True)
         meta.fit(X_meta_tr, y_meta_tr)
         y_stacked = meta.predict(X_meta_val).astype(np.float32)
 
-        # Per-training-cube OOF bias of the fitted meta-learner -> G0 trend
+        # Per-training-cube OOF biases of the fitted meta-learner -> G0 trends
+        oof_preds = [meta.predict(Xp) for Xp in X_meta_tr_parts]
         per_cube_bias = np.array([
-            float(np.mean(meta.predict(Xp) - yp))
-            for Xp, yp in zip(X_meta_tr_parts, y_meta_tr_parts)
+            float(np.mean(pp - yp))
+            for pp, yp in zip(oof_preds, y_meta_tr_parts)
+        ])
+        per_cube_bias_mw = np.array([
+            mass_weighted_bias(pp, yp)
+            for pp, yp in zip(oof_preds, y_meta_tr_parts)
         ])
         slope, intercept = fit_g0_bias_correction(per_cube_bias,
                                                   np.array(g0_tr))
         offset = predict_bias(slope, intercept, g0_values[fold])
         y_stacked_cal = (y_stacked - offset).astype(np.float32)
 
-        metrics     = compute_metrics(y_true_val, y_stacked)
-        metrics_cal = compute_metrics(y_true_val, y_stacked_cal)
+        slope_mw, intercept_mw = fit_g0_bias_correction(per_cube_bias_mw,
+                                                        np.array(g0_tr))
+        offset_mw = predict_bias(slope_mw, intercept_mw, g0_values[fold])
+        y_stacked_mwcal = (y_stacked - offset_mw).astype(np.float32)
+
+        metrics       = compute_metrics(y_true_val, y_stacked)
+        metrics_cal   = compute_metrics(y_true_val, y_stacked_cal)
+        metrics_mwcal = compute_metrics(y_true_val, y_stacked_mwcal)
         fold_metrics.append(metrics)
         fold_metrics_cal.append(metrics_cal)
+        fold_metrics_mwcal.append(metrics_mwcal)
         weights = {m: f"{w:.3f}" for m, w in zip(model_names, meta.coef_)}
         print(f"  {ensemble_name:<24}  fold={fold} (G0={g0_values[fold]:.1f})  "
               f"R2={metrics['R2']:.4f}  massR={metrics['mass_ratio']:.3f}  "
@@ -597,8 +634,12 @@ def run_stacked_ensemble_cv(ensemble_name: str,
         print(f"  {ensemble_name + '_cal':<24}  fold={fold} (G0={g0_values[fold]:.1f})  "
               f"R2={metrics_cal['R2']:.4f}  massR={metrics_cal['mass_ratio']:.3f}  "
               f"offset={offset:+.3f} dex")
+        print(f"  {ensemble_name + '_mwcal':<24}  fold={fold} (G0={g0_values[fold]:.1f})  "
+              f"R2={metrics_mwcal['R2']:.4f}  massR={metrics_mwcal['mass_ratio']:.3f}  "
+              f"offset={offset_mw:+.3f} dex")
     return {ensemble_name: fold_metrics,
-            ensemble_name + '_cal': fold_metrics_cal}
+            ensemble_name + '_cal': fold_metrics_cal,
+            ensemble_name + '_mwcal': fold_metrics_mwcal}
 
 
 def run_cnn_cv_guided(variant_name: str,
@@ -611,6 +652,7 @@ def run_cnn_cv_guided(variant_name: str,
                       epochs: int = 150,
                       lr: float = 1e-3,
                       input_cols_base: list[str] | None = None,
+                      pool: bool = False,
                       ) -> tuple[list[dict], list[np.ndarray], list[np.ndarray]]:
     """CNN fold training where XGBoost's OOB predictions are the 15th input channel.
 
@@ -636,7 +678,7 @@ def run_cnn_cv_guided(variant_name: str,
         val_vols_g   = [{**all_vols[fold], 'xgb_pred': xgb_vols[fold]}]
         metrics, y_true, y_pred = _train_cnn_fold(
             train_vols_g, val_vols_g, ops, device, epochs, lr, base_ch,
-            input_cols=_guided_cols, seed=fold)
+            input_cols=_guided_cols, seed=fold, pool=pool)
         fold_metrics.append(metrics)
         y_true_folds.append(y_true)
         y_pred_folds.append(y_pred)
@@ -647,26 +689,82 @@ def run_cnn_cv_guided(variant_name: str,
 
 # ── Reporting ─────────────────────────────────────────────────────────────────
 
+def add_skill_scores(all_results: dict[str, list[dict]],
+                     all_preds: dict[str, tuple[list, list]],
+                     cubes: list,
+                     g0_values: list[float],
+                     ens_preds: dict | None = None,
+                     ref_name: str = 'xgb_standard') -> None:
+    """Add per-fold 'skill_vs_xgb' = 1 - MSE_model / MSE_ref to every variant.
+
+    The reference is the pointwise XGBoost baseline (ref_name) — a meaningful
+    baseline, unlike the fold-mean prediction implicit in R2's denominator.
+
+    Error metrics are permutation-invariant, so at native resolution one
+    reference MSE (computed over all 128^3 cells) applies to every variant
+    regardless of cell ordering.  Only variants evaluated on *pooled* 64^3
+    volumes (--cnn-downsample runs and the ensembles built on them) see a
+    different target field, and are scored against the reference's
+    predictions pooled to 64^3.  Mutates the metric dicts in place; a no-op
+    with a console note if the reference was not run.
+    """
+    if ref_name not in all_results:
+        print(f"\n(Skill scores skipped: reference '{ref_name}' not run)")
+        return
+    n64 = 64 ** 3
+    ens_pooled = (ens_preds is not None and len(ens_preds) > 0 and
+                  len(next(iter(ens_preds.values()))[1][0]) == n64)
+
+    def _pooled(name: str) -> bool:
+        if name in all_preds:
+            return len(all_preds[name][1][0]) == n64
+        # ens_*/stacked_* variants live in the aligned ensemble space
+        return ens_pooled
+
+    ref128 = [m['RMSE'] ** 2 for m in all_results[ref_name]]
+    ref64: list[float] | None = None
+    if any(_pooled(n) for n in all_results):
+        if ens_pooled and ref_name in ens_preds:
+            yt64, yp64 = ens_preds[ref_name]
+        else:
+            yt64, yp64 = _align_preds({ref_name: all_preds[ref_name]},
+                                      cubes, g0_values,
+                                      force_pool=True)[ref_name]
+        ref64 = [compute_metrics(yt64[f], yp64[f], fast=True)['RMSE'] ** 2
+                 for f in range(len(g0_values))]
+    for name, fms in all_results.items():
+        ref = ref64 if (_pooled(name) and ref64 is not None) else ref128
+        for m, mse_ref in zip(fms, ref):
+            m['skill_vs_xgb'] = 1.0 - (m['RMSE'] ** 2) / mse_ref
+
+
 def print_comparison(all_results: dict[str, list[dict]],
                      g0_values: list[float]) -> None:
-    """Print a compact R2 comparison table: variants (rows) x G0 folds (cols)."""
+    """Print a compact comparison table: variants (rows) x G0 folds (cols),
+    followed by cross-fold means of the headline metrics."""
     name_w  = 20
     g0_hdr  = "".join(f"G0={g:<5.1f}" for g in g0_values)
-    header  = f"  {'Variant':<{name_w}}  {g0_hdr}  {'MeanR2':>8}  {'R2_lin':>8}  {'Std':>6}"
+    header  = (f"  {'Variant':<{name_w}}  {g0_hdr}  {'MeanR2':>8}  {'Std':>6}  "
+               f"{'RMSE':>7}  {'bias':>7}  {'massR':>6}  {'CCC':>7}  {'W1':>6}  "
+               f"{'skill':>7}")
     sep     = "=" * len(header)
 
     print(f"\n{sep}")
-    print("  Architecture Comparison  (R2 log-space per fold)")
+    print("  Architecture Comparison  (R2 log-space per fold; "
+          "trailing columns are cross-fold means)")
     print(sep)
     print(header)
     print("-" * len(header))
 
     for name, fms in all_results.items():
-        r2s     = [m['R2']     for m in fms]
-        r2_lins = [m['R2_lin'] for m in fms]
+        r2s     = [m['R2'] for m in fms]
         r2_cols = "".join(f"{r2:>+8.4f} " for r2 in r2s)
+        def _mean(key: str) -> float:
+            return float(np.nanmean([m.get(key, np.nan) for m in fms]))
         print(f"  {name:<{name_w}}  {r2_cols}  {np.mean(r2s):>+8.4f}  "
-              f"{np.mean(r2_lins):>+8.4f}  {np.std(r2s):>6.4f}")
+              f"{np.std(r2s):>6.4f}  {_mean('RMSE'):>7.3f}  {_mean('bias'):>+7.3f}  "
+              f"{_mean('mass_ratio'):>6.3f}  {_mean('CCC'):>7.4f}  "
+              f"{_mean('W1'):>6.3f}  {_mean('skill_vs_xgb'):>+7.3f}")
 
     print(sep)
 
@@ -674,7 +772,8 @@ def print_comparison(all_results: dict[str, list[dict]],
 def save_comparison_log(all_results: dict[str, list[dict]],
                         g0_values: list[float],
                         run_config: dict,
-                        log_path: str) -> None:
+                        log_path: str,
+                        xgb_importances: dict[str, dict] | None = None) -> None:
     out: dict = {'run_config': run_config, 'g0_values': g0_values, 'variants': {}}
     for name, fms in all_results.items():
         out['variants'][name] = {
@@ -684,11 +783,17 @@ def save_comparison_log(all_results: dict[str, list[dict]],
                 for i, m in enumerate(fms)
             ],
             'summary': {
-                key: {'mean': float(np.mean([m[key] for m in fms])),
-                      'std':  float(np.std([m[key] for m in fms]))}
+                # nan-safe: phase-conditional metrics are NaN when a phase
+                # has fewer than 10 cells in a fold
+                key: {'mean': float(np.nanmean([m[key] for m in fms])),
+                      'std':  float(np.nanstd([m[key] for m in fms]))}
                 for key in fms[0].keys()
             },
         }
+        # Per-fold XGBoost feature importances (for plot_feature_importance.py)
+        if xgb_importances and name in xgb_importances:
+            out['variants'][name]['xgb_feature_importance'] = \
+                xgb_importances[name]
     with open(log_path, 'w') as f:
         json.dump(out, f, indent=2)
     print(f"\nComparison log saved -> {log_path}")
@@ -708,6 +813,10 @@ if __name__ == '__main__':
                         help='Include CNN variants (slow; off by default)')
     parser.add_argument('--cnn-epochs', type=int, default=150,
                         help='CNN epochs per variant/fold (default 150)')
+    parser.add_argument('--cnn-downsample', action='store_true',
+                        help='Average-pool CNN volumes 128^3 -> 64^3 (legacy '
+                             'behaviour for constrained VRAM; default trains '
+                             'at native 128^3)')
     parser.add_argument('--mlp-epochs', type=int, default=100,
                         help='MLP epochs per variant/fold (default 100)')
     parser.add_argument('--all-ops',    action='store_true',
@@ -752,6 +861,7 @@ if __name__ == '__main__':
         'device':           str(device),
         'run_cnn':          args.cnn,
         'cnn_epochs':       args.cnn_epochs,
+        'cnn_grid':         64 if args.cnn_downsample else 128,
         'mlp_epochs':       args.mlp_epochs,
         'all_ops':          args.all_ops,
         'spatial':          args.spatial,
@@ -783,6 +893,7 @@ if __name__ == '__main__':
 
     all_results:       dict[str, list[dict]]           = {}
     all_preds:         dict[str, tuple[list, list]]    = {}
+    xgb_importances:   dict[str, dict]                 = {}
     xgb_standard_vols: list[np.ndarray] | None         = None
 
     # ── XGBoost variants ──────────────────────────────────────────────────────
@@ -790,10 +901,12 @@ if __name__ == '__main__':
         print("\n--- XGBoost ---")
         for name, cfg in XGB_VARIANTS.items():
             print(f"\n[{name}]")
-            fold_metrics, yt, yp, xvols = run_xgb_cv(
+            fold_metrics, yt, yp, xvols, fi = run_xgb_cv(
                 name, cfg, X, y, folds, g0_vals, cubes)
-            all_results[name] = fold_metrics
-            all_preds[name]   = (yt, yp)
+            all_results[name]     = fold_metrics
+            all_preds[name]       = (yt, yp)
+            xgb_importances[name] = {'feature_names': list(feat_cols),
+                                     'per_fold': fi}
             if name == 'xgb_standard':
                 xgb_standard_vols = xvols
 
@@ -814,7 +927,8 @@ if __name__ == '__main__':
             print(f"\n[{name}]")
             fold_metrics, yt, yp = run_cnn_cv_variant(
                 name, cfg, all_vols, g0_vals, device, ops,
-                epochs=args.cnn_epochs, input_cols=feat_cols)
+                epochs=args.cnn_epochs, pool=args.cnn_downsample,
+                input_cols=feat_cols)
             all_results[name] = fold_metrics
             all_preds[name]   = (yt, yp)
 
@@ -828,12 +942,19 @@ if __name__ == '__main__':
         print(f"  Spatial kernels: {args.spatial_kernels}  ->  {n_sp} spatial features  "
               f"(X_sp shape: {X_sp.shape})")
 
+        # Spatial feature-matrix column names: base features, then k-major
+        # blocks matching _compute_spatial_X's concatenation order
+        sp_names = list(feat_cols) + [f'{c}_k{k}'
+                                      for k in args.spatial_kernels
+                                      for c in feat_cols]
+
         if not args.skip_xgb:
             name = 'xgb_standard_sp'
-            fold_metrics, yt, yp, _ = run_xgb_cv(
+            fold_metrics, yt, yp, _, fi = run_xgb_cv(
                 name, XGB_VARIANTS['xgb_standard'], X_sp, y, folds, g0_vals, cubes)
-            all_results[name] = fold_metrics
-            all_preds[name]   = (yt, yp)
+            all_results[name]     = fold_metrics
+            all_preds[name]       = (yt, yp)
+            xgb_importances[name] = {'feature_names': sp_names, 'per_fold': fi}
 
         if not args.skip_mlp:
             name = 'mlp_wide_sp'
@@ -846,11 +967,12 @@ if __name__ == '__main__':
         if not args.skip_xgb and not args.skip_mlp:
             print("\n  [weighted variants]")
             name = 'xgb_standard_sp_w'
-            fold_metrics, yt, yp, _ = run_xgb_cv(
+            fold_metrics, yt, yp, _, fi = run_xgb_cv(
                 name, XGB_VARIANTS['xgb_standard'], X_sp, y, folds, g0_vals,
                 cubes, weighted=True)
-            all_results[name] = fold_metrics
-            all_preds[name]   = (yt, yp)
+            all_results[name]     = fold_metrics
+            all_preds[name]       = (yt, yp)
+            xgb_importances[name] = {'feature_names': sp_names, 'per_fold': fi}
 
             name = 'mlp_wide_sp_w'
             fold_metrics, yt, yp = run_mlp_cv(
@@ -866,7 +988,8 @@ if __name__ == '__main__':
             print(f"\n[{name}]")
             fold_metrics, yt, yp = run_cnn_cv_guided(
                 name, cfg, all_vols, xgb_standard_vols, g0_vals, device, ops,
-                epochs=args.cnn_epochs, input_cols_base=feat_cols)
+                epochs=args.cnn_epochs, input_cols_base=feat_cols,
+                pool=args.cnn_downsample)
             all_results[name] = fold_metrics
             all_preds[name]   = (yt, yp)
     elif args.cnn and args.skip_xgb:
@@ -889,9 +1012,10 @@ if __name__ == '__main__':
     ]
     ens_to_run     = [(n, ms) for n, ms in ens_groups     if all(m in all_preds for m in ms)]
     stacked_to_run = [(n, ms) for n, ms in stacked_groups if all(m in all_preds for m in ms)]
+    ens_preds: dict | None = None
     if ens_to_run or stacked_to_run:
         print("\n--- Ensemble variants ---")
-        ens_preds = _normalize_preds_to_64(all_preds, cubes, g0_vals)
+        ens_preds = _align_preds(all_preds, cubes, g0_vals)
         for ens_name, members in ens_to_run:
             all_results[ens_name] = run_ensemble_cv(
                 ens_name, members, ens_preds, g0_vals)
@@ -899,5 +1023,9 @@ if __name__ == '__main__':
             all_results.update(run_stacked_ensemble_cv(
                 stk_name, members, ens_preds, g0_vals))
 
+    # ── Skill scores vs the pointwise-XGBoost reference ──────────────────────
+    add_skill_scores(all_results, all_preds, cubes, g0_vals, ens_preds)
+
     print_comparison(all_results, g0_vals)
-    save_comparison_log(all_results, g0_vals, run_config, log_path)
+    save_comparison_log(all_results, g0_vals, run_config, log_path,
+                        xgb_importances=xgb_importances)
