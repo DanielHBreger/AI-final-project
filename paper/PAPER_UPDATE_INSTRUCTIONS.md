@@ -1,5 +1,20 @@
 # Instructions: updating or rewriting the paper with the new results
 
+> **2026-07-05 addendum:** a dual-AI review pass was dispositioned in
+> `REVIEW3_DISPOSITIONS.md` (same directory) — read it before further
+> paper edits. Text fixes are already in paper.tex; open items: run 16
+> (leakage-free U-Net checkpoints, blocking), runs 8/12/17, analysis
+> items A1–A5 (RUN_PLAN). Bib TODO (verify on ADS before citing, like
+> KMT09/Sternberg2014/Bialy2016): Palud et al. 2023, A&A (Meudon PDR
+> neural emulation); Janssen, Branca & Buck 2026, A&A (surrogate
+> benchmarking/model selection). Provenance deliverables for C1 now have
+> concrete templates: a simulation-metadata table (code, box, resolution,
+> BCs, driving, B-field, metallicity, dust, radiation geometry, network,
+> heating/cooling, equilibrium criterion) and a per-feature provenance
+> column for Table 1 (MHD primitive / chemistry output / column integral
+> / imposed parameter / derived), plus an exact definition of `ext`
+> (formula, direction, normalisation, boundary convention).
+
 Audience: a future Claude Code session asked to take the rerun results and
 figures (see `../docs/RUN_PLAN.md`) and either revise `paper/paper.tex` in place
 or write a new version. Written 2026-07-03 by the session that did the
@@ -260,8 +275,8 @@ two stacking protocols (disclosure 7).
 | Table 2 (f_H2 ablation) | `results/ablation_nofh2_128eval.json` (run 2b) | pointwise rows bit-match run 2; NEVER quote run 2's pooled ensemble rows |
 | §5.2 11-input upper bound | `results/cnn_test_20260704_170833.json` (run 4) | R² 0.893±0.088; "morphology yes, chemistry no" |
 | §5.4 error analysis + D2/D3 | `predictions/pred_g0_*_20260704_*.npz` (run 5) | nested weighted stack + mwcal; R² 0.9901±0.0064, mass 0.985–1.090; independent check = merit_metrics table 2026-07-05 |
-| §6.1 single-cube matrix | archived `logs/single_cube_extrapolation/` | rerun (run 10) only if new metrics quoted there |
-| §6.2 intra-cube section | archived `logs/intra_cube_section/` | same (run 11) |
+| §6.1 single-cube matrix | `logs/single_cube_extrapolation/run_20260705_114057.json` (run 10, 2026-07-05) | consistent with March matrix; full metric dicts |
+| §6.2 intra-cube section | `logs/intra_cube_section/run_20260705_121037.json` (run 11, 2026-07-05) | ⚠ March log irreproducible (uncommitted script variant); §6.2 text rewritten from this log — do NOT quote the March slab/rand_1 numbers |
 | U-Net config sensitivity | archived `results/cnn_test_20260322_221728.json`, `results/cnn_test_20260323_010315.json`, `results/cnn_training_*` | 64³ — say so explicitly |
 | Fig 1 (histograms) | `plot_nH2_histograms.py` | data unchanged |
 | Fig 2 (method diagram) | static | |
@@ -373,8 +388,8 @@ sentence with a placeholder if the answer is pending.
 | Fig 8 | `figures/fig8_slices.png` | **path change** (was a stale PNG the old code couldn't regenerate); caption already matches this layout |
 | NEW | `figures/fig7_massbudget.png` | insert in §5.4: mass ratio + bias raw-vs-recalibrated + phase-conditional R² |
 | NEW | `figures/fig_feature_importance.png` | insert in Methods or Discussion (closes review D4) |
-| Fig 9 | `logs/single_cube_extrapolation/heatmap_20260313_022129.png` | keep; update path only if rerun |
-| Fig 10 | `logs/intra_cube_section/run_20260313_142443_heatmap.png` | keep; update path only if rerun |
+| Fig 9 | `logs/single_cube_extrapolation/heatmap_20260705_114057.png` | updated 2026-07-05 (run 10) |
+| Fig 10 | `logs/intra_cube_section/run_20260705_121037_heatmap.png` | updated 2026-07-05 (run 11; March heatmap shows irreproducible numbers — do not revert) |
 
 `\graphicspath` in paper.tex is `{./}{../}` — figures/ and logs/
 paths resolve via `../` from `paper/`. Verify every `\includegraphics`

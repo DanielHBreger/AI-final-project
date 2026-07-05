@@ -158,17 +158,40 @@ Notes:
 
 | # | Command | Time | Purpose |
 |---|---------|------|---------|
-| 8 | `python -u compare_architectures.py --no-vel --no-B --log ablation_novelB_<date>.json > run_novelB.log` | ~2.5 h | Minimal deployable feature set (6 local features). Expected: little accuracy loss → new result + closes review item D4 together with the importance figure |
+| 8 | `python -u compare_architectures.py --no-vel --no-B --log results/ablation_novelB_<date>.json > logs/run_novelB.log` | ~1 h (per runs 1–2 timing) | **ELEVATED 2026-07-05** (both external reviews request it): converts §5.3's "minimal six-feature deployable set … not separately evaluated" into a table row. Expected: little accuracy loss → new result + closes review item D4 together with the importance figure |
 | 9 | z-column cumulative-sum features — **code not yet written** (add a cumsum-along-z variant to `model_helpers._compute_spatial_X`, expose as `--spatial-mode zcum` or similar), then one comparison run and one `--no-fh2` run with it | ~0.5 day | Directional (physics-informed) vs isotropic non-locality; strongest candidate headline for the methods contribution |
 
 ## Optional runs from the 2026-07-04 design audit (see DESIGN_DECISIONS.md)
 
 | # | Command | Time | Purpose / status |
 |---|---------|------|------------------|
-| 12 | Density-weight α sensitivity: **small code change first** (expose `_compute_weights` α — e.g. `--weight-alpha` in compare_architectures, or a standalone XGB-only sweep script), then α ∈ {10, 100, 1000} on `xgb_standard_sp_w` | ~1 h total (XGB-only) | The weighting is inside the headline model with three untested hyperparameters (p99/p99.99/α=100); a flat response inoculates the reviewer question. DESIGN_DECISIONS §4.1 |
+| 12 | Density-weight α sensitivity: **small code change first** (expose `_compute_weights` α — e.g. `--weight-alpha` in compare_architectures, or a standalone XGB-only sweep script), then α ∈ {10, 100, 1000} on `xgb_standard_sp_w` | ~1 h total (XGB-only) | **ELEVATED 2026-07-05** (ChatGPT review #6 requests exactly this table). The weighting is inside the headline model with three untested hyperparameters (p99/p99.99/α=100); a flat response inoculates the reviewer question. DESIGN_DECISIONS §4.1 |
 | 13 | Different-seed test cube — **blocked on data** (request one re-seeded simulation at an existing G0 from the collaborators), then `predict_and_visualize.py` inference on it | inference only, minutes | Highest-value robustness addition: separates G0-difficulty from realization noise; scopes the OOD claim beyond shared initial conditions. DESIGN_DECISIONS §3.2 |
 | 14 | Weighted U-Net (density-weighted CNN loss) — **post-paper / future work** | hours | Removes the mass-budget training asymmetry vs the weighted stack; for this paper a limitation sentence suffices. DESIGN_DECISIONS §4.6 |
 | 15 | Boundary-mode robustness: **small code change first** (`mode` flag on `_compute_spatial_X`), then one `xgb_standard_sp` fold-set with `mode='wrap'` | ~20 min | Only if the sims turn out periodic (see Verification below); quantifies the `reflect` approximation on ~13 % boundary cells. DESIGN_DECISIONS §5.1 |
+
+## Runs from the 2026-07-05 dual-AI review (paper/REVIEW3_DISPOSITIONS.md)
+
+| # | Command | Time | Purpose / status |
+|---|---------|------|------------------|
+| 16 | **BLOCKING (both reviewers): leakage-free U-Net checkpoints.** Code change first: `test_cnn.py` selects the checkpoint on an *inner validation cube* (one of the six training cubes) instead of the held-out cube, and additionally records final-epoch metrics. Then rerun the run-3 config (`--variants unet_baseline`), and ideally the run-4 11-input config | ~4.6 h per config | Replaces the test-set-selected U-Net rows in Tables 2–3 and §5.4. Until done, the ≤12 % disclosure stands (per-epoch `history` in the cnn_test JSONs audits the bound but cannot yield final-epoch R²/mass) |
+| 17 | Intra-cube random-mask seed repeats: rerun `intra_cube_section.py` rand splits with ≥3 seeds (add a `--seed` flag + loop, or a `--splits rand_*` subset flag) | a few hours | ChatGPT #9: one mask per fraction is not enough for a claim about random coverage. Current (run 11) rand_1 spread across cubes is 0.79–0.94, so instability is unlikely — this quantifies it |
+
+### Analysis items (no GPU training — scripts over saved artifacts)
+
+| # | Task | Time | Purpose |
+|---|------|------|---------|
+| A1 | Phase-threshold sensitivity: recompute phase-conditional metrics of the run-5 volumes for thresholds in [−5, −3] | minutes | One stability sentence immunises the PHASE_SPLIT = −4 choice (both reviews) |
+| A2 | Cell-level bootstrap CIs (within fold) for the deployed pipeline's headline metrics, from the run-5 npz + truth | minutes | Honest CIs for n = 7 headline numbers (Claude) |
+| A3 | Replot Figs 11–12 heatmaps from the saved run-10/11 JSONs with a diverging colormap clipped to [−1, 1] (values < −1 marked); enlarge in-cell text | ~1 h code | ChatGPT figure comment; no retraining — plot from `logs/*/run_20260705_*.json` |
+| A4 | (Optional) Compare mass-weighted-residual calibration vs exact log-mass-ratio fitting on the run-5 volumes | minutes | Quantifies the first-order-equivalence claim added to §4.5, if a referee asks |
+| A5 | Line-level numbers audit: every number in the abstract, §5, §7.3, and the conclusions checked against its source table/log | ~1 h | Claude's "highest-value hour before submission"; the 7-vs-9 fix was one instance, there may be others |
+
+Done 2026-07-05 without new runs (from existing artifacts): multiplicity/
+per-fold-consistency sentence (§5.1, from run-1b), calibration LOO
+stability sentence (§5.2, from run-5 npz), clip-never-active verification
+(§5.5 + Table 3 caption), deployed nested rows in Tables 2–3
+(`results/deployed_row_metrics.json`).
 
 ## Verification items (no compute — ask the simulation collaborators)
 
@@ -191,8 +214,28 @@ Feed the answers into the paper's §2 wording (see PAPER_UPDATE_INSTRUCTIONS
 
 | # | Command | Time | Note |
 |---|---------|------|------|
-| 10 | `python -u single_cube_extrapolation.py > run_scx.log` | hours | §6.1. Old log + heatmap remain valid for the R²-only presentation; rerun records full metric dicts |
-| 11 | `python -u intra_cube_section.py > run_intra.log` | hours | §6.2. Same note. New timestamped heatmap → update the figure path in paper.tex |
+| 10 | `python -u single_cube_extrapolation.py > logs/run_scx.log` | ~30 min | §6.1. Old log + heatmap remain valid for the R²-only presentation; rerun records full metric dicts |
+| 11 | `python -u intra_cube_section.py > logs/run_intra.log` | ~30 min | §6.2. New timestamped heatmap → update the figure path in paper.tex |
+
+- **Run 10 DONE** (2026-07-05, ~30 min) → `logs/single_cube_extrapolation/run_20260705_114057.json` + heatmap.
+  Consistent with the March matrix (off-diag stacked mean 0.7060 → 0.7076);
+  only extreme-extrapolation corners move (≤0.06). §6.1 numbers updated in
+  paper.tex (steps 3/4/5/6: 0.732/0.457/0.171/−0.013; off-diag mean 0.708);
+  Fig 9 path updated.
+- **Run 11 DONE** (2026-07-05, ~30 min) → `logs/intra_cube_section/run_20260705_121037.json` + heatmap.
+  ⚠ **The March §6.2 log (`run_20260313_142443`) is NOT reproducible by any
+  committed code**: the three 2026-03-13 runs are mutually inconsistent (the
+  script was edited between them) and the rerun instead reproduces the
+  12:44 run's behaviour, which matches the committed code AND the masked-filter
+  convention described in the paper. New picture: slabs no longer fail in
+  log-space R² (mean 0.85–0.89, worst 0.42) but DO fail on the primary
+  metrics (RMSE ≈0.86 dex, frac_01 0.07–0.18, R2_mol ≤0.13, mass ratios
+  0.006–4.4; small boxes predict essentially zero mass); rand_1 is stable
+  at 0.90 (0.79–0.94) though with RMSE 0.69/mass 0.52–2.5; random ≥10 %
+  preserves everything (RMSE 0.24, mass 0.82–1.23). §6.2 (now with the
+  full metric hierarchy), Fig 10 caption+path, abstract and conclusion
+  (vii) rewritten accordingly; §6.1 also quotes RMSE/bias/mass by step.
+  Paper recompiled clean (2026-07-05).
 
 ## Figures to produce
 

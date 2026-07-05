@@ -1,0 +1,10 @@
+g0=0.1: R2=0.9775 RMSE=0.471 bias=-0.161 scatter=0.443 mass=1.010 R2mol=0.979 R2dif=0.735 f01=0.596 W1=0.162 skill=+0.491 clip=0.00e+00
+g0=0.2: R2=0.9884 RMSE=0.372 bias=+0.046 scatter=0.369 mass=0.985 R2mol=0.992 R2dif=0.876 f01=0.687 W1=0.071 skill=+0.775 clip=0.00e+00
+g0=0.4: R2=0.9900 RMSE=0.324 bias=+0.051 scatter=0.320 mass=1.024 R2mol=0.991 R2dif=0.893 f01=0.692 W1=0.061 skill=+0.642 clip=0.00e+00
+g0=0.8: R2=0.9866 RMSE=0.303 bias=+0.158 scatter=0.259 mass=1.062 R2mol=0.991 R2dif=0.880 f01=0.382 W1=0.174 skill=+0.522 clip=0.00e+00
+g0=1.6: R2=0.9945 RMSE=0.147 bias=+0.047 scatter=0.139 mass=1.090 R2mol=0.992 R2dif=0.969 f01=0.799 W1=0.054 skill=+0.823 clip=0.00e+00
+g0=3.2: R2=0.9962 RMSE=0.089 bias=-0.035 scatter=0.081 mass=1.004 R2mol=0.993 R2dif=0.985 f01=0.957 W1=0.036 skill=+0.922 clip=0.00e+00
+g0=6.4: R2=0.9976 RMSE=0.043 bias=+0.015 scatter=0.041 mass=1.013 R2mol=0.994 R2dif=0.996 f01=0.988 W1=0.019 skill=+0.980 clip=0.00e+00
+MEANS: R2=0.9901  RMSE=0.2499  bias=0.0171  scatter=0.2360  R2_mol=0.9902  R2_dif=0.9049  frac_01=0.7287  W1=0.0823  skill=0.7364
+mass range: 0.985 - 1.090
+max clip frac: 0.0

@@ -175,9 +175,17 @@ Quantified from run-3 histories: best epoch 61–128/150, final/best
 val-MSE ratio 1.01–1.14 → ≤ 7 % RMSE advantage. Conservative for the
 paper's claim (the favoured baseline still loses OOD).
 
-**Disposition:** KEEP for this paper + DISCLOSE with the quantified
-bound ("upper bound for the U-Net"). FUTURE: report final-epoch metrics
-or select on a training-cube holdout.
+**Disposition (superseded):** KEEP for this paper + DISCLOSE with the
+quantified bound ("upper bound for the U-Net"). FUTURE: report
+final-epoch metrics or select on a training-cube holdout.
+**REVISED 2026-07-05:** upgraded to FIX before submission — both
+external reviews (paper/REVIEW3_DISPOSITIONS.md #4) independently flag
+test-set checkpoint selection as unacceptable for the primary benchmark
+table even with the bound disclosed. Now RUN_PLAN run 16:
+inner-validation-cube selection (+ record final-epoch metrics), rerun
+the run-3 (and run-4) configs, then replace the U-Net rows in
+Tables 2--3 and the §5.4 numbers. Disclosure remains in the paper until
+run 16 lands.
 
 ### 4.6 CNN trained unweighted (vs density-weighted stack)
 **Assessment:** The mass-budget comparison has an asymmetry: the headline
@@ -326,3 +334,6 @@ KEEP.
 | 13 | Weighted U-Net | future (run 14 candidate) | RUN_PLAN |
 | 14 | `mode='wrap'` robustness check | optional run 15 | RUN_PLAN |
 | 15 | Training-range clip + mass_ratio_raw; final-epoch CNN option; --save-preds | future code revision | this file |
+| 16 | Leakage-free U-Net checkpoints (disposition change of §4.5, 2026-07-05) | **run 16, blocking** | RUN_PLAN + REVIEW3_DISPOSITIONS #4 |
+| 17 | Mass-cal functional stated exactly in §4.5 (mass-weighted residual ≠ exact log-mass-ratio closure; kept, validated OOS at 0.985–1.090; optional check A4) | paper text DONE 2026-07-05 | REVIEW3_DISPOSITIONS #6 |
+| 18 | Deployed nested rows added to Tables 2–3 below a rule, excluded from bolding; shortcut comparison kept in main text (uniform protocol; nesting all 17 variants ≈ 6× compute for no inferential gain) | paper DONE 2026-07-05 | REVIEW3_DISPOSITIONS #3/#5 |
