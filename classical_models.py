@@ -256,9 +256,7 @@ def run_xgboost(X: np.ndarray, y: np.ndarray,
             random_state=67,
             verbosity=0,
         )
-        model.fit(X_tr, y_tr,
-                  eval_set=[(X_va, y_va)],
-                  verbose=False)
+        model.fit(X_tr, y_tr, verbose=False)
         y_pred = model.predict(X_va)
 
         fold_metrics.append(compute_metrics(y_va, y_pred))

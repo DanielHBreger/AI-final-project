@@ -243,8 +243,7 @@ def run_xgb_cv(variant_name: str,
         X_tr_s, X_va_s = _standardize_inplace(X_tr, X_va)
         model = xgb.XGBRegressor(**cfg)
         sw = _compute_weights(y_tr) if weighted else None
-        model.fit(X_tr_s, y_tr, sample_weight=sw,
-                  eval_set=[(X_va_s, y_va)], verbose=False)
+        model.fit(X_tr_s, y_tr, sample_weight=sw, verbose=False)
         y_pred = model.predict(X_va_s).astype(np.float32)
         fold_metrics.append(compute_metrics(y_va, y_pred))
         y_true_folds.append(y_va.astype(np.float32))
@@ -552,13 +551,23 @@ def run_stacked_ensemble_cv(ensemble_name: str,
                              model_names: list[str],
                              aligned_preds: dict[str, tuple[list, list]],
                              g0_values: list[float]) -> dict[str, list[dict]]:
-    """Ridge-regression stacked ensemble trained on OOF predictions (no leakage).
+    """Ridge-regression stacked ensemble trained on OOF predictions.
 
     For each held-out fold i:
       - Meta-train: stack per-cell OOF predictions from the 6 other folds.
         X_meta_tr shape (6 * n_cells, n_models); y_meta_tr = ground-truth log_nH2.
       - Fit Ridge(alpha=1.0) on meta-train, then predict on fold i's predictions.
       - Reported weights show which model dominates for each fold.
+
+    Leakage note: fold i's own predictions come from base models that never
+    saw cube i, but the meta-training rows for cube j are produced by fold
+    j's base models, which were trained on the other six cubes INCLUDING
+    cube i.  This is the standard reuse-the-CV-OOF-predictions shortcut —
+    with a 2-3-coefficient Ridge the indirect effect is tiny, but it is not
+    fully nested.  predict_and_visualize.py implements the fully nested
+    version (base models for meta-training fitted on 5 cubes, held-out cube
+    excluded throughout), so stacked numbers from the two pipelines are
+    close but not identical.
 
     G0-linear recalibration, two flavours (both leakage-free — fitted on
     per-training-cube OOF biases vs log10(G0), evaluated at the held-out G0):

@@ -2,14 +2,21 @@
 """
 predict_and_visualize.py
 ========================
-Train stacked_sp (Ridge meta-learner over xgb_standard_sp + mlp_wide_sp, with
-multi-scale spatial features 3^3+5^3+7^3) on 6 of the 7 G0 cubes, predict on
-the held-out cube, and display a 3-panel interactive 3D comparison:
+Train the WEIGHTED stacked ensemble (Ridge meta-learner over
+xgb_standard_sp_w + mlp_wide_sp_w: both base models use density-weighted
+training via _compute_weights, with multi-scale spatial features
+3^3+5^3+7^3) on 6 of the 7 G0 cubes and predict the held-out cube.
+This is the `stacked_weighted` family of compare_architectures.py — with
+the default mass recalibration the saved pred_vol corresponds to the
+`stacked_weighted_mwcal` rows of the comparison logs, NOT `stacked_sp`
+(whose base models are unweighted).
 
-    [ Ground Truth ]  |  [ stacked_sp Prediction ]  |  [ Error ]
-
-Best model from run 231200: stacked_sp R2=0.9911, R2_lin=0.616
-4-run average: stacked_sp R2=0.988 +/- 0.002
+Stacking here is fully nested: the OOF predictions that train the Ridge
+meta-learner come from base models fitted on 5 training cubes with the
+held-out cube excluded entirely (compare_architectures reuses the outer
+CV's OOF predictions instead — a standard shortcut whose meta-training
+rows come from base models that saw the held-out cube — so stacked
+numbers from the two pipelines are close but not identical).
 
 Mass-budget recalibration (--recal-mode, default 'mass'): the stacked
 predictions carry a G0-dependent, density-dependent error that shows up in
@@ -65,20 +72,21 @@ from model_helpers import (
 
 def _train_xgb(X_tr: np.ndarray, y_tr: np.ndarray,
                X_va: np.ndarray, y_va: np.ndarray) -> np.ndarray:
-    """Fit XGBoost (xgb_standard config) and return val predictions."""
+    """Fit density-weighted XGBoost (the *_sp_w config) and return val
+    predictions."""
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     sc    = StandardScaler()
     model = xgb.XGBRegressor(**_XGB_CFG, device=device)
     model.fit(sc.fit_transform(X_tr), y_tr,
-              sample_weight=_compute_weights(y_tr),
-              eval_set=[(sc.transform(X_va), y_va)], verbose=False)
+              sample_weight=_compute_weights(y_tr), verbose=False)
     return model.predict(sc.transform(X_va)).astype(np.float32)
 
 
 def _train_mlp(X_tr: np.ndarray, y_tr: np.ndarray,
                X_va: np.ndarray, y_va: np.ndarray,
                epochs: int = 100) -> np.ndarray:
-    """Fit MLP (mlp_wide config) and return val predictions."""
+    """Fit density-weighted MLP (the *_sp_w config) and return val
+    predictions."""
     device  = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     use_amp = device.type == 'cuda'
 
@@ -135,11 +143,11 @@ def _run_fold(fold: int, g0_val: float,
               X_sp: np.ndarray, y: np.ndarray, fold_labels: np.ndarray,
               cubes: list, g0_vals: list, mlp_epochs: int, spatial_kernels: list,
               recal_mode: str = 'mass') -> None:
-    """Train stacked_sp on N-1 cubes, predict on the held-out fold.
+    """Train the weighted stack on N-1 cubes, predict on the held-out fold.
 
     Stacking procedure:
       1. Nested 6-fold CV on the training cubes generates OOF predictions
-         for xgb_standard_sp and mlp_wide_sp.
+         for xgb_standard_sp_w and mlp_wide_sp_w (density-weighted).
       2. Ridge(alpha=1.0) is fit on those OOF predictions.
       3. Final base models are trained on all 6 training cubes; Ridge meta
          is applied to their predictions on the held-out cube.
@@ -206,12 +214,12 @@ def _run_fold(fold: int, g0_val: float,
 
     print(f"\n[Step 2/3] Final base models on {mask.sum():,} training samples...")
 
-    print(f"\n[xgb_standard_sp]")
+    print(f"\n[xgb_standard_sp_w]")
     y_xgb = _train_xgb(X_tr, y_tr, X_va, y_va)
     m_xgb = compute_metrics(y_va, y_xgb)
     print(f"  XGB  R2={m_xgb['R2']:.4f}  R2_lin={m_xgb['R2_lin']:.4f}  RMSE={m_xgb['RMSE']:.4f}")
 
-    print(f"\n[mlp_wide_sp]  {mlp_epochs} epochs...")
+    print(f"\n[mlp_wide_sp_w]  {mlp_epochs} epochs...")
     y_mlp = _train_mlp(X_tr, y_tr, X_va, y_va, epochs=mlp_epochs)
     m_mlp = compute_metrics(y_va, y_mlp)
     print(f"  MLP  R2={m_mlp['R2']:.4f}  R2_lin={m_mlp['R2_lin']:.4f}  RMSE={m_mlp['RMSE']:.4f}")
@@ -221,13 +229,13 @@ def _run_fold(fold: int, g0_val: float,
     y_stacked     = (y_stacked_raw - bias_offset).astype(np.float32)
     m_raw     = compute_metrics(y_va, y_stacked_raw)
     m_stacked = compute_metrics(y_va, y_stacked)
-    print(f"\n[Step 3/3] stacked_sp (raw)  R2={m_raw['R2']:.4f}  "
+    print(f"\n[Step 3/3] stacked_weighted (raw)  R2={m_raw['R2']:.4f}  "
           f"R2_lin={m_raw['R2_lin']:.4f}  RMSE={m_raw['RMSE']:.4f}  "
           f"bias={m_raw['bias']:+.3f}  massRatio={m_raw['mass_ratio']:.3f}")
-    print(f"           stacked_sp (cal)  R2={m_stacked['R2']:.4f}  "
+    print(f"           stacked_weighted (cal)  R2={m_stacked['R2']:.4f}  "
           f"R2_lin={m_stacked['R2_lin']:.4f}  RMSE={m_stacked['RMSE']:.4f}  "
           f"bias={m_stacked['bias']:+.3f}  massRatio={m_stacked['mass_ratio']:.3f}")
-    print(f"           stacked_sp (cal)  f0.1={m_stacked['frac_01']:.3f}  "
+    print(f"           stacked_weighted (cal)  f0.1={m_stacked['frac_01']:.3f}  "
           f"f0.3={m_stacked['frac_03']:.3f}  CCC={m_stacked['CCC']:.4f}  "
           f"W1={m_stacked['W1']:.3f}  R2_mol={m_stacked['R2_mol']:.4f}  "
           f"R2_dif={m_stacked['R2_dif']:.4f}")
@@ -244,9 +252,12 @@ def _run_fold(fold: int, g0_val: float,
     save_path = f'predictions/pred_g0_{g0_val}_{timestamp}.npz'
     # Full metric dicts for all four models, JSON-encoded so every recorded
     # value survives in the .npz (read back with json.loads(str(d['metrics_json'])))
+    # Keys say _w: the base models are density-weighted, so these metrics
+    # correspond to the xgb_standard_sp_w / mlp_wide_sp_w / stacked_weighted*
+    # rows of the comparison logs.
     metrics_json = json.dumps({
-        'xgb_sp':      m_xgb,
-        'mlp_sp':      m_mlp,
+        'xgb_sp_w':    m_xgb,
+        'mlp_sp_w':    m_mlp,
         'stacked_raw': m_raw,
         'stacked_cal': m_stacked,   # delivered prediction (per recal_mode)
         'recal_mode':  recal_mode,
@@ -285,7 +296,9 @@ def _run_fold(fold: int, g0_val: float,
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description='Predict nH2 with stacked_sp and compare 3D volumes against truth.')
+        description='Predict nH2 with the weighted stacked ensemble '
+                    '(stacked_weighted_mwcal by default) and compare 3D '
+                    'volumes against truth.')
     parser.add_argument('--g0', type=float, default=0.8,
                         help='G0 value to hold out as validation (default: 0.8). '
                              'Available: 0.1 0.2 0.4 0.8 1.6 3.2 6.4')

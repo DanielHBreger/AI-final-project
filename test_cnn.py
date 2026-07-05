@@ -32,39 +32,9 @@ import torch.nn.functional as F
 from torch.utils.data import Dataset
 
 from data_loader import (load_all_cubes, cube_to_volumes, get_g0_values,
+                         get_feature_cols, add_drop_args, build_drop_set,
                          FEATURE_COLS, LOG_TARGET_COL)
 from augmentation import augment_cube
-
-
-# ── Feature-drop helpers (inlined; not yet in data_loader on this branch) ──────
-
-_DROP_MAP: dict[str, list[str]] = {
-    'no_fh2': ['log_fh2'],
-    'no_nH':  ['log_nH'],
-    'no_T':   ['log_T'],
-    'no_nHp': ['log_nHp'],
-    'no_ext': ['ext'],
-    'no_G0':  ['log_G0'],
-    'no_vel': ['vx', 'vy', 'vz'],
-    'no_B':   ['bxl', 'bxr', 'byl', 'byr', 'bzl', 'bzr'],
-}
-
-def _add_drop_args(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument('--no-fh2', action='store_true', help='Exclude log_fh2.')
-    parser.add_argument('--no-nH',  action='store_true', help='Exclude log_nH.')
-    parser.add_argument('--no-T',   action='store_true', help='Exclude log_T.')
-    parser.add_argument('--no-nHp', action='store_true', help='Exclude log_nHp.')
-    parser.add_argument('--no-ext', action='store_true', help='Exclude ext.')
-    parser.add_argument('--no-G0',  action='store_true', help='Exclude log_G0.')
-    parser.add_argument('--no-vel', action='store_true', help='Exclude vx/vy/vz.')
-    parser.add_argument('--no-B',   action='store_true', help='Exclude B-field components.')
-
-def _get_feature_cols(args: argparse.Namespace) -> list[str]:
-    drop: set[str] = set()
-    for flag, cols in _DROP_MAP.items():
-        if getattr(args, flag, False):
-            drop.update(cols)
-    return [c for c in FEATURE_COLS if c not in drop] if drop else FEATURE_COLS
 from augmentation   import get_symmetry_ops
 from cnn_model      import UNet3D, count_parameters
 from classical_models import compute_metrics, print_results
@@ -289,10 +259,10 @@ def main() -> None:
                         help='Average-pool volumes 128^3 -> 64^3 (legacy '
                              'behaviour for constrained VRAM; default trains '
                              'at native 128^3)')
-    _add_drop_args(parser)
+    add_drop_args(parser)
     args = parser.parse_args()
 
-    input_cols = _get_feature_cols(args)
+    input_cols = get_feature_cols(build_drop_set(args))
     device     = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     print(f"Device:    {device}")

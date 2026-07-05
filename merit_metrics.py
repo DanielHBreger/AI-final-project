@@ -43,8 +43,12 @@ for path in latest_per_g0():
     true_vol[ix, iy, iz] = df['log_nH2'].values
     true = true_vol.ravel()
 
-    # total H2 mass ratio (uniform grid -> mass proportional to sum of nH2)
-    mass_ratio = np.sum(10.0 ** pred) / np.sum(10.0 ** true)
+    # total H2 mass ratio (uniform grid -> mass proportional to sum of nH2).
+    # Predictions are clipped to the truth range +/- 1 dex, matching
+    # classical_models.compute_metrics, so this table is directly comparable
+    # to the mass_ratio column of the run logs.
+    clip_lo, clip_hi = true.min() - 1.0, true.max() + 1.0
+    mass_ratio = np.sum(10.0 ** np.clip(pred, clip_lo, clip_hi)) / np.sum(10.0 ** true)
 
     def r2(t, p):
         ss = np.sum((t - np.mean(t)) ** 2)

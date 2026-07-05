@@ -1,4 +1,4 @@
-\begin{thebibliography}{30}
+\begin{thebibliography}{29}
 \expandafter\ifx\csname natexlab\endcsname\relax\def\natexlab#1{#1}\fi
 
 \bibitem[Bialy \& Sternberg(2016)]{Bialy2016}
@@ -142,13 +142,6 @@ Ronneberger, O., Fischer, P., \& Brox, T., 2015.
 \newblock {U-Net}: Convolutional networks for biomedical image segmentation, in
   {\em Medical Image Computing and Computer-Assisted Intervention -- MICCAI
   2015, LNCS\/}, vol. 9351, pp. 234--241, Springer.
-
-\bibitem[Srivastava et~al.(2014)Srivastava, Hinton, Krizhevsky, Sutskever, \&
-  Salakhutdinov]{Srivastava2014}
-Srivastava, N., Hinton, G., Krizhevsky, A., Sutskever, I., \& Salakhutdinov,
-  R., 2014.
-\newblock Dropout: A simple way to prevent neural networks from overfitting,
-  {\it J.\ Mach.\ Learn.\ Res.\/}, {\bf 15}, 1929--1958.
 
 \bibitem[Sternberg et~al.(2014)Sternberg, Le~Petit, Roueff, \&
   Le~Bourlot]{Sternberg2014}

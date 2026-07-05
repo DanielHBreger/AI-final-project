@@ -19,8 +19,9 @@ For the face-centred B-field stored as (bxl, bxr, byl, byr, bzl, bzr):
 If the UV field illuminates the cube from a fixed direction (e.g. along +z),
 only operations that keep that axis invariant are physically valid.
 Set SAFE_ONLY = True (default) to restrict to the 8-element subgroup that
-preserves the z-axis:  4 rotations (0°/90°/180°/270° around z) + their
-reflections across the xy-plane.
+keeps +z fixed:  4 rotations (0°/90°/180°/270° around z) + 4 reflections
+across vertical planes containing the z-axis (the group C4v).  Reflections
+across the xy-plane (which would flip z) are excluded.
 Run with SAFE_ONLY = False only if the UV field is assumed isotropic.
 """
 

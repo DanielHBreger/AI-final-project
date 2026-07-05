@@ -43,24 +43,66 @@ apply_journal_style()
 
 # Display names and stable colors/markers per variant (colorblind-safe)
 VARIANT_STYLE = {
-    'xgb_standard':      ('XGBoost',                '#1f77b4', 'o', '--'),
-    'mlp_wide':          ('Wide MLP',               '#ff7f0e', 's', '--'),
-    'xgb_standard_sp':   ('XGBoost + spatial',      '#1f77b4', 'o', '-'),
-    'mlp_wide_sp':       ('MLP + spatial',          '#ff7f0e', 's', '-'),
-    'ens_sp':            ('Equal-weight ensemble',  '#2ca02c', '^', '-'),
-    'stacked_sp':        ('Stacked ensemble',       '#d62728', 'D', '-'),
-    'stacked_sp_cal':    ('Stacked (recalibrated)', '#9467bd', 'v', '-'),
-    'unet_standard':     ('3D U-Net (32 ch.)',      '#8c564b', 'P', ':'),
-    'xgb_standard_sp_w': ('XGBoost + sp. (wght.)',  '#17becf', 'o', ':'),
-    'mlp_wide_sp_w':     ('MLP + sp. (wght.)',      '#bcbd22', 's', ':'),
+    'xgb_standard':           ('XGBoost',                '#1f77b4', 'o', '--'),
+    'mlp_wide':               ('Wide MLP',               '#ff7f0e', 's', '--'),
+    'xgb_standard_sp':        ('XGBoost + spatial',      '#1f77b4', 'o', '-'),
+    'mlp_wide_sp':            ('MLP + spatial',          '#ff7f0e', 's', '-'),
+    'ens_sp':                 ('Equal-weight ensemble',  '#2ca02c', '^', '-'),
+    'stacked_sp':             ('Stacked ensemble',       '#d62728', 'D', '-'),
+    'stacked_sp_cal':         ('Stacked (recalibrated)', '#9467bd', 'v', '-'),
+    'stacked_weighted':       ('Weighted stack',         '#d62728', 'D', '--'),
+    'stacked_weighted_mwcal': ('Weighted stack (mass-recal.)',
+                                                         '#9467bd', 'v', '-'),
+    'unet_standard':          ('3D U-Net (32 ch.)',      '#8c564b', 'P', ':'),
+    'unet_baseline':          ('3D U-Net (32 ch.)',      '#8c564b', 'P', ':'),
+    'unet_large':             ('3D U-Net (64 ch.)',      '#8c564b', 'X', ':'),
+    'xgb_standard_sp_w':      ('XGBoost + sp. (wght.)',  '#17becf', 'o', ':'),
+    'mlp_wide_sp_w':          ('MLP + sp. (wght.)',      '#bcbd22', 's', ':'),
 }
 DEFAULT_VARIANTS = ['xgb_standard', 'mlp_wide', 'xgb_standard_sp',
-                    'mlp_wide_sp', 'ens_sp', 'stacked_sp', 'unet_standard']
+                    'mlp_wide_sp', 'ens_sp', 'stacked_sp', 'unet_standard',
+                    'unet_baseline']
 
 
 def _latest_log() -> str | None:
     logs = sorted(glob.glob('arch_comparison_*.json'))
     return logs[-1] if logs else None
+
+
+def _merge_cnn_log(log: dict, cnn_log_path: str) -> None:
+    """Merge U-Net variants from a cnn_test_*.json into the arch log dict.
+
+    test_cnn.py writes CNN results to a separate JSON with the same
+    folds/metrics structure but no 'skill_vs_xgb' (skill is a cross-model
+    quantity added at comparison level).  Because RMSE is permutation-
+    invariant and both logs evaluate the same native-grid cells, the skill
+    can be computed here from RMSE ratios against the arch log's
+    xgb_standard row — but only when the grid sizes match (a 64³ CNN sees
+    a pooled target field and is not comparable to the native reference).
+    """
+    with open(cnn_log_path) as f:
+        cnn = json.load(f)
+    if cnn.get('g0_values') != log['g0_values']:
+        print(f'  (cnn log skipped: g0_values differ from {cnn_log_path})')
+        return
+    ref = log['variants'].get('xgb_standard')
+    same_grid = cnn.get('grid_size', 128) == 128
+    if not same_grid:
+        print('  (cnn log is 64^3-pooled: skill vs the native XGBoost '
+              'reference not computed)')
+    for name, var in cnn['variants'].items():
+        merged = {'folds': [
+            {'fold': f['fold'], 'g0': f['g0'], 'metrics': dict(f['metrics'])}
+            for f in var['folds']
+        ]}
+        if ref is not None and same_grid:
+            for fm, fr in zip(merged['folds'], ref['folds']):
+                mse_ref = fr['metrics']['RMSE'] ** 2
+                fm['metrics']['skill_vs_xgb'] = \
+                    1.0 - fm['metrics']['RMSE'] ** 2 / mse_ref
+        log['variants'][name] = merged
+        print(f'  Merged {name} from {cnn_log_path} '
+              f'(grid={cnn.get("grid_size", "?")}^3)')
 
 
 def _fold_values(variant: dict, key: str) -> list[float]:
@@ -72,6 +114,11 @@ def main() -> None:
         description='Per-fold model comparison figure from an arch_comparison JSON.')
     parser.add_argument('--log', default=None,
                         help='arch_comparison JSON (default: latest in cwd)')
+    parser.add_argument('--cnn-log', default=None,
+                        help='Optional cnn_test_*.json whose U-Net variants '
+                             'are merged into the comparison (skill vs the '
+                             'arch log\'s xgb_standard is computed from RMSE '
+                             'when both are native 128^3)')
     parser.add_argument('--variants', nargs='+', default=None,
                         help=f'Variants to plot (default: those of '
                              f'{DEFAULT_VARIANTS} present in the log)')
@@ -89,6 +136,9 @@ def main() -> None:
     with open(log_path) as f:
         log = json.load(f)
     print(f'Log: {log_path}')
+
+    if args.cnn_log:
+        _merge_cnn_log(log, args.cnn_log)
 
     g0 = np.array(log['g0_values'], dtype=float)
     wanted = args.variants or DEFAULT_VARIANTS

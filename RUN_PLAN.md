@@ -1,7 +1,7 @@
 # Run plan — regenerating all paper data and figures
 
 Written 2026-07-03, after the metrics overhaul (full metric suite recorded by
-`compute_metrics`: RMSE = bias ⊕ scatter, mass_ratio, frac_01/03/05,
+`compute_metrics`: RMSE = bias + scatter, mass_ratio, frac_01/03/05,
 phase-conditional R²/RMSE/bias, MAE_mw, CCC, W1, skill_vs_xgb) and the figure
 overhaul (fig7/fig8 + two standalone figure scripts). Old JSON logs remain
 *valid* but lack the new metric keys — that is why the reruns are needed.
@@ -68,16 +68,83 @@ overhaul (fig7/fig8 + two standalone figure scripts). Old JSON logs remain
   (RMSE 0.294 best-of-table, mass 0.93–1.07 in all folds, R² 0.985 within
   noise of `stacked_sp_cal`; unweighted `_cal` fixes cell-mean bias but
   overshoots mass down to 0.50–0.89).
-- **Run 2b TODO**: `python -u compare_architectures.py --no-fh2 --log
-  ablation_nofh2_128eval.json > run_nofh2_2b.log` (~1 h). Run 2's
-  ensemble/stacked rows are 64³-pooled (it launched before `_align_preds`;
-  its rows bit-match the 7/1 ablation). Run 2b gives the no-fh2
-  ensemble/stacked/mwcal rows evaluated at native 128³ for a consistent
-  Table 2. Pointwise rows must bit-match run 2.
-- Run 5 note: `predict_and_visualize.py` now applies **mass-weighted**
+- **Run 2b DONE** (2026-07-04) → `ablation_nofh2_128eval.json` (~1 h).
+  All 6 pointwise rows bit-match run 2 on every metric key (determinism
+  verified); ensemble/stacked rows now native 128³ with the full mwcal set.
+  **This is the Table 2 source** (run 2/`ablation_nofh2_spatial.json` are
+  64³-pooled — do not quote their ensemble rows). Headline no-fh2 numbers:
+  `stacked_weighted_mwcal` R² 0.964 ± 0.014, RMSE 0.469, mass 0.93–1.16,
+  R2_mol 0.840, R2_dif 0.744. Ablation cost vs run 1b on the same variant:
+  R² 0.985→0.964, RMSE 0.294→0.469, **R2_mol 0.991→0.840**,
+  bias_mol −0.01→−0.10; degradation is worst at low G0 (g0=0.1 R2_mol 0.70,
+  R2_dif 0.49). Mean-recal pathology is *stronger* without f_H2
+  (stacked_sp_cal mass 0.38–0.63) and the weighted stack now clearly beats
+  the sp stack (mwcal 0.964 vs 0.935) — both reinforce the run-1b headline
+  choice. Details in PAPER_UPDATE_INSTRUCTIONS.md finding 3.
+- **Run 3 DONE** (2026-07-04, ~4.6 h) → `cnn_test_20260704_122206.json`
+  (unet_baseline, native 128³, 150 epochs). **This is the U-Net row of
+  Table 1**: R² 0.970 ± 0.039, RMSE 0.310, skill_vs_xgb +0.48 (computed
+  against run 1b xgb_standard; valid — same native cells). Headline
+  pattern: best-in-table interpolator, worst extrapolator —
+  interior folds (0.2–3.2) R² 0.9946 / RMSE 0.187 (beats the stack's
+  0.9836/0.311); edge folds (0.1, 6.4) R² 0.907 / RMSE 0.618 (stack:
+  0.988/0.253). Mass budget uncontrolled OOD: mass ratio per fold
+  0.81 / 3.9 / 0.94 / 1.8 / 2.8 / 16.7 / **171.6** (clipped values →
+  lower bounds); at G0=6.4 bias_mol +1.09 dex, R2_mol 0.05; at G0=0.1
+  bias −0.63 dex. MAE_mw 0.90 dex vs 0.06 for stacked_weighted_mwcal.
+  Native-vs-64³ sanity: per-fold pattern matches the archived
+  cnn_test_20260323 log (0.970 vs 0.974 mean R²); conclusions unchanged.
+  Checkpoint note (see review): best epochs 61–128/150; final/best
+  val-MSE ratio 1.01–1.14 → best-checkpoint selection on the held-out
+  cube is worth ≤7 % RMSE — quantify this in the disclosure sentence.
+- **Run 4 DONE** (2026-07-04, ~4.5 h) → `cnn_test_20260704_170833.json`
+  (unet_baseline, 11 inputs: log_T + log_G0 + v + B — no chemistry-local
+  inputs — native 128³, 150 epochs). **§5.2 upper-bound source**:
+  R² 0.893 ± 0.088 (archived 64³ number was 0.874 — same story, cite the
+  native value now), RMSE 0.684, scatter 0.610. Reading: dynamics +
+  temperature + UV alone recover ~90 % of log-nH2 variance (morphology),
+  but chemistry precision is gone — R2_mol 0.09 ± 1.18 (negative at both
+  edges: −1.22 at G0=0.1, −2.24 at 6.4), frac_01 0.17, bias_mol −1.08 /
+  +2.14 dex at the edges, mass ratio 0.27–×800 (clipped → lower bound).
+  Same edge collapse as run 3, amplified (edge R² 0.75). Checkpoint gap
+  larger than run 3: final/best val-MSE 1.10–1.25 → ≤ 12 % RMSE (update
+  the disclosure bound to cover both runs). Feature-set caveat: NOT
+  comparable to run 2b's no-fh2 rows (those keep nH/nHp/ext, 14
+  features); comparable only to the archived 11-input 64³ log.
+- **Run 5 DONE** (2026-07-04 22:01–23:50, ~2 h) →
+  `predictions/pred_g0_*_20260704_*.npz` (7 folds, mass recal default,
+  metrics_json uses the new `xgb_sp_w`/`mlp_sp_w` keys). **§5.4 source;
+  closes review items D2 (full schedule) and D3 (recalibration).**
+  Delivered (nested stacked_weighted + mwcal): R² 0.9901 ± 0.0064,
+  RMSE 0.250, bias +0.017, **mass ratio 0.985–1.090 every fold**,
+  R2_mol 0.990, R2_dif 0.905 (worst 0.74 at G0=0.1), frac_01 0.73,
+  W1 0.082, CCC 0.995. Raw stacks over-predict mass ×1.65–1.90 —
+  consistent with both the old §5.4 volumes (×1.63–1.85) and run 1b.
+  Protocol note: these NESTED numbers are *better* than Table 1's
+  shortcut `stacked_weighted_mwcal` row (0.9847/0.294) — mostly because
+  the G0=0.8 fold doesn't dip (0.9866 vs 0.9516); the stricter protocol
+  scoring higher is a good look (disclosure item 7 wording).
+  ⚠ Two stale partial files from 2026-07-03 remain for G0=0.1/0.2 —
+  selectors correctly ignore them (latest-per-G0).
+- **Run 7 DONE** (2026-07-05) — merit_metrics on the run-5 volumes
+  independently confirms the npz metrics: mass 0.985–1.090,
+  R2_mol 0.979–0.994, R2_dif 0.735–0.996, MAE_mw 0.03–0.09. The
+  scientific-merit review's complaints (mass ×1.63–1.85, diffuse R²
+  down to 0.60) are resolved in the delivered volumes.
+- **Figures DONE** (2026-07-05): run 6 (`analysis_output/fig1..fig8`)
+  from the run-5 volumes; `fig_model_comparison.png` (run 1b + run 3 via
+  `--cnn-log`); `fig_feature_importance.png` (run 1b — log_fh2 dominates
+  ≈0.6 local/≈0.85 aggregated, then T/nH/nHp/G0; v and B negligible →
+  closes D4 with the ablation, and predicts run 8's outcome).
+- Run 5 note: `predict_and_visualize.py` applies **mass-weighted**
   recalibration by default (`--recal-mode mass`); the legacy cell-mean
   correction is `--recal-mode mean`, off is `--recal-mode off`. Both fits
   are recorded in each npz regardless of mode.
+- Figure note for `plot_model_comparison.py`: it reads only
+  arch_comparison JSONs, so the U-Net per-fold line (now in a cnn_test
+  JSON) is missing from the replacement for paper Fig 3 — either extend
+  the script with a `--cnn-log` merge option or drop the U-Net line and
+  cite its numbers in Table 1 only.
 
 Notes:
 - Run 6 and 7 automatically pick the **latest** prediction file per G0 and
@@ -93,6 +160,32 @@ Notes:
 |---|---------|------|---------|
 | 8 | `python -u compare_architectures.py --no-vel --no-B --log ablation_novelB_<date>.json > run_novelB.log` | ~2.5 h | Minimal deployable feature set (6 local features). Expected: little accuracy loss → new result + closes review item D4 together with the importance figure |
 | 9 | z-column cumulative-sum features — **code not yet written** (add a cumsum-along-z variant to `model_helpers._compute_spatial_X`, expose as `--spatial-mode zcum` or similar), then one comparison run and one `--no-fh2` run with it | ~0.5 day | Directional (physics-informed) vs isotropic non-locality; strongest candidate headline for the methods contribution |
+
+## Optional runs from the 2026-07-04 design audit (see DESIGN_DECISIONS.md)
+
+| # | Command | Time | Purpose / status |
+|---|---------|------|------------------|
+| 12 | Density-weight α sensitivity: **small code change first** (expose `_compute_weights` α — e.g. `--weight-alpha` in compare_architectures, or a standalone XGB-only sweep script), then α ∈ {10, 100, 1000} on `xgb_standard_sp_w` | ~1 h total (XGB-only) | The weighting is inside the headline model with three untested hyperparameters (p99/p99.99/α=100); a flat response inoculates the reviewer question. DESIGN_DECISIONS §4.1 |
+| 13 | Different-seed test cube — **blocked on data** (request one re-seeded simulation at an existing G0 from the collaborators), then `predict_and_visualize.py` inference on it | inference only, minutes | Highest-value robustness addition: separates G0-difficulty from realization noise; scopes the OOD claim beyond shared initial conditions. DESIGN_DECISIONS §3.2 |
+| 14 | Weighted U-Net (density-weighted CNN loss) — **post-paper / future work** | hours | Removes the mass-budget training asymmetry vs the weighted stack; for this paper a limitation sentence suffices. DESIGN_DECISIONS §4.6 |
+| 15 | Boundary-mode robustness: **small code change first** (`mode` flag on `_compute_spatial_X`), then one `xgb_standard_sp` fold-set with `mode='wrap'` | ~20 min | Only if the sims turn out periodic (see Verification below); quantifies the `reflect` approximation on ~13 % boundary cells. DESIGN_DECISIONS §5.1 |
+
+## Verification items (no compute — ask the simulation collaborators)
+
+Feed the answers into the paper's §2 wording (see PAPER_UPDATE_INSTRUCTIONS
+"Audit-mandated disclosures"):
+
+1. **Boundary conditions** of the MHD cubes (periodic?) → decides whether
+   `reflect`/zero-padding is a disclosed approximation or simply wrong-free,
+   and whether optional run 15 is worth doing. DESIGN_DECISIONS §5.1.
+2. **UV field geometry** (directional along z vs isotropic) → justifies the
+   z-preserving augmentation subgroup wording. DESIGN_DECISIONS §5.2.
+3. **Box metadata** (physical size identical across G0, uniform cell
+   volumes) → underpins the mass_ratio = mass interpretation; same source
+   as review item C3 (physical units). DESIGN_DECISIONS §7.3.
+4. **How f_H2 is computed** in the solver (from H2 column density?) →
+   pins the exact wording of the solver-internal-quantity disclosure.
+   DESIGN_DECISIONS §2.2.
 
 ## Optional reruns (only if the paper should quote new metrics there)
 

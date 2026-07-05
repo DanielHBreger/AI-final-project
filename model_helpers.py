@@ -18,10 +18,16 @@ Contents
   _preds_to_volume     -- reshape flat predictions to 128^3 volume
   fit_g0_bias_correction -- fit per-cube OOF bias vs log10(G0) (mass-budget fix)
   predict_bias         -- evaluate the fitted bias correction at a G0 value
-  _fit_xgb             -- fit XGBoost, return (model, scaler)
+  _fit_xgb             -- fit density-weighted XGBoost (*_sp_w config), return (model, scaler)
   _predict_xgb         -- predict with fitted XGBoost
-  _fit_mlp             -- fit MLP with density weighting, return (model, scaler, device, y_min, y_max)
+  _fit_mlp             -- fit density-weighted MLP (*_sp_w config), return (model, scaler, device, y_min, y_max)
   _predict_mlp         -- predict with fitted MLP (with output clipping)
+
+NOTE: _fit_xgb/_fit_mlp always apply density weighting (_compute_weights),
+so every pipeline built on them (predict_and_visualize,
+single_cube_extrapolation, intra_cube_section) trains the WEIGHTED model
+family — the *_sp_w / stacked_weighted rows of the comparison logs, not
+the unweighted *_sp rows.
 """
 
 import platform
@@ -271,7 +277,8 @@ def mass_weighted_bias(y_pred: np.ndarray, y_true: np.ndarray) -> float:
 
 def _fit_xgb(X_tr: np.ndarray, y_tr: np.ndarray,
              ) -> tuple[xgb.XGBRegressor, StandardScaler]:
-    """Fit XGBoost (xgb_standard + density weighting). Return (model, scaler)."""
+    """Fit XGBoost with density weighting (the *_sp_w config, matching the
+    xgb_standard_sp_w rows of the comparison logs). Return (model, scaler)."""
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     sc = StandardScaler()
     X_s = sc.fit_transform(X_tr)
@@ -290,7 +297,9 @@ def _fit_mlp(X_tr: np.ndarray, y_tr: np.ndarray,
              epochs: int = 100, quiet: bool = False,
              seed: int = 0,
              ) -> tuple[nn.Module, StandardScaler, torch.device, float, float]:
-    """Fit MLP (mlp_wide + density weighting). Return (model, scaler, device, y_min, y_max)."""
+    """Fit MLP with density weighting (the *_sp_w config, matching the
+    mlp_wide_sp_w rows of the comparison logs).
+    Return (model, scaler, device, y_min, y_max)."""
     device  = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     use_amp = device.type == 'cuda'
 
