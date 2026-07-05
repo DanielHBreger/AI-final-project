@@ -4,6 +4,12 @@ test_cnn.py
 Evaluate the current UNet3D (ResConvBlock-based) under leave-one-G0-out CV.
 Runs only CNN variants — use compare_architectures.py for full model comparison.
 
+Checkpoint selection is leakage-free (since 2026-07-05): each fold holds out
+one *training* cube as an inner validation cube (nearest to the test cube in
+log10 G0, ties -> lower G0) and selects the best epoch on it; the test cube
+never influences which checkpoint is evaluated.  Final-epoch (no-selection)
+metrics are recorded alongside as `metrics_final`.
+
 Variants
 --------
   unet_baseline  base_ch=32, dropout=0.0, no warmup  (old hyperparams, new arch)
@@ -91,32 +97,43 @@ CNN_TARGET_COL = LOG_TARGET_COL
 
 # ── Single-fold training ───────────────────────────────────────────────────────
 
-def _run_fold(train_vols: list[dict], val_vols: list[dict],
+def _run_fold(train_vols: list[dict], inner_vols: list[dict],
+              test_vols: list[dict],
               ops: list[np.ndarray], device: torch.device,
               epochs: int, lr: float, base_ch: int,
               input_cols: list[str],
               dropout: float = 0.0,
               warmup_epochs: int = 0,
               seed: int = 0,
-              pool: bool = False) -> tuple[dict, list[dict]]:
-    """Train one CV fold, return (metrics, per-epoch history)."""
+              pool: bool = False) -> tuple[dict, dict, int, list[dict]]:
+    """Train one CV fold, return (metrics_best, metrics_final, best_epoch,
+    per-epoch history).
+
+    The best epoch is selected by MSE on `inner_vols` (a cube excluded from
+    the training set) — the test cube never influences the selection.  Its
+    per-epoch loss is still recorded in the history for auditing, and
+    `metrics_final` reports the no-selection (last-epoch) alternative."""
     torch.manual_seed(seed)
     np.random.seed(seed)
 
     train_ds = CubeDataset(train_vols, ops,      augment=True,
                            input_cols=input_cols, pool=pool)
-    val_ds   = CubeDataset(val_vols,   ops=None, augment=False,
+    inner_ds = CubeDataset(inner_vols, ops=None, augment=False,
+                           input_cols=input_cols, pool=pool)
+    test_ds  = CubeDataset(test_vols,  ops=None, augment=False,
                            input_cols=input_cols, pool=pool)
 
     # Fold-safe normalisation (training stats only), streaming + in place —
     # a full-dataset stack would be a ~6 GB temporary at 128³
-    normalize_channels_inplace(train_ds.xs, val_ds.xs)
-    y_mean, y_std = normalize_targets_inplace(train_ds.ys, val_ds.ys)
+    normalize_channels_inplace(train_ds.xs, inner_ds.xs + test_ds.xs)
+    y_mean, y_std = normalize_targets_inplace(train_ds.ys, inner_ds.ys + test_ds.ys)
 
     pin_mem  = device.type == 'cuda'
     train_dl = DataLoader(train_ds, batch_size=1, shuffle=True,
                           num_workers=0, pin_memory=pin_mem)
-    val_dl   = DataLoader(val_ds,   batch_size=1, shuffle=False,
+    inner_dl = DataLoader(inner_ds, batch_size=1, shuffle=False,
+                          num_workers=0, pin_memory=pin_mem)
+    test_dl  = DataLoader(test_ds,  batch_size=1, shuffle=False,
                           num_workers=0, pin_memory=pin_mem)
 
     model   = UNet3D(n_channels=len(input_cols), base_ch=base_ch, dropout=dropout).to(device)
@@ -132,7 +149,18 @@ def _run_fold(train_vols: list[dict], val_vols: list[dict],
     sched   = torch.optim.lr_scheduler.LambdaLR(opt, _lr_lambda)
     loss_fn = nn.MSELoss()
 
+    def _avg_loss(dl: DataLoader) -> float:
+        model.eval()
+        total = 0.0
+        with torch.no_grad():
+            for xb, yb in dl:
+                xb = xb.to(device, non_blocking=pin_mem)
+                yb = yb.to(device, non_blocking=pin_mem)
+                total += loss_fn(model(xb), yb).item()
+        return total / len(dl)
+
     best_val   = float('inf')
+    best_epoch = 0
     best_state: dict | None = None
     history: list[dict] = []
 
@@ -150,47 +178,81 @@ def _run_fold(train_vols: list[dict], val_vols: list[dict],
         sched.step()
         train_loss /= len(train_dl)
 
-        model.eval()
-        val_loss = 0.0
-        with torch.no_grad():
-            for xb, yb in val_dl:
-                xb, yb = xb.to(device, non_blocking=pin_mem), yb.to(device, non_blocking=pin_mem)
-                val_loss += loss_fn(model(xb), yb).item()
-        val_loss /= len(val_dl)
+        inner_loss = _avg_loss(inner_dl)
+        test_loss  = _avg_loss(test_dl)   # audit only — never used for selection
 
         history.append({'epoch': epoch,
-                        'train_loss': round(float(train_loss), 6),
-                        'val_loss':   round(float(val_loss),   6)})
+                        'train_loss':     round(float(train_loss), 6),
+                        'inner_val_loss': round(float(inner_loss), 6),
+                        'test_loss':      round(float(test_loss),  6)})
 
-        if val_loss < best_val:
-            best_val   = val_loss
+        if inner_loss < best_val:
+            best_val   = inner_loss
+            best_epoch = epoch
             best_state = {k: v.cpu().clone() for k, v in model.state_dict().items()}
 
         if epoch % 10 == 0 or epoch == 1:
             print(f"    epoch {epoch:3d}/{epochs}  "
-                  f"train={train_loss:.4f}  val={val_loss:.4f}")
+                  f"train={train_loss:.4f}  inner={inner_loss:.4f}  "
+                  f"test={test_loss:.4f}")
 
-    # Restore best checkpoint, evaluate in original log_nH2 space
+    # Evaluate on the test cube in original log_nH2 space: final epoch
+    # first (model is already in that state), then the best-inner checkpoint
+    def _predict_test() -> np.ndarray:
+        model.eval()
+        parts = []
+        with torch.no_grad():
+            for xb, _ in test_dl:
+                parts.append(model(xb.to(device)).float().cpu().numpy().ravel())
+        return np.concatenate(parts) * y_std + y_mean
+
+    y_true = np.concatenate([yb.numpy().ravel() for _, yb in test_dl]) * y_std + y_mean
+    y_pred_final = _predict_test()
     model.load_state_dict(best_state)
-    model.eval()
-    y_true_parts, y_pred_parts = [], []
-    with torch.no_grad():
-        for xb, yb in val_dl:
-            y_pred_parts.append(model(xb.to(device)).float().cpu().numpy().ravel())
-            y_true_parts.append(yb.numpy().ravel())
-    y_true = np.concatenate(y_true_parts) * y_std + y_mean
-    y_pred = np.concatenate(y_pred_parts) * y_std + y_mean
+    y_pred_best = _predict_test()
 
-    return compute_metrics(y_true, y_pred), history
+    return (compute_metrics(y_true, y_pred_best),
+            compute_metrics(y_true, y_pred_final),
+            best_epoch, history)
 
 
 # ── Full CV for one variant ────────────────────────────────────────────────────
+
+def pick_inner_val(g0_vals: list[float], test_fold: int,
+                   rule: str = 'nearest') -> int:
+    """Index of the training cube used for checkpoint selection.  Depends
+    only on the G0 labels, never on test-cube data.
+
+    rule='nearest': nearest to the held-out cube in log10(G0) — validation
+      closest to the test distribution, but removes the edge folds' only
+      adjacent cube from training (edge tasks become two-step
+      extrapolation).
+    rule='central': nearest to the median log10(G0) of the six training
+      cubes — validation representative of the training range, preserving
+      the one-step extrapolation geometry at the edge folds.
+
+    Ties -> lower G0 in both rules."""
+    cands = [i for i in range(len(g0_vals)) if i != test_fold]
+    if rule == 'central':
+        logs   = sorted(math.log10(g0_vals[i]) for i in cands)
+        n      = len(logs)
+        target = 0.5 * (logs[(n - 1) // 2] + logs[n // 2])
+    elif rule == 'nearest':
+        target = math.log10(g0_vals[test_fold])
+    else:
+        raise ValueError(f'unknown inner-val rule: {rule!r}')
+    # round the distance so exact log-space ties (the G0 grid is a power
+    # ladder) are broken by the G0 value, not by float rounding noise
+    return min(cands, key=lambda i: (round(abs(math.log10(g0_vals[i]) - target), 9),
+                                     g0_vals[i]))
+
 
 def run_variant(name: str, config: dict,
                 all_vols: list[dict], g0_vals: list[float],
                 ops: list[np.ndarray], device: torch.device,
                 epochs: int, input_cols: list[str],
-                pool: bool = False) -> dict:
+                pool: bool = False,
+                inner_val_rule: str = 'nearest') -> dict:
     base_ch   = config['base_ch']
     dropout   = config.get('dropout', 0.0)
     warmup_ep = config.get('warmup_epochs', 0)
@@ -207,36 +269,48 @@ def run_variant(name: str, config: dict,
     log_folds:   list[dict] = []
 
     for fold in range(len(all_vols)):
-        print(f"\n  [Fold {fold+1}/{len(all_vols)}]  Val G0={g0_vals[fold]:.1f}")
-        train_vols = [v for i, v in enumerate(all_vols) if i != fold]
-        val_vols   = [all_vols[fold]]
+        inner_idx  = pick_inner_val(g0_vals, fold, rule=inner_val_rule)
+        print(f"\n  [Fold {fold+1}/{len(all_vols)}]  Test G0={g0_vals[fold]:.1f}  "
+              f"inner-val G0={g0_vals[inner_idx]:.1f}")
+        train_vols = [v for i, v in enumerate(all_vols)
+                      if i not in (fold, inner_idx)]
+        inner_vols = [all_vols[inner_idx]]
+        test_vols  = [all_vols[fold]]
 
-        metrics, history = _run_fold(
-            train_vols, val_vols, ops, device, epochs, lr, base_ch,
-            input_cols=input_cols, dropout=dropout,
+        metrics, metrics_final, best_epoch, history = _run_fold(
+            train_vols, inner_vols, test_vols, ops, device, epochs, lr,
+            base_ch, input_cols=input_cols, dropout=dropout,
             warmup_epochs=warmup_ep, seed=fold, pool=pool)
 
         fold_metrics.append(metrics)
         log_folds.append({
-            'fold':    fold,
-            'g0':      g0_vals[fold],
-            'metrics': {k: float(v) for k, v in metrics.items()},
-            'history': history,
+            'fold':          fold,
+            'g0':            g0_vals[fold],
+            'inner_val_g0':  g0_vals[inner_idx],
+            'best_epoch':    best_epoch,
+            'metrics':       {k: float(v) for k, v in metrics.items()},
+            'metrics_final': {k: float(v) for k, v in metrics_final.items()},
+            'history':       history,
         })
-        print(f"    R2={metrics['R2']:.4f}  R2_lin={metrics['R2_lin']:.4f}  "
-              f"RMSE={metrics['RMSE']:.4e}  MAE={metrics['MAE']:.4e}")
+        print(f"    best epoch {best_epoch}: R2={metrics['R2']:.4f}  "
+              f"RMSE={metrics['RMSE']:.4e}  "
+              f"(final epoch: R2={metrics_final['R2']:.4f}  "
+              f"RMSE={metrics_final['RMSE']:.4e})")
 
     print_results(name, fold_metrics, g0_vals)
 
-    summary = {}
-    for metric in ('R2', 'R2_lin', 'RMSE', 'MAE'):
-        vals = [m[metric] for m in fold_metrics]
-        summary[metric] = {'mean': float(np.mean(vals)), 'std': float(np.std(vals))}
+    def _summarize(key: str) -> dict:
+        out = {}
+        for metric in ('R2', 'R2_lin', 'RMSE', 'MAE'):
+            vals = [f[key][metric] for f in log_folds]
+            out[metric] = {'mean': float(np.mean(vals)), 'std': float(np.std(vals))}
+        return out
 
     return {
-        'config':  {**config, 'n_params': n_params},
-        'folds':   log_folds,
-        'summary': summary,
+        'config':        {**config, 'n_params': n_params},
+        'folds':         log_folds,
+        'summary':       _summarize('metrics'),
+        'summary_final': _summarize('metrics_final'),
     }
 
 
@@ -259,6 +333,11 @@ def main() -> None:
                         help='Average-pool volumes 128^3 -> 64^3 (legacy '
                              'behaviour for constrained VRAM; default trains '
                              'at native 128^3)')
+    parser.add_argument('--inner-val-rule', choices=['nearest', 'central'],
+                        default='nearest',
+                        help='Which training cube becomes the inner '
+                             'validation cube for checkpoint selection '
+                             '(see pick_inner_val)')
     add_drop_args(parser)
     args = parser.parse_args()
 
@@ -290,7 +369,7 @@ def main() -> None:
         results[name] = run_variant(
             name, CNN_VARIANTS[name], all_vols, g0_vals, ops, device,
             epochs=args.epochs, input_cols=input_cols,
-            pool=args.downsample)
+            pool=args.downsample, inner_val_rule=args.inner_val_rule)
 
     # Final comparison table
     print(f"\n{'Variant':<20}  {'R2 mean':>8}  {'+-':>6}  {'R2_lin mean':>11}  {'MAE mean':>9}")
@@ -307,6 +386,7 @@ def main() -> None:
         'device':     str(device),
         'epochs':     args.epochs,
         'grid_size':  64 if args.downsample else 128,
+        'checkpoint_selection': f'inner_val_{args.inner_val_rule}_log_g0',
         'input_cols': input_cols,
         'g0_values':  g0_vals,
         'variants':   results,

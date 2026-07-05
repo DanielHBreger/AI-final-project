@@ -25,9 +25,9 @@
        three-dimensional interstellar medium simulations
        using multi-scale spatial features}
 
-\author[D.~H.~Breger]{Daniel H.~Breger$^{1}$\thanks{E-mail: danielbreger@campus.technion.ac.il}
+\author[D.~H.~Breger]{Daniel H.~Breger\(^{1}\)\thanks{E-mail: danielbreger@campus.technion.ac.il}
 \\
-$^{1}$Department of Physics, Technion,
+\(^{1}\)Department of Physics, Technion,
 Haifa, Israel}
 
 \date{Accepted XXX. Received YYY; in original form ZZZ}
@@ -42,70 +42,67 @@ Haifa, Israel}
 
 % ============================================================
 \begin{abstract}
-Computing the molecular hydrogen number density $\nHH$ self-consistently
+Computing the molecular hydrogen number density \(\nHH\) self-consistently
 in three-dimensional interstellar-medium (ISM) simulations requires
 solving stiff non-equilibrium chemistry coupled to radiative transfer, a
 cost that limits the resolution and parameter coverage of modern
 calculations. We evaluate machine-learning surrogates that predict
-$\logn$ cell-by-cell on a controlled suite of seven $128^3$ UV-only
-chemistry simulations spanning $\Gzero \in \{0.1, \dots, 6.4\}$ Habing
-(14.7 million cells), under leave-one-$\Gzero$-out cross-validation:
+\(\logn\) cell-by-cell on a controlled suite of seven \(128^3\) UV-only
+chemistry simulations spanning \(\Gzero \in \{0.1, \dots, 6.4\}\) Habing
+(14.7 million cells), under leave-one-\(\Gzero\)-out cross-validation:
 each fold withholds an entire simulation at a UV field strength absent
-from training. Alongside the usual log-space $\Rsq$ we evaluate the
+from training. Alongside the usual log-space \(\Rsq\) we evaluate the
 predictions as physical fields, decomposing the RMSE into bias and
-scatter and tracking the total H$_2$ mass budget and phase-conditional
-accuracy. These metrics expose what $\Rsq$ hides: models within 0.03 of
-each other in $\Rsq$ differ by factors of several in recovered H$_2$
+scatter and tracking the total H\(_2\) mass budget and phase-conditional
+accuracy. These metrics expose what \(\Rsq\) hides: models within 0.03 of
+each other in \(\Rsq\) differ by factors of several in recovered H\(_2\)
 mass. Multi-scale box-filter neighbourhood features (kernel widths 3, 5,
-7 voxels; computed in $\approx$30\,s by separable convolution) reduce
+7 voxels; computed in \(\approx\)30\,s by separable convolution) reduce
 the RMSE of gradient-boosted trees from 0.49 to 0.37\dex{} by acting on
 the scatter term, while a Ridge-stacked tree--MLP ensemble minimises
-squared error at the price of a systematic $+0.3\dex$ offset that
-compounds to a $\times$1.7 mass over-prediction. Density-weighted
+squared error at the price of a systematic \(+0.3\dex\) offset that
+compounds to a \(\times\)1.7 mass over-prediction. Density-weighted
 training and a two-parameter, mass-weighted bias calibration fitted on
 training cubes alone repair the budget: the final pipeline reaches
-RMSE $= 0.25\dex$, $\Rsq = 0.990$, and a total H$_2$ mass within 9 per
-cent of truth on every fold, with molecular-phase $\Rsq = 0.99$.
+RMSE \(= 0.25\dex\), \(\Rsq = 0.990\), and a total H\(_2\) mass within 9 per
+cent of truth on every fold, with molecular-phase \(\Rsq = 0.99\).
 Ablating the solver-provided self-shielding factor costs little in
-aggregate ($\Rsq$ $0.985 \rightarrow 0.964$) but most of the
-molecular-phase fidelity (molecular $\Rsq$ $0.991 \rightarrow 0.840$).
+aggregate (\(\Rsq\) \(0.985 \rightarrow 0.964\)) but most of the
+molecular-phase fidelity (molecular \(\Rsq\) \(0.991 \rightarrow 0.840\)).
 A 3D U-Net trained on the same suite is the best interpolator in the
-comparison (interior-fold $\Rsq = 0.995$, RMSE $0.19\dex$) but collapses
-at both extrapolation boundaries and over-predicts the H$_2$ mass of the
+comparison (interior-fold \(\Rsq = 0.995\), RMSE \(0.19\dex\)) but collapses
+at both extrapolation boundaries and over-predicts the H\(_2\) mass of the
 hardest fold by more than two orders of magnitude, a failure mode the
 global calibration cannot repair. Within-cube sampling experiments --- with cell-local inputs available
 everywhere but labels and neighbourhood context restricted to the
 sample --- show that reconstruction quality is controlled by sampling
 geometry rather than sample volume: 10 per cent uniformly random
 labelled coverage reconstructs the field nearly losslessly, while a
-contiguous half-cube retains $\Rsq = 0.86$ but corrupts the total-mass
+contiguous half-cube retains \(\Rsq = 0.86\) but corrupts the total-mass
 budget by up to two orders of magnitude.
 \end{abstract}
-
 \begin{keywords}
 ISM: molecules -- ISM: clouds -- astrochemistry --
 methods: numerical -- methods: statistical
 \end{keywords}
-
 % ============================================================
 \section{Introduction}
 \label{sec:intro}
-
 The formation of molecular hydrogen on dust-grain surfaces
 \citep{Cazaux2004} and its photodissociation by Lyman--Werner UV photons
 \citep{Habing1968,Draine1996} together determine the molecular content
-of the interstellar medium (ISM). Because H$_2$ is the dominant
+of the interstellar medium (ISM). Because H\(_2\) is the dominant
 molecular reservoir and the direct precursor of CO and the other
 molecular tracers used to infer star-formation rates
-\citep{Narayanan2012}, the H$_2$ abundance sets the initial conditions
+\citep{Narayanan2012}, the H\(_2\) abundance sets the initial conditions
 for the star-formation sequence. Computing it self-consistently within a
 three-dimensional hydrodynamics simulation requires integrating a stiff
 system of non-equilibrium chemistry equations at every grid cell,
-tracking the competition between H$_2$ formation on grain surfaces, UV
+tracking the competition between H\(_2\) formation on grain surfaces, UV
 photodissociation in the Lyman--Werner band (11.2--13.6\,eV), and the
-H$_2$ self-shielding that occurs when H$_2$ columns attenuate their own
+H\(_2\) self-shielding that occurs when H\(_2\) columns attenuate their own
 dissociating radiation \citep{Wolcott-Green2011}. In simulations with
-$10^6$--$10^7$ cells this chemistry solver can dominate the compute
+\(10^6\)--\(10^7\) cells this chemistry solver can dominate the compute
 budget, and covering a wide UV-parameter range at full resolution is
 often infeasible \citep{Grassi2014}.
 
@@ -123,21 +120,21 @@ chemical network onto a learned low-dimensional manifold, and, closest
 to this work, \citet{Branca2024} train DeepONet emulators on KROME
 \citep{Grassi2014} integrations to reproduce the \emph{time evolution}
 of a nine-species ISM photochemistry network at a single point, reaching
-mean relative errors below 3 per cent with a $\sim$128$\times$ speed-up
+mean relative errors below 3 per cent with a \(\sim\)128\(\times\) speed-up
 over the stiff ODE solver. All of these emulators are zero-dimensional:
 they map a local initial state to a local final state and treat every
 cell independently. The present work addresses a complementary question
 that a zero-dimensional emulator cannot: how should a per-cell surrogate
 represent the \emph{non-local} information --- principally UV shielding
 by surrounding gas \citep[cf.][]{Glover2007,Glover2010} --- that couples
-a cell's equilibrium H$_2$ density to its three-dimensional environment,
+a cell's equilibrium H\(_2\) density to its three-dimensional environment,
 and how well do the resulting models generalise to radiation-field
 strengths absent from training?
 
-Three properties of the problem shape the answer. First, $\nHH$ in our
+Three properties of the problem shape the answer. First, \(\nHH\) in our
 simulation suite spans roughly 16 orders of magnitude (from
-$\sim$$10^{-12}$ to $\sim$$10^{4}$\,cm$^{-3}$), so all modelling is done
-in $\log_{10}$ space. Second, the atomic-to-molecular transition is
+\(\sim\)\(10^{-12}\) to \(\sim\)\(10^{4}\)\,cm\(^{-3}\)), so all modelling is done
+in \(\log_{10}\) space. Second, the atomic-to-molecular transition is
 sharp: the equilibrium abundance changes by orders of magnitude across a
 small range of shielding column. Third, and most importantly, a cell's
 chemical state is not a function of its local primitive variables alone;
@@ -158,28 +155,28 @@ averages of all input fields, appended to the per-cell feature vector of
 tabular models (gradient-boosted trees and multilayer perceptrons).
 
 A second theme of the paper is that \emph{how} a surrogate is scored
-determines what one learns about it. A predicted $\nHH$ field is a
+determines what one learns about it. A predicted \(\nHH\) field is a
 physical object: downstream applications integrate it into masses and
 column densities, split it into diffuse and molecular phases, and
 compare its statistics to observations. We therefore evaluate every
-model not only with the log-space $\Rsq$ conventional in this
+model not only with the log-space \(\Rsq\) conventional in this
 literature, but with a metric hierarchy designed around those uses ---
-RMSE decomposed into bias and scatter, the total H$_2$ mass budget,
+RMSE decomposed into bias and scatter, the total H\(_2\) mass budget,
 phase-conditional errors, and distributional distances
 (Section~\ref{sec:metrics}). These metrics change the conclusions: the
-minimum-squared-error ensemble carries a systematic $+0.3\dex$ offset,
-invisible at the precision R$^2$ is usually quoted, that compounds to a
-$\times$1.7 error in total H$_2$ mass. We treat that bias as a
+minimum-squared-error ensemble carries a systematic \(+0.3\dex\) offset,
+invisible at the precision R\(^2\) is usually quoted, that compounds to a
+\(\times\)1.7 error in total H\(_2\) mass. We treat that bias as a
 first-class modelling target, comparing two designed calibration
 functionals --- one that centres the cell-mean log error and one that
 centres the mass budget --- fitted only on training-cube quantities.
 
 This paper makes five contributions. (i) We define a stringent
-out-of-distribution evaluation protocol --- leave-one-$\Gzero$-out
+out-of-distribution evaluation protocol --- leave-one-\(\Gzero\)-out
 cross-validation over a controlled seven-simulation UV-parameter sweep,
-with every model scored on the same native $128^3$ cells --- together
+with every model scored on the same native \(128^3\) cells --- together
 with a physics-weighted metric hierarchy, and show that both are needed:
-random cell-level splits would inflate every conclusion, and $\Rsq$
+random cell-level splits would inflate every conclusion, and \(\Rsq\)
 alone would miss the dominant error mode. (ii) We show that multi-scale
 spatial neighbourhood features deliver a consistent accuracy gain to
 tabular models at negligible cost, and that the gain is purely a
@@ -187,19 +184,19 @@ scatter reduction --- non-local context buys precision, not calibration.
 (iii) We identify the residual bias of the stacked ensemble as a smooth
 function of the UV field strength and repair it with a two-parameter
 calibration fitted on training cubes alone, comparing the cell-mean and
-mass-weighted variants; the final pipeline reaches RMSE $= 0.25\dex$,
-$\Rsq = 0.990$, and a total H$_2$ mass within 9 per cent of truth on
-every fold. (iv) Because one input feature --- the H$_2$ self-shielding
-factor $\fshield$ --- is itself produced by the chemistry solver, we
+mass-weighted variants; the final pipeline reaches RMSE \(= 0.25\dex\),
+\(\Rsq = 0.990\), and a total H\(_2\) mass within 9 per cent of truth on
+every fold. (iv) Because one input feature --- the H\(_2\) self-shielding
+factor \(\fshield\) --- is itself produced by the chemistry solver, we
 quantify the surrogate's dependence on it with a dedicated ablation,
-finding that the aggregate cost is modest ($\Rsq$
-$0.985 \rightarrow 0.964$ for the adopted configuration in the
+finding that the aggregate cost is modest (\(\Rsq\)
+\(0.985 \rightarrow 0.964\) for the adopted configuration in the
 comparison protocol of Table~\ref{tab:fh2}) but that the
-molecular-phase accuracy bears most of it (molecular $\Rsq$
-$0.991 \rightarrow 0.840$). (v) We characterise when the volumetric
+molecular-phase accuracy bears most of it (molecular \(\Rsq\)
+\(0.991 \rightarrow 0.840\)). (v) We characterise when the volumetric
 approach is and is not competitive: the 3D U-Net is the best
 interpolator in the comparison but degrades sharply at both
-extrapolation boundaries, over-predicts the H$_2$ mass of the hardest
+extrapolation boundaries, over-predicts the H\(_2\) mass of the hardest
 fold by more than two orders of magnitude, and is roughly two orders of
 magnitude more expensive to train.
 
@@ -208,9 +205,9 @@ data. Section~\ref{sec:protocol} defines the evaluation protocol,
 metrics, and reproducibility measures. Section~\ref{sec:methods}
 describes the feature engineering, models, and calibration.
 Section~\ref{sec:results} presents the main comparison, the mass-budget
-analysis, the $\fshield$ ablation, the volumetric baseline, and the
+analysis, the \(\fshield\) ablation, the volumetric baseline, and the
 error analysis of the final model. Section~\ref{sec:supp} reports
-supplementary experiments on cross-$\Gzero$ transfer and within-cube
+supplementary experiments on cross-\(\Gzero\) transfer and within-cube
 sampling geometry. Sections~\ref{sec:discussion} and~\ref{sec:conc} give
 the discussion and conclusions.
 
@@ -223,27 +220,27 @@ the discussion and conclusions.
 
 The data set consists of seven three-dimensional uniform-grid
 simulations from a UV-only chemistry suite. Each simulation occupies a
-$128 \times 128 \times 128$ grid of 2,097,152 cells, evolving identical
+\(128 \times 128 \times 128\) grid of 2,097,152 cells, evolving identical
 turbulent ISM initial conditions under a spatially uniform, time-steady
-UV radiation field of strength $\Gzero$ in Habing units
-\citep{Habing1968}. The seven runs differ in their imposed $\Gzero$
+UV radiation field of strength \(\Gzero\) in Habing units
+\citep{Habing1968}. The seven runs differ in their imposed \(\Gzero\)
 alone, sharing the same initial turbulent realisation and grid geometry;
 the suite is a controlled UV-parameter sweep, not a set of independent
 realisations. The evolved snapshots nonetheless differ in their
 hydrodynamic state as well as their chemistry --- the median gas
-temperature rises from $\approx$$1.0\times10^{3}$\,K at $\Gzero = 0.1$
-to $\approx$$1.1\times10^{4}$\,K at $\Gzero = 6.4$ as UV heating
+temperature rises from \(\approx\)\(1.0\times10^{3}\)\,K at \(\Gzero = 0.1\)
+to \(\approx\)\(1.1\times10^{4}\)\,K at \(\Gzero = 6.4\) as UV heating
 strengthens, with corresponding shifts in the density and velocity
 fields --- while the large-scale structure remains strongly correlated
-across the suite. The $\Gzero$
+across the suite. The \(\Gzero\)
 values span a 64-fold range on a geometric sequence,
-$\Gzero \in \{0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 6.4\}$, and the snapshots
+\(\Gzero \in \{0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 6.4\}\), and the snapshots
 represent quasi-equilibrium chemical states. The UV field illuminates
-each cube along the $+z$ axis, which breaks the full octahedral grid
+each cube along the \(+z\) axis, which breaks the full octahedral grid
 symmetry and dictates the augmentation strategy of
 Section~\ref{sec:cnn}. The dominant chemical processes in the suite are
-H$_2$ formation on grain surfaces \citep{Cazaux2004} and Lyman--Werner
-photodissociation \citep{Draine1996} attenuated by H$_2$ self-shielding
+H\(_2\) formation on grain surfaces \citep{Cazaux2004} and Lyman--Werner
+photodissociation \citep{Draine1996} attenuated by H\(_2\) self-shielding
 computed along the illumination axis \citep{Wolcott-Green2011}. The
 total data set contains 14,680,064 cells.
 
@@ -265,17 +262,17 @@ simulations (none directly).
 \label{sec:fields}
 
 Each cell carries 18 raw fields: three integer grid coordinates
-(excluded from model input), the target $\nHH$, and 15 input features
+(excluded from model input), the target \(\nHH\), and 15 input features
 summarised in Table~\ref{tab:features}. Fields spanning many orders of
 magnitude are log-transformed,
 \begin{equation}
   x_\ell = \log_{10}(x + \varepsilon), \qquad \varepsilon = 10^{-30},
   \label{eq:logtransform}
 \end{equation}
-where $\varepsilon$ guards against $\log(0)$ without affecting any
-physically realised value (the smallest non-zero $\nHH$ in the suite is
-$\sim$$5\times10^{-12}$\,cm$^{-3}$ and the smallest $\fshield$ is
-$\sim$$10^{-24}$).
+where \(\varepsilon\) guards against \(\log(0)\) without affecting any
+physically realised value (the smallest non-zero \(\nHH\) in the suite is
+\(\sim\)\(5\times10^{-12}\)\,cm\(^{-3}\) and the smallest \(\fshield\) is
+\(\sim\)\(10^{-24}\)).
 
 \begin{table}
 \centering
@@ -284,7 +281,7 @@ applied before modelling. ``Type'' distinguishes local primitive
 variables, the global run parameter, and non-local quantities.
 ``Deployable'' indicates whether the feature would be directly available
 in a target application where the chemistry solver has not been run;
-the self-shielding factor $\fshield$ is the single problematic input and
+the self-shielding factor \(\fshield\) is the single problematic input and
 is treated by ablation in Section~\ref{sec:ablation_fh2}.}
 \label{tab:features}
 \small
@@ -293,65 +290,65 @@ is treated by ablation in Section~\ref{sec:ablation_fh2}.}
 \hline
 Feature & Units & Transform & Type & Deployable \\
 \hline
-$n_{\mathrm{H}}$       & cm$^{-3}$ & $\log_{10}$ & local & yes \\
-$T$                    & K         & $\log_{10}$ & local & yes \\
-$n_{\mathrm{H^+}}$     & cm$^{-3}$ & $\log_{10}$ & local & yes \\
+\(n_{\mathrm{H}}\)       & cm\(^{-3}\) & \(\log_{10}\) & local & yes \\
+\(T\)                    & K         & \(\log_{10}\) & local & yes \\
+\(n_{\mathrm{H^+}}\)     & cm\(^{-3}\) & \(\log_{10}\) & local & yes \\
 \texttt{ext}           & --        & none        & non-local proxy & yes \\
-$\fshield$             & --        & $\log_{10}$ & non-local, solver & no \\
-$\Gzero$               & Habing    & $\log_{10}$ & global  & yes \\
-$v_x, v_y, v_z$        & code      & none        & local & yes \\
-$B$ (6 face comps.)    & code      & none        & local & yes \\
+\(\fshield\)             & --        & \(\log_{10}\) & non-local, solver & no \\
+\(\Gzero\)               & Habing    & \(\log_{10}\) & global  & yes \\
+\(v_x, v_y, v_z\)        & code      & none        & local & yes \\
+\(B\) (6 face comps.)    & code      & none        & local & yes \\
 \hline
 \end{tabular}
 \end{table}
 
-The H$_2$ self-shielding factor $\fshield$ merits a precise statement.
+The H\(_2\) self-shielding factor \(\fshield\) merits a precise statement.
 It is the attenuation factor applied to the Lyman--Werner
-photodissociation rate, computed by the chemistry solver from the H$_2$
+photodissociation rate, computed by the chemistry solver from the H\(_2\)
 column between each cell and the UV source. It is not algebraically
-derived from the cell's own $\nHH$ --- we verified directly in the data
-that $\fshield$ does not equal the local molecular fraction
-$2\nHH/(n_{\mathrm{H}} + 2\nHH)$ for any cell, and that cells with
-nearly identical local $\nHH$ carry $\fshield$ values differing by
+derived from the cell's own \(\nHH\) --- we verified directly in the data
+that \(\fshield\) does not equal the local molecular fraction
+\(2\nHH/(n_{\mathrm{H}} + 2\nHH)\) for any cell, and that cells with
+nearly identical local \(\nHH\) carry \(\fshield\) values differing by
 orders of magnitude depending on their depth within the cloud --- but as
 a column integral over the very field being predicted it imports
 target information through the solver, and it is an output of the very
 calculation the surrogate aims to replace. In a deployment scenario
-where the solver has not been run, $\fshield$ would have to be
+where the solver has not been run, \(\fshield\) would have to be
 estimated, e.g.\ from a dust-extinction proxy or an approximate
 radiative-transfer sweep. Its contribution to surrogate accuracy is
 therefore quantified separately (Section~\ref{sec:ablation_fh2}) rather
 than assumed, and the configuration without it is the one we consider
 deployable. The dust-extinction proxy \texttt{ext} is also a column-type
-quantity, but unlike $\fshield$ it is computable from the density field
+quantity, but unlike \(\fshield\) it is computable from the density field
 alone without chemical information.
 
 \subsection{Target distribution}
 \label{sec:target}
 
-Figure~\ref{fig:histograms} shows the distribution of $\logn$ across
-$\Gzero$. The target spans $\approx$16 orders of magnitude, from
-$\sim$$10^{-12}$\,cm$^{-3}$ in UV-exposed gas to
-$\sim$$10^{4}$\,cm$^{-3}$ in shielded cores, leaving linear-space
+Figure~\ref{fig:histograms} shows the distribution of \(\logn\) across
+\(\Gzero\). The target spans \(\approx\)16 orders of magnitude, from
+\(\sim\)\(10^{-12}\)\,cm\(^{-3}\) in UV-exposed gas to
+\(\sim\)\(10^{4}\)\,cm\(^{-3}\) in shielded cores, leaving linear-space
 regression severely ill-conditioned and motivating log-space modelling
-throughout. At $\Gzero = 0.1$ the distribution is bimodal --- a
-UV-exposed population near $\logn \approx -10$ and a self-shielded
-molecular population near $\logn \approx 0$ --- and the per-cube mean
-falls from $-3.1$ at $\Gzero = 0.1$ to $-7.2$ at $\Gzero = 6.4$ as
+throughout. At \(\Gzero = 0.1\) the distribution is bimodal --- a
+UV-exposed population near \(\logn \approx -10\) and a self-shielded
+molecular population near \(\logn \approx 0\) --- and the per-cube mean
+falls from \(-3.1\) at \(\Gzero = 0.1\) to \(-7.2\) at \(\Gzero = 6.4\) as
 photodissociation becomes dominant. This strong dependence of the
-marginal target distribution on $\Gzero$ is what makes
-leave-one-$\Gzero$-out evaluation demanding: each held-out cube has a
+marginal target distribution on \(\Gzero\) is what makes
+leave-one-\(\Gzero\)-out evaluation demanding: each held-out cube has a
 target distribution shifted relative to everything seen in training.
 
 \begin{figure*}
 \centering
 \includegraphics[width=\textwidth]{figures/nH2_histograms.png}
-\caption{Distribution of $\logn$ across six UV field strengths. The
-seventh cube, $\Gzero = 0.2$, closely resembles $\Gzero = 0.1$ and is
+\caption{Distribution of \(\logn\) across six UV field strengths. The
+seventh cube, \(\Gzero = 0.2\), closely resembles \(\Gzero = 0.1\) and is
 omitted from this figure only to avoid visual redundancy; it is included
-in all quantitative analyses. The bimodal structure at low $\Gzero$
+in all quantitative analyses. The bimodal structure at low \(\Gzero\)
 (UV-exposed and self-shielded populations) collapses to a single
-UV-dominated mode as $\Gzero$ increases. Dashed lines mark per-cube
+UV-dominated mode as \(\Gzero\) increases. Dashed lines mark per-cube
 means. All modelling is performed in log-space.}
 \label{fig:histograms}
 \end{figure*}
@@ -360,44 +357,44 @@ means. All modelling is performed in log-space.}
 \section{Evaluation protocol}
 \label{sec:protocol}
 
-\subsection{Leave-one-\texorpdfstring{$\Gzero$}{G0}-out cross-validation}
+\subsection{Leave-one-\texorpdfstring{\(\Gzero\)}{G0}-out cross-validation}
 \label{sec:cv}
 
-All headline results use leave-one-$\Gzero$-out seven-fold
+All headline results use leave-one-\(\Gzero\)-out seven-fold
 cross-validation: each fold withholds one entire cube
-($\approx$2.1\,M cells) and trains on the remaining six
-($\approx$12.6\,M cells). Random cell-level splits would place cells
-from every cube --- hence every $\Gzero$ and the single shared
+(\(\approx\)2.1\,M cells) and trains on the remaining six
+(\(\approx\)12.6\,M cells). Random cell-level splits would place cells
+from every cube --- hence every \(\Gzero\) and the single shared
 turbulence realisation --- in both training and test sets; under that
 protocol a pointwise gradient-boosted tree already exceeds
-$\Rsq = 0.99$, telling us nothing about generalisation. The intended
+\(\Rsq = 0.99\), telling us nothing about generalisation. The intended
 application is prediction at a UV field strength that has not been
-simulated, and leave-one-$\Gzero$-out measures exactly that. Every model
+simulated, and leave-one-\(\Gzero\)-out measures exactly that. Every model
 --- tabular and volumetric alike --- is evaluated on the same native
-$128^3$ cells of the held-out cube.
+\(128^3\) cells of the held-out cube.
 
 The two boundary folds require genuine extrapolation: no training data
-exist below $\Gzero = 0.1$ or above $\Gzero = 6.4$. The five interior
+exist below \(\Gzero = 0.1\) or above \(\Gzero = 6.4\). The five interior
 folds require interpolation between bracketing cubes. Empirically, which
 folds are hardest depends on the model family (Table~\ref{tab:main}).
 Gradient-boosted trees lose most accuracy at the upward fold
-($\Gzero = 6.4$): tree leaves are piecewise-constant, so in the
-$\log\Gzero$ coordinate --- the only input that identifies the regime
+(\(\Gzero = 6.4\)): tree leaves are piecewise-constant, so in the
+\(\log\Gzero\) coordinate --- the only input that identifies the regime
 --- their splits saturate at the training range and the model cannot
 extrapolate the trend. The 3D U-Net degrades at both boundaries. The MLP
 and the ensembles built on it are instead weakest at the interior fold
-$\Gzero = 0.8$, showing that $\Gzero$-extrapolation is not the only
+\(\Gzero = 0.8\), showing that \(\Gzero\)-extrapolation is not the only
 failure mode the protocol exposes.
 
 \subsection{Metrics}
 \label{sec:metrics}
 
-A predicted $\nHH$ field feeds downstream uses --- mass budgets, phase
+A predicted \(\nHH\) field feeds downstream uses --- mass budgets, phase
 statistics, synthetic observations --- that are sensitive to different
 error properties, so we score every model with a fixed metric hierarchy
-rather than a single statistic. All metrics are computed in $\logn$
-space over the $128^3$ cells of the held-out cube and aggregated over
-the seven folds as mean $\pm$ fold standard deviation; the seven folds,
+rather than a single statistic. All metrics are computed in \(\logn\)
+space over the \(128^3\) cells of the held-out cube and aggregated over
+the seven folds as mean \(\pm\) fold standard deviation; the seven folds,
 not the 14.7 million cells, are the inferential unit, and model-ranking
 statements are checked for per-fold consistency.
 
@@ -409,17 +406,17 @@ exactly into a systematic and a random part,
   s = \mathrm{std}(\hat{y} - y),
   \label{eq:rmse}
 \end{equation}
-where $b$ is the mean residual (bias) and $s$ the residual scatter; and
-the total H$_2$ mass ratio
+where \(b\) is the mean residual (bias) and \(s\) the residual scatter; and
+the total H\(_2\) mass ratio
 \begin{equation}
   \Mratio = \frac{\sum_i 10^{\hat{y}_i}}{\sum_i 10^{y_i}},
   \label{eq:massratio}
 \end{equation}
 which on a uniform grid with equal cell volumes equals the ratio of
-predicted to true total H$_2$ mass. These two answer the question
+predicted to true total H\(_2\) mass. These two answer the question
 ``can the predicted densities be trusted as physical values?'': a bias
-of $b$ dex that is invisible to variance-normalised statistics
-multiplies the mass budget by up to $10^{b}$.
+of \(b\) dex that is invisible to variance-normalised statistics
+multiplies the mass budget by up to \(10^{b}\).
 
 \emph{Secondary metrics.} The log-space coefficient of determination
 \begin{equation}
@@ -428,19 +425,23 @@ multiplies the mass budget by up to $10^{b}$.
 \end{equation}
 is retained for comparability with the emulator literature, with one
 caveat used throughout: because its denominator is the held-out fold's
-target variance, per-fold $\Rsq$ rewards models that win high-variance
-folds, and model rankings under mean $\Rsq$ can invert relative to
+target variance, per-fold \(\Rsq\) rewards models that win high-variance
+folds, and model rankings under mean \(\Rsq\) can invert relative to
 pooled squared error (Section~\ref{sec:results_main} contains a concrete
 example). We also report the fraction of cells with absolute residual
-below 0.1 and 0.3\dex{} ($f_{0.1}$, $f_{0.3}$); phase-conditional
-$\Rsq$ and bias for the molecular ($y > -4$) and diffuse ($y \le -4$)
+below 0.1 and 0.3\dex{} (\(f_{0.1}\), \(f_{0.3}\)); phase-conditional
+\(\Rsq\) and bias for the molecular (\(y > -4\)) and diffuse (\(y \le -4\))
 populations, the threshold lying in the gap between the two modes of
 Figure~\ref{fig:histograms}; and the mass-weighted mean absolute error
-$\mathrm{MAE_{mw}}$ (weights $\propto 10^{y}$), which measures accuracy
-where the H$_2$ mass resides.
+\(\mathrm{MAE_{mw}}\) (weights \(\propto 10^{y}\)), which measures accuracy
+where the H\(_2\) mass resides. The phase-conditional conclusions do not
+depend on the exact split: moving the threshold anywhere in \([-5, -3]\)
+changes the deployed pipeline's cross-fold molecular-phase \(\Rsq\)
+smoothly and monotonically from 0.976 to 0.995 and its diffuse-phase
+\(\Rsq\) from 0.88 to 0.93, with the per-fold pattern unchanged.
 
-\emph{Supporting metrics.} The 1-D Wasserstein distance $W_1$ (dex)
-between the true and predicted marginal distributions of $\logn$
+\emph{Supporting metrics.} The 1-D Wasserstein distance \(W_1\) (dex)
+between the true and predicted marginal distributions of \(\logn\)
 measures distributional realism independently of per-cell pairing; and a
 skill score
 \begin{equation}
@@ -448,18 +449,18 @@ skill score
   \label{eq:skill}
 \end{equation}
 with the pointwise 15-feature XGBoost model as the reference, replaces
-$\Rsq$'s fold-mean denominator with a meaningful baseline.
+\(\Rsq\)'s fold-mean denominator with a meaningful baseline.
 
 Linear-space quantities require one numerical guard: before
-exponentiation, predictions are clipped to within $1\dex$ of the
+exponentiation, predictions are clipped to within \(1\dex\) of the
 held-out fold's true range, preventing a handful of outlier cells from
-dominating $\Mratio$ (and the linear-space $\Rsq$, which we report only
+dominating \(\Mratio\) (and the linear-space \(\Rsq\), which we report only
 in the field-level analysis of Section~\ref{sec:per_fold}). For the
 well-calibrated tabular models the clip is essentially never active;
-for models that over-predict beyond the clip the reported $\Mratio$ is a
+for models that over-predict beyond the clip the reported \(\Mratio\) is a
 \emph{lower bound} on the violation, and we flag those cases
 explicitly. The MLP's own predictions are additionally clamped to the
-training-target range $\pm 2\dex$ as part of the model definition
+training-target range \(\pm 2\dex\) as part of the model definition
 (Section~\ref{sec:models}); this uses training information only.
 
 \subsection{Reproducibility}
@@ -483,23 +484,23 @@ reproducible on fixed hardware.
 \subsection{Multi-scale spatial neighbourhood features}
 \label{sec:spatial}
 
-The dominant non-local effect on $\nHH$ is UV attenuation by surrounding
+The dominant non-local effect on \(\nHH\) is UV attenuation by surrounding
 gas. To give pointwise models access to spatial context without training
 a volumetric network, we precompute uniform box-filter averages of all
-15 input fields. For each feature $f$ and cube, the tabular values are
-reshaped to a $128^3$ volume and filtered at kernel widths
-$k \in \{3, 5, 7\}$ voxels:
+15 input fields. For each feature \(f\) and cube, the tabular values are
+reshaped to a \(128^3\) volume and filtered at kernel widths
+\(k \in \{3, 5, 7\}\) voxels:
 \begin{equation}
   \bar{f}_{\bm{i},k} = \frac{1}{k^3}
     \sum_{\bm{j} \in \mathcal{N}_k(\bm{i})} f_{\bm{j}},
   \label{eq:boxfilter}
 \end{equation}
-where $\mathcal{N}_k(\bm{i})$ is the $k \times k \times k$ neighbourhood
-centred on $\bm{i}$ (kernel volumes of 27, 125, and 343 voxels);
+where \(\mathcal{N}_k(\bm{i})\) is the \(k \times k \times k\) neighbourhood
+centred on \(\bm{i}\) (kernel volumes of 27, 125, and 343 voxels);
 neighbourhoods are reflected at the box faces. The box
-filter is separable, so the cost is $\mathcal{O}(N)$ per scale
-independent of $k$; computing all 45 filtered fields for all seven cubes
-takes $\approx$30\,s. The filtered values are concatenated with the 15
+filter is separable, so the cost is \(\mathcal{O}(N)\) per scale
+independent of \(k\); computing all 45 filtered fields for all seven cubes
+takes \(\approx\)30\,s. The filtered values are concatenated with the 15
 local features into a 60-dimensional vector:
 \begin{equation}
   \bm{x}_i^{(60)} = \left[
@@ -513,7 +514,7 @@ local features into a 60-dimensional vector:
 Figure~\ref{fig:diagram} contrasts this representation with per-cell
 modelling. Spatial averages of the deployable column-type fields
 (density, extinction) act as crude shielding estimators; this is why the
-spatial features partially substitute for $\fshield$ in the ablation of
+spatial features partially substitute for \(\fshield\) in the ablation of
 Section~\ref{sec:ablation_fh2}.
 
 \begin{figure*}
@@ -523,7 +524,7 @@ Section~\ref{sec:ablation_fh2}.
 the multi-scale spatial neighbourhood representation used here
 (\emph{right}). Note that the 15-feature baseline already includes one
 non-local quantity, the solver-computed self-shielding factor
-$\fshield$; what the spatial features add is explicit neighbourhood
+\(\fshield\); what the spatial features add is explicit neighbourhood
 context for \emph{all} fields, including the solver-independent ones,
 at three nested scales.}
 \label{fig:diagram}
@@ -534,8 +535,8 @@ at three nested scales.}
 
 The cell population is dominated by diffuse gas: at the phase threshold
 of Section~\ref{sec:metrics} the molecular fraction of cells ranges from
-0.8 per cent ($\Gzero = 6.4$) to 68 per cent ($\Gzero = 0.1$), while the
-H$_2$ \emph{mass} resides almost entirely in the densest few per cent of
+0.8 per cent (\(\Gzero = 6.4\)) to 68 per cent (\(\Gzero = 0.1\)), while the
+H\(_2\) \emph{mass} resides almost entirely in the densest few per cent of
 cells. An unweighted log-space loss therefore optimises the diffuse
 majority and treats the mass-carrying tail as an afterthought. As a
 designed counterweight we train each tabular model in two variants:
@@ -546,11 +547,11 @@ unweighted, and with smooth exponential sample weights
      \frac{y - q_{99}}{q_{99.99} - q_{99}}, 0, 1\right),
   \label{eq:weights}
 \end{equation}
-with $\alpha = 100$ and $q_p$ the $p$-th percentile of the training
+with \(\alpha = 100\) and \(q_p\) the \(p\)-th percentile of the training
 targets, normalised to unit mean so the effective learning rate is
-unchanged. The weight rises from $1\times$ at the 99th percentile to
-$100\times$ at the 99.99th: the mass-carrying tail is upweighted without
-destabilising the bulk fit. The percentile anchors and $\alpha$ are a
+unchanged. The weight rises from \(1\times\) at the 99th percentile to
+\(100\times\) at the 99.99th: the mass-carrying tail is upweighted without
+destabilising the bulk fit. The percentile anchors and \(\alpha\) are a
 designed choice, not tuned; their effect is reported in
 Section~\ref{sec:results_main}.
 
@@ -561,22 +562,22 @@ Section~\ref{sec:results_main}.
 We use XGBoost \citep{Chen2016} with the GPU histogram method: 400
 boosting rounds, maximum depth 6, learning rate 0.1, row subsampling
 0.3, column subsampling 0.8. Depth variants 4 and 8 change the mean
-$\Rsq$ by less than 0.003 and were retired. Features are standardised
+\(\Rsq\) by less than 0.003 and were retired. Features are standardised
 per training fold (a no-op for trees in principle; retained for pipeline
 uniformity).
 
 \subsubsection{Wide MLP}
-The multilayer perceptron has hidden widths $[512, 512, 256, 128]$ with
+The multilayer perceptron has hidden widths \([512, 512, 256, 128]\) with
 batch normalisation \citep{Ioffe2015} and ReLU activations, trained with
-Adam \citep{Kingma2015} (learning rate $10^{-3}$, weight decay
-$10^{-5}$), batch size 262,144, 100 epochs per fold, cosine-annealed
+Adam \citep{Kingma2015} (learning rate \(10^{-3}\), weight decay
+\(10^{-5}\)), batch size 262,144, 100 epochs per fold, cosine-annealed
 learning rate, and mixed precision. The full training fold is preloaded
 to GPU memory and batched by on-device permutation. Predictions are
-clipped to the training-target range $\pm 2\dex$: the surrogate is not
+clipped to the training-target range \(\pm 2\dex\): the surrogate is not
 permitted to invent densities far outside the training support (trees
 have this property inherently, their leaf values being bounded by
 training targets). Narrower and residual-block \citep{He2016} variants
-give mean $\Rsq$ within $\sim$0.02 with no consistent ordering across
+give mean \(\Rsq\) within \(\sim\)0.02 with no consistent ordering across
 runs; differences between MLP architectures are comparable to
 seed-to-seed variation.
 
@@ -585,7 +586,7 @@ seed-to-seed variation.
 The volumetric baseline is a 3D U-Net \citep{Ronneberger2015,Cicek2016}
 with three encoder stages, a bottleneck, trilinear-upsampling decoder,
 skip connections, and residual convolution blocks, trained and evaluated
-at the native $128^3$ resolution (peak memory 5.7\,GiB at 32 base
+at the native \(128^3\) resolution (peak memory 5.7\,GiB at 32 base
 channels and batch size 1 on an RTX 3090). Because each training sample
 is one entire volume (batch size 1), instance normalisation
 \citep{Ulyanov2017} replaces batch normalisation; note that instance
@@ -597,14 +598,14 @@ are standardised per fold from training-cube statistics; per-fold target
 standardisation is necessary for stable training because the target mean
 shifts by several dex from fold to fold (Section~\ref{sec:target}) and
 otherwise dominates the loss. Training uses Adam (learning rate
-$5\times10^{-4}$, weight decay $10^{-5}$), gradient-norm clipping at
+\(5\times10^{-4}\), weight decay \(10^{-5}\)), gradient-norm clipping at
 1.0, an unweighted mean-squared-error loss, and 150 epochs per fold.
 
 Two protocol properties of the U-Net favour it relative to the tabular
 models and should be kept in mind when reading its results. First, the
 reported checkpoint is the epoch with the lowest loss on the held-out
 cube --- a model-selection step the fixed-epoch tabular models do not
-get; the per-epoch training histories bound its advantage at $\le$12 per
+get; the per-epoch training histories bound its advantage at \(\le\)12 per
 cent in RMSE (final-epoch versus best-epoch validation loss ratios of
 1.01--1.25 across folds and configurations), so U-Net numbers should be
 read as mild upper bounds. Second, the U-Net output is unbounded ---
@@ -614,13 +615,13 @@ matters for its mass-budget behaviour
 box faces.
 
 Data augmentation respects the broken symmetry of the illuminated cube:
-of the 48 octahedral operations, only the eight $z$-preserving ones
-(rotations about $z$ and reflections through planes containing $z$) are
+of the 48 octahedral operations, only the eight \(z\)-preserving ones
+(rotations about \(z\) and reflections through planes containing \(z\)) are
 physically valid. Scalars transform by index permutation, velocities as
 polar vectors, and the face-centred magnetic field components as axial
 vectors with the appropriate face swaps. Using all 48 operations
 injects unphysical samples and degrades validation accuracy. Each fold
-therefore trains on $6 \times 8 = 48$ augmented volumes; the held-out
+therefore trains on \(6 \times 8 = 48\) augmented volumes; the held-out
 cube is never augmented.
 
 \subsection{Ensembles and bias calibration}
@@ -628,12 +629,12 @@ cube is never augmented.
 
 Two ensembles combine the spatial-feature XGBoost and MLP. The
 \emph{equal-weight ensemble} averages their per-cell predictions. The
-\emph{Ridge-stacked ensemble} fits a Ridge regression ($\alpha = 1$)
+\emph{Ridge-stacked ensemble} fits a Ridge regression (\(\alpha = 1\))
 meta-learner on out-of-fold (OOF) predictions of the training cubes and
 applies it to the held-out cube. In the model-comparison experiments the
 OOF predictions are reused from the outer cross-validation --- the
 standard stacking shortcut, in which the base models that generate cube
-$j$'s meta-training predictions were themselves trained with the
+\(j\)'s meta-training predictions were themselves trained with the
 held-out cube in their training set; with a two-coefficient meta-learner
 the indirect effect is small, but we do not describe those rows as fully
 nested. The deployed pipeline of Section~\ref{sec:per_fold} instead uses
@@ -650,11 +651,11 @@ pair (Section~\ref{sec:weighting}) are stacked, giving two stack
 families.
 
 \emph{Bias calibration.} The stacked predictions minimise squared error
-but are not guaranteed unbiased on a held-out $\Gzero$, and
+but are not guaranteed unbiased on a held-out \(\Gzero\), and
 Section~\ref{sec:massbudget} shows they are not. As a designed audit
 step we therefore fit, for each held-out fold, the per-training-cube OOF
-residual of the stacked model against $\log_{10}\Gzero$ by two-parameter
-least squares, and subtract the fitted value at the held-out $\Gzero$
+residual of the stacked model against \(\log_{10}\Gzero\) by two-parameter
+least squares, and subtract the fitted value at the held-out \(\Gzero\)
 from the predictions. Only training-cube quantities enter the fit; the
 correction is a genuine out-of-sample prediction of the bias. The
 residual functional can be chosen in two ways, and the choice is a
@@ -663,12 +664,12 @@ methodological decision we evaluate explicitly:
 \item \emph{mean calibration} centres the unweighted per-cube mean log
   residual --- the natural choice if all cells matter equally;
 \item \emph{mass calibration} centres the mass-weighted mean residual
-  $b_M = \sum_i 10^{y_i}(\hat{y}_i - y_i) / \sum_i 10^{y_i}$
+  \(b_M = \sum_i 10^{y_i}(\hat{y}_i - y_i) / \sum_i 10^{y_i}\)
   (per training cube), the constant-offset correction that
-  approximately centres the predicted \emph{total H$_2$ mass}, since
+  approximately centres the predicted \emph{total H\(_2\) mass}, since
   the same dense cells dominate both the weights and the mass budget.
   Exact per-cube mass closure would instead subtract the log mass
-  ratio $\log_{10}(\sum_i 10^{\hat{y}_i} / \sum_i 10^{y_i})$; the two
+  ratio \(\log_{10}(\sum_i 10^{\hat{y}_i} / \sum_i 10^{y_i})\); the two
   functionals coincide to first order in the residuals, and the
   approximation is validated out of sample by the deployed pipeline's
   fold mass ratios of 0.985--1.090 (Section~\ref{sec:per_fold}).
@@ -687,7 +688,7 @@ reported raw, mean-calibrated, and mass-calibrated.
 \label{sec:results_main}
 
 Tables~\ref{tab:main} and~\ref{tab:summary} report the
-leave-one-$\Gzero$-out performance of all models on the full 15-feature
+leave-one-\(\Gzero\)-out performance of all models on the full 15-feature
 input set (plus 45 spatial features where indicated), and
 Figure~\ref{fig:modelcomp} shows the per-fold behaviour. The progression
 through the model families cleanly separates \emph{what each ingredient
@@ -698,31 +699,31 @@ features reduces XGBoost's RMSE from 0.49 to 0.37\dex{} and the MLP's
 from 0.52 to 0.32\dex, and the improvement is almost entirely in the
 scatter term of equation~(\ref{eq:rmse}): XGBoost's residual scatter
 falls from 0.36 to 0.25\dex{} and the MLP's from 0.46 to 0.29\dex,
-while the bias terms move by $\la 0.1\dex$. Non-local context sharpens
+while the bias terms move by \(\la 0.1\dex\). Non-local context sharpens
 the prediction; it does not recalibrate it.
 
 \emph{Density weighting buys the mass budget --- for free.} The weighted
 tree variant is statistically indistinguishable from the unweighted one
-in $\Rsq$ (0.963 in both cases; per-fold values agree to $\pm 0.0003$)
+in \(\Rsq\) (0.963 in both cases; per-fold values agree to \(\pm 0.0003\))
 yet its fold mass ratios move from 0.47--0.93 to 0.89--1.03: upweighting
 the mass-carrying tail fixes \emph{where} the model is accurate without
 degrading the bulk statistics. The weighted MLP behaves the same way
 (mass ratios 0.92--1.03, versus 0.94--1.16 unweighted, with
-$\mathrm{MAE_{mw}}$ halved from 0.095 to 0.050\dex).
+\(\mathrm{MAE_{mw}}\) halved from 0.095 to 0.050\dex).
 
 \emph{Stacking buys squared error and exposes a bias.} The Ridge stacks
-have the lowest scatter in the comparison ($s = 0.25$--0.26\dex) but
-carry a systematic $+0.32\dex$ mean offset on the held-out cubes ---
+have the lowest scatter in the comparison (\(s = 0.25\)--0.26\dex) but
+carry a systematic \(+0.32\dex\) mean offset on the held-out cubes ---
 the meta-learner's intercept zeroes the residual on the pooled training
-folds, not on an unseen $\Gzero$. Section~\ref{sec:massbudget} treats
+folds, not on an unseen \(\Gzero\). Section~\ref{sec:massbudget} treats
 this bias and its repair. After mass calibration the weighted stack is
-the best model in the comparison: RMSE $= 0.294\dex$ (the lowest of all
-17 evaluated variants), $\Rsq = 0.985 \pm 0.015$, mass ratios
-0.93--1.07 in every fold, molecular-phase $\Rsq = 0.991$, and skill
-$+0.55$ against the pointwise-XGBoost reference. We adopt it as the
+the best model in the comparison: RMSE \(= 0.294\dex\) (the lowest of all
+17 evaluated variants), \(\Rsq = 0.985 \pm 0.015\), mass ratios
+0.93--1.07 in every fold, molecular-phase \(\Rsq = 0.991\), and skill
+\(+0.55\) against the pointwise-XGBoost reference. We adopt it as the
 final model. Two caveats attend this selection. With 17 variants,
 seven folds, and several metrics, differences of
-$\la 0.01$ in mean $\Rsq$ or $\la 0.02\dex$ in RMSE lie within
+\(\la 0.01\) in mean \(\Rsq\) or \(\la 0.02\dex\) in RMSE lie within
 fold-to-fold noise --- on RMSE the adopted model beats its
 mean-calibrated counterpart in only 3 of 7 folds. The adoption
 therefore rests on the criteria where the separations are large and
@@ -733,35 +734,35 @@ against the mean-calibrated variant (ranges 0.93--1.07 versus
 
 Two methodological observations from Table~\ref{tab:summary} are worth
 recording because they generalise beyond this data set. First, the
-$\Rsq$ caveat of Section~\ref{sec:metrics} is not hypothetical: the
-pointwise MLP \emph{beats} pointwise XGBoost on mean $\Rsq$ (0.958
+\(\Rsq\) caveat of Section~\ref{sec:metrics} is not hypothetical: the
+pointwise MLP \emph{beats} pointwise XGBoost on mean \(\Rsq\) (0.958
 versus 0.950) while its pooled squared error is 18 per cent \emph{worse}
-(skill $-0.18$) --- the MLP wins the high-variance low-$\Gzero$ folds,
-which mean $\Rsq$ rewards. Second, $W_1$ and the threshold fractions
+(skill \(-0.18\)) --- the MLP wins the high-variance low-\(\Gzero\) folds,
+which mean \(\Rsq\) rewards. Second, \(W_1\) and the threshold fractions
 expose a family difference that error moments hide: the trees are
 moderately wrong almost everywhere (compressed predicted distribution;
-$f_{0.3} = 0.50$, $W_1 = 0.30$), whereas the MLP is nearly right for
-most cells with a heavy error tail ($f_{0.3} = 0.73$, $W_1 = 0.22$,
+\(f_{0.3} = 0.50\), \(W_1 = 0.30\)), whereas the MLP is nearly right for
+most cells with a heavy error tail (\(f_{0.3} = 0.73\), \(W_1 = 0.22\),
 despite the larger RMSE). The best marginal realism in the table belongs
-to the weighted spatial MLP ($W_1 = 0.109$), slightly better than the
+to the weighted spatial MLP (\(W_1 = 0.109\)), slightly better than the
 stacks --- Ridge averaging narrows the predicted distribution --- which
 matters for applications that need statistically realistic fields
 rather than minimum per-cell error (Section~\ref{sec:discussion}).
 The deployed nested pipeline recovers what the shortcut stacks lose
-here, reaching a mean $W_1$ of $0.08\dex$
+here, reaching a mean \(W_1\) of \(0.08\dex\)
 (Section~\ref{sec:per_fold}).
 
 \begin{table*}
 \centering
-\caption{Leave-one-$\Gzero$-out log-space $\Rsq$ per held-out fold for
-all evaluated models, on the same native $128^3$ cells. ``+S'' appends
+\caption{Leave-one-\(\Gzero\)-out log-space \(\Rsq\) per held-out fold for
+all evaluated models, on the same native \(128^3\) cells. ``+S'' appends
 the 45 multi-scale spatial features (Section~\ref{sec:spatial}); ``+W''
 uses density-weighted training (Section~\ref{sec:weighting}). Stack
 rows give the Ridge-stacked ensemble of the indicated base pair, raw and
 with the two bias calibrations of Section~\ref{sec:ensemble}. The
 best value in each column is bold. Tabular rows are from the master
 comparison log; the U-Net row is its best configuration (32 base
-channels, 150 epochs, no dropout) trained at native $128^3$. The final
+channels, 150 epochs, no dropout) trained at native \(128^3\). The final
 row, set off by a rule, is the deployed fully nested pipeline of
 Section~\ref{sec:per_fold}; it is excluded from the per-column
 bolding, which compares rows under the shared CV-OOF stacking protocol
@@ -769,9 +770,9 @@ of Section~\ref{sec:ensemble}.}
 \label{tab:main}
 \begin{tabular}{lccccccccc}
 \hline
-Model & Mean $\Rsq$ & $\sigma$ &
-  $\Gzero{=}0.1$ & $\Gzero{=}0.2$ & $\Gzero{=}0.4$ &
-  $\Gzero{=}0.8$ & $\Gzero{=}1.6$ & $\Gzero{=}3.2$ & $\Gzero{=}6.4$ \\
+Model & Mean \(\Rsq\) & \(\sigma\) &
+  \(\Gzero{=}0.1\) & \(\Gzero{=}0.2\) & \(\Gzero{=}0.4\) &
+  \(\Gzero{=}0.8\) & \(\Gzero{=}1.6\) & \(\Gzero{=}3.2\) & \(\Gzero{=}6.4\) \\
 \hline
 XGBoost                    & 0.950 & 0.029 & 0.956 & 0.949 & 0.972 & 0.972 & 0.969 & 0.951 & 0.883 \\
 Wide MLP                   & 0.958 & 0.028 & 0.927 & 0.947 & 0.924 & 0.940 & 0.986 & 0.992 & 0.992 \\
@@ -796,40 +797,40 @@ Deployed stack (+S+W), nested, mass-cal. & 0.990 & 0.006 & 0.977 & 0.988 & 0.990
 \begin{table*}
 \centering
 \caption{Physical-field metrics for the models of Table~\ref{tab:main}
-(cross-fold means; mass ratio $\Mratio$ as the min--max range over
-folds). RMSE decomposes as $\mathrm{RMSE}^2 = b^2 + s^2$
-(equation~\ref{eq:rmse}); $\Rsq_{\mathrm{mol}}$/$\Rsq_{\mathrm{dif}}$
-are phase-conditional at $\logn = -4$; $f_{0.1}$ is the fraction of
-cells within 0.1\dex; $W_1$ the Wasserstein distance between marginals;
+(cross-fold means; mass ratio \(\Mratio\) as the min--max range over
+folds). RMSE decomposes as \(\mathrm{RMSE}^2 = b^2 + s^2\)
+(equation~\ref{eq:rmse}); \(\Rsq_{\mathrm{mol}}\)/\(\Rsq_{\mathrm{dif}}\)
+are phase-conditional at \(\logn = -4\); \(f_{0.1}\) is the fraction of
+cells within 0.1\dex; \(W_1\) the Wasserstein distance between marginals;
 skill is measured against the pointwise XGBoost row
-(equation~\ref{eq:skill}). $^\dagger$The U-Net's mass range is a lower
-bound on its violation (predictions clipped at truth $+1\dex$;
+(equation~\ref{eq:skill}). \(^\dagger\)The U-Net's mass range is a lower
+bound on its violation (predictions clipped at truth \(+1\dex\);
 Section~\ref{sec:metrics}).
 The final row, set off by a rule, is the deployed fully nested pipeline
 of Section~\ref{sec:per_fold}, for which the clip is never active.}
 \label{tab:summary}
 \begin{tabular}{lccccccccc}
 \hline
-Model & RMSE & bias $b$ & scatter $s$ & $\Mratio$ (range) &
-  $\Rsq_{\mathrm{mol}}$ & $\Rsq_{\mathrm{dif}}$ & $f_{0.1}$ & $W_1$ & skill \\
+Model & RMSE & bias \(b\) & scatter \(s\) & \(\Mratio\) (range) &
+  \(\Rsq_{\mathrm{mol}}\) & \(\Rsq_{\mathrm{dif}}\) & \(f_{0.1}\) & \(W_1\) & skill \\
  & (dex) & (dex) & (dex) & & & & & (dex) & \\
 \hline
-XGBoost                    & 0.486 & $+0.24$ & 0.36 & 0.51--0.90 & 0.978 & 0.68 & 0.20 & 0.30 & $0.00$ \\
-Wide MLP                   & 0.518 & $+0.21$ & 0.46 & 1.00--2.59 & 0.981 & 0.57 & 0.56 & 0.22 & $-0.18$ \\
-XGBoost +S                 & 0.374 & $+0.20$ & 0.25 & 0.47--0.93 & 0.988 & 0.81 & 0.21 & 0.25 & $+0.32$ \\
-Wide MLP +S                & 0.322 & $+0.11$ & 0.29 & 0.94--1.16 & 0.989 & 0.83 & 0.69 & 0.11 & $+0.46$ \\
-XGBoost +S+W               & 0.374 & $+0.20$ & 0.25 & 0.89--1.03 & 0.989 & 0.81 & 0.21 & 0.25 & $+0.32$ \\
-Wide MLP +S+W              & 0.329 & $+0.10$ & 0.30 & 0.92--1.03 & 0.989 & 0.82 & 0.70 & 0.11 & $+0.41$ \\
-Equal-weight ensemble (+S) & 0.314 & $+0.15$ & 0.24 & 0.61--0.92 & 0.992 & 0.86 & 0.26 & 0.18 & $+0.55$ \\
-Stack (+S), raw            & 0.424 & $+0.32$ & 0.25 & 1.08--1.65 & 0.955 & 0.76 & 0.03 & 0.33 & $+0.10$ \\
-Stack (+S), mean-cal.      & 0.295 & $-0.01$ & 0.25 & 0.50--0.81 & 0.981 & 0.87 & 0.51 & 0.15 & $+0.60$ \\
-Stack (+S), mass-cal.      & 0.359 & $+0.20$ & 0.25 & 0.92--1.22 & 0.982 & 0.82 & 0.20 & 0.23 & $+0.35$ \\
-Stack (+S+W), raw          & 0.433 & $+0.32$ & 0.26 & 1.65--1.84 & 0.955 & 0.74 & 0.03 & 0.33 & $+0.02$ \\
-Stack (+S+W), mean-cal.    & 0.301 & $-0.01$ & 0.26 & 0.71--0.89 & 0.981 & 0.86 & 0.52 & 0.16 & $+0.57$ \\
-Stack (+S+W), mass-cal.    & 0.294 & $+0.09$ & 0.26 & 0.93--1.07 & 0.991 & 0.86 & 0.68 & 0.13 & $+0.55$ \\
-3D U-Net (32 ch.)          & 0.310 & $-0.06$ & 0.26 & 0.81--172$^\dagger$ & 0.79 & 0.83 & 0.51 & 0.17 & $+0.48$ \\
+XGBoost                    & 0.486 & \(+0.24\) & 0.36 & 0.51--0.90 & 0.978 & 0.68 & 0.20 & 0.30 & \(0.00\) \\
+Wide MLP                   & 0.518 & \(+0.21\) & 0.46 & 1.00--2.59 & 0.981 & 0.57 & 0.56 & 0.22 & \(-0.18\) \\
+XGBoost +S                 & 0.374 & \(+0.20\) & 0.25 & 0.47--0.93 & 0.988 & 0.81 & 0.21 & 0.25 & \(+0.32\) \\
+Wide MLP +S                & 0.322 & \(+0.11\) & 0.29 & 0.94--1.16 & 0.989 & 0.83 & 0.69 & 0.11 & \(+0.46\) \\
+XGBoost +S+W               & 0.374 & \(+0.20\) & 0.25 & 0.89--1.03 & 0.989 & 0.81 & 0.21 & 0.25 & \(+0.32\) \\
+Wide MLP +S+W              & 0.329 & \(+0.10\) & 0.30 & 0.92--1.03 & 0.989 & 0.82 & 0.70 & 0.11 & \(+0.41\) \\
+Equal-weight ensemble (+S) & 0.314 & \(+0.15\) & 0.24 & 0.61--0.92 & 0.992 & 0.86 & 0.26 & 0.18 & \(+0.55\) \\
+Stack (+S), raw            & 0.424 & \(+0.32\) & 0.25 & 1.08--1.65 & 0.955 & 0.76 & 0.03 & 0.33 & \(+0.10\) \\
+Stack (+S), mean-cal.      & 0.295 & \(-0.01\) & 0.25 & 0.50--0.81 & 0.981 & 0.87 & 0.51 & 0.15 & \(+0.60\) \\
+Stack (+S), mass-cal.      & 0.359 & \(+0.20\) & 0.25 & 0.92--1.22 & 0.982 & 0.82 & 0.20 & 0.23 & \(+0.35\) \\
+Stack (+S+W), raw          & 0.433 & \(+0.32\) & 0.26 & 1.65--1.84 & 0.955 & 0.74 & 0.03 & 0.33 & \(+0.02\) \\
+Stack (+S+W), mean-cal.    & 0.301 & \(-0.01\) & 0.26 & 0.71--0.89 & 0.981 & 0.86 & 0.52 & 0.16 & \(+0.57\) \\
+Stack (+S+W), mass-cal.    & 0.294 & \(+0.09\) & 0.26 & 0.93--1.07 & 0.991 & 0.86 & 0.68 & 0.13 & \(+0.55\) \\
+3D U-Net (32 ch.)          & 0.310 & \(-0.06\) & 0.26 & 0.81--172\(^\dagger\) & 0.79 & 0.83 & 0.51 & 0.17 & \(+0.48\) \\
 \hline
-Deployed stack (+S+W), nested, mass-cal. & 0.250 & $+0.02$ & 0.24 & 0.99--1.09 & 0.990 & 0.90 & 0.73 & 0.08 & $+0.74$ \\
+Deployed stack (+S+W), nested, mass-cal. & 0.250 & \(+0.02\) & 0.24 & 0.99--1.09 & 0.990 & 0.90 & 0.73 & 0.08 & \(+0.74\) \\
 \hline
 \end{tabular}
 \end{table*}
@@ -838,50 +839,50 @@ Deployed stack (+S+W), nested, mass-cal. & 0.250 & $+0.02$ & 0.24 & 0.99--1.09 &
 \centering
 \includegraphics[width=\textwidth]{figures/fig_model_comparison.png}
 \caption{Per-fold behaviour of representative models across the
-$\Gzero$ sweep: log-space $\Rsq$ (\emph{a}), RMSE (\emph{b}), and skill
+\(\Gzero\) sweep: log-space \(\Rsq\) (\emph{a}), RMSE (\emph{b}), and skill
 against the pointwise XGBoost baseline (\emph{c}). Grey bands mark the
 two extrapolation folds. The 3D U-Net (dotted) is the most accurate
 model on the interior folds and the least robust at both boundaries;
 the mass-calibrated weighted stack (purple) is the only model that
 remains strong across the entire range. XGBoost's decline with
-increasing $\Gzero$ reflects constant-valued tree extrapolation in the
-$\log\Gzero$ coordinate (Section~\ref{sec:cv}).}
+increasing \(\Gzero\) reflects constant-valued tree extrapolation in the
+\(\log\Gzero\) coordinate (Section~\ref{sec:cv}).}
 \label{fig:modelcomp}
 \end{figure*}
 
-\subsection{The H\texorpdfstring{$_2$}{2} mass budget and bias calibration}
+\subsection{The H\texorpdfstring{\(_2\)}{2} mass budget and bias calibration}
 \label{sec:massbudget}
 
 The raw stacks illustrate why the mass budget is a primary metric. Their
-mean residual on held-out cubes is $+0.32\dex$ --- a factor of two in
+mean residual on held-out cubes is \(+0.32\dex\) --- a factor of two in
 density --- and the corresponding fold mass ratios are 1.08--1.65
 (unweighted stack) and 1.65--1.84 (weighted stack): the
-minimum-squared-error combination over-predicts the total H$_2$ mass of
-an unseen cube by up to 80 per cent while scoring $\Rsq > 0.95$
-throughout. The offset varies smoothly with the held-out $\Gzero$,
+minimum-squared-error combination over-predicts the total H\(_2\) mass of
+an unseen cube by up to 80 per cent while scoring \(\Rsq > 0.91\) in
+every fold. The offset varies smoothly with the held-out \(\Gzero\),
 which is exactly the structure the two-parameter calibration of
 Section~\ref{sec:ensemble} is designed to remove; the fitted corrections
-are $+0.2$ to $+0.4\dex$ depending on fold and functional.
+are \(+0.2\) to \(+0.4\dex\) depending on fold and functional.
 
 The choice of residual functional matters, and
 Table~\ref{tab:summary} quantifies the designed comparison.
 \emph{Mean} calibration centres the cell-mean bias essentially perfectly
-($b = -0.01\dex$) and delivers the best skill ($+0.60$) --- but
+(\(b = -0.01\dex\)) and delivers the best skill (\(+0.60\)) --- but
 \emph{overshoots} the mass budget, dragging the fold mass ratios down to
 0.50--0.81 for the unweighted stack: the cell-mean offset is set by the
 diffuse majority and is larger than the mass-weighted offset, so
 subtracting it pushes the dense cells too low. \emph{Mass} calibration
-centres the budget ($\Mratio = 0.93$--1.07 for the weighted stack) at
-the cost of a $+0.09\dex$ residual cell-mean bias carried by the diffuse
+centres the budget (\(\Mratio = 0.93\)--1.07 for the weighted stack) at
+the cost of a \(+0.09\dex\) residual cell-mean bias carried by the diffuse
 population. The two functionals differ because the stacks' residual
 error is density-dependent --- a compression-to-the-mean pattern in
 which dense cells are under-predicted relative to diffuse ones --- and
 the 0.1--0.15\dex{} gap between the fitted offsets measures that
 dependence directly. The two-parameter fit itself is stable: refitting
 with each of the six training cubes removed in turn moves the applied
-offset of the deployed pipeline by at most $0.04\dex$ (equivalently
-$\la$10 per cent in mass), the maximum occurring at the two boundary
-folds, where the fit extrapolates in $\log\Gzero$.
+offset of the deployed pipeline by at most \(0.04\dex\) (equivalently
+\(\la\)10 per cent in mass), the maximum occurring at the two boundary
+folds, where the fit extrapolates in \(\log\Gzero\).
 Under the primary-metric hierarchy (RMSE and mass
 budget) the mass-calibrated weighted stack is the best configuration;
 applications that weight all cells equally may prefer the
@@ -895,13 +896,13 @@ picture holds fold by fold.
 \includegraphics[width=\textwidth]{figures/fig7_massbudget.png}
 \caption{Mass budget and phase-conditional accuracy of the deployed
 (fully nested) pipeline of Section~\ref{sec:per_fold}.
-\emph{(a)} Total H$_2$ mass ratio per held-out fold: the raw stack
-(grey) over-predicts by $\times$1.65--1.90 at every $\Gzero$; the
+\emph{(a)} Total H\(_2\) mass ratio per held-out fold: the raw stack
+(grey) over-predicts by \(\times\)1.65--1.90 at every \(\Gzero\); the
 mass-calibrated prediction (red) is within 9 per cent of the true mass
 in every fold. \emph{(b)} Cell-mean log residual: the calibration also
-removes most of the mean bias. \emph{(c)} Phase-conditional $\Rsq$:
-molecular-phase accuracy is uniformly high ($\Rsq \ge 0.98$); the
-diffuse phase is hardest at low $\Gzero$, where UV-exposed gas spans
+removes most of the mean bias. \emph{(c)} Phase-conditional \(\Rsq\):
+molecular-phase accuracy is uniformly high (\(\Rsq \ge 0.98\)); the
+diffuse phase is hardest at low \(\Gzero\), where UV-exposed gas spans
 the steep transition.}
 \label{fig:massbudget}
 \end{figure*}
@@ -909,72 +910,72 @@ the steep transition.}
 \subsection{Dependence on the self-shielding factor}
 \label{sec:ablation_fh2}
 
-Because $\fshield$ is produced by the solver the surrogate aims to
-replace, Table~\ref{tab:fh2} repeats the comparison with $\fshield$
+Because \(\fshield\) is produced by the solver the surrogate aims to
+replace, Table~\ref{tab:fh2} repeats the comparison with \(\fshield\)
 excluded from both the local features and the spatial averages (14
 local + 42 spatial features). In aggregate the surrogate degrades
-gracefully: the pointwise trees lose 0.039 in mean $\Rsq$
-(0.950 $\rightarrow$ 0.911), the pointwise MLP 0.049
-(0.958 $\rightarrow$ 0.909), the spatial variants roughly half as much
+gracefully: the pointwise trees lose 0.039 in mean \(\Rsq\)
+(0.950 \(\rightarrow\) 0.911), the pointwise MLP 0.049
+(0.958 \(\rightarrow\) 0.909), the spatial variants roughly half as much
 --- as expected if neighbourhood averages of density and extinction act
 as crude column estimators --- and the mass-calibrated weighted stack
-retains $\Rsq = 0.964 \pm 0.014$ with its mass budget intact
+retains \(\Rsq = 0.964 \pm 0.014\) with its mass budget intact
 (fold mass ratios 0.93--1.16).
 
-The phase-resolved metrics tell a sharper story that the $\Rsq$
+The phase-resolved metrics tell a sharper story that the \(\Rsq\)
 comparison alone would miss: for the final model the ablation raises the
-RMSE by 60 per cent (0.294 $\rightarrow$ 0.469\dex) and costs most of
-the molecular-phase fidelity --- molecular $\Rsq$ falls from 0.991 to
-0.840 and the molecular bias grows from $-0.01$ to $-0.10\dex$. The
-degradation concentrates precisely where H$_2$ matters most: at
-$\Gzero = 0.1$, the most molecular cube, the final model's molecular
-$\Rsq$ drops to 0.70. The deployable (solver-independent) configuration
+RMSE by 60 per cent (0.294 \(\rightarrow\) 0.469\dex) and costs most of
+the molecular-phase fidelity --- molecular \(\Rsq\) falls from 0.991 to
+0.840 and the molecular bias grows from \(-0.01\) to \(-0.10\dex\). The
+degradation concentrates precisely where H\(_2\) matters most: at
+\(\Gzero = 0.1\), the most molecular cube, the final model's molecular
+\(\Rsq\) drops to 0.70. The deployable (solver-independent) configuration
 is thus a usable surrogate for aggregate statistics and morphology, but
 applications requiring per-cell accuracy \emph{inside} the molecular
-phase depend on a shielding estimate of $\fshield$ quality.
+phase depend on a shielding estimate of \(\fshield\) quality.
 
 Feature attribution corroborates the ablation.
 Figure~\ref{fig:importance} shows XGBoost gain importances:
-$\log\fshield$ dominates (0.58 of total gain for the pointwise model;
-0.85 when its spatial averages are aggregated with it), followed by
-temperature, density, and $\Gzero$; the velocity and magnetic-field
+\(\log\fshield\) dominates (0.57 of total gain for the pointwise model;
+0.83 when its spatial averages are aggregated with it), followed by
+temperature, density, and \(\Gzero\); the velocity and magnetic-field
 components contribute negligibly, suggesting a minimal six-feature
 deployable set that we have not separately evaluated.
 
 For the volumetric model the available evidence is an upper bound of a
 different kind: a U-Net trained on only 11 inputs --- temperature,
-$\Gzero$, velocity, and magnetic field, i.e.\ \emph{no}
-chemistry-adjacent quantities at all (no $n_{\mathrm{H}}$,
-$n_{\mathrm{H^+}}$, extinction, or $\fshield$) --- still reaches
-$\Rsq = 0.893 \pm 0.088$. Roughly 90 per cent of the log-density
+\(\Gzero\), velocity, and magnetic field, i.e.\ \emph{no}
+chemistry-adjacent quantities at all (no \(n_{\mathrm{H}}\),
+\(n_{\mathrm{H^+}}\), extinction, or \(\fshield\)) --- still reaches
+\(\Rsq = 0.893 \pm 0.088\). Roughly 90 per cent of the log-density
 variance is thus recoverable from dynamics, thermodynamics, and the UV
-strength alone: the H$_2$ \emph{morphology} is largely inferable without
+strength alone: the H\(_2\) \emph{morphology} is largely inferable without
 chemical inputs. The field-level metrics show what that number hides ---
 residual scatter of 0.61\dex, only 17 per cent of cells within
-0.1\dex, molecular-phase $\Rsq$ near zero on average and negative at
+0.1\dex, molecular-phase \(\Rsq\) near zero on average and negative at
 both extrapolation folds, and fold mass ratios from 0.27 to a clipped
-$\times$800 --- the large-scale morphology is retained, but chemically
+\(\times\)800 --- the large-scale morphology is retained, but chemically
 precise molecular-phase prediction is lost.
 
 \begin{table*}
 \centering
 \caption{Ablation of the solver-derived self-shielding factor
-$\fshield$: key metrics with the full feature set (left of each arrow)
-and with $\fshield$ excluded from the local features and the spatial
-averages (right). $\Rsq$ entries give mean $\pm$ fold std.; RMSE and
+\(\fshield\): key metrics with the full feature set (left of each arrow)
+and with \(\fshield\) excluded from the local features and the spatial
+averages (right). \(\Rsq\) entries give mean \(\pm\) fold std.; RMSE and
 molecular-phase entries are cross-fold means. All runs use the identical
-pipeline, seeds, and hyperparameters; the without-$\fshield$
+pipeline, seeds, and hyperparameters; the without-\(\fshield\)
 mass-calibrated stack keeps fold mass ratios of 0.93--1.16.}
 \label{tab:fh2}
 \begin{tabular}{lccc}
 \hline
-Model & $\Rsq$ & RMSE (dex) & $\Rsq_{\mathrm{mol}}$ \\
+Model & \(\Rsq\) & RMSE (dex) & \(\Rsq_{\mathrm{mol}}\) \\
 \hline
-XGBoost              & $0.950 \pm 0.029 \rightarrow 0.911 \pm 0.033$ & $0.49 \rightarrow 0.70$ & $0.978 \rightarrow 0.701$ \\
-Wide MLP             & $0.958 \pm 0.028 \rightarrow 0.909 \pm 0.057$ & $0.52 \rightarrow 0.76$ & $0.981 \rightarrow 0.713$ \\
-XGBoost +S           & $0.963 \pm 0.033 \rightarrow 0.941 \pm 0.029$ & $0.37 \rightarrow 0.54$ & $0.988 \rightarrow 0.815$ \\
-Wide MLP +S          & $0.982 \pm 0.017 \rightarrow 0.953 \pm 0.027$ & $0.32 \rightarrow 0.55$ & $0.989 \rightarrow 0.809$ \\
-Stack (+S+W), mass-cal. & $0.985 \pm 0.015 \rightarrow 0.964 \pm 0.014$ & $0.29 \rightarrow 0.47$ & $0.991 \rightarrow 0.840$ \\
+XGBoost              & \(0.950 \pm 0.029 \rightarrow 0.911 \pm 0.033\) & \(0.49 \rightarrow 0.70\) & \(0.978 \rightarrow 0.701\) \\
+Wide MLP             & \(0.958 \pm 0.028 \rightarrow 0.909 \pm 0.057\) & \(0.52 \rightarrow 0.76\) & \(0.981 \rightarrow 0.713\) \\
+XGBoost +S           & \(0.963 \pm 0.033 \rightarrow 0.941 \pm 0.029\) & \(0.37 \rightarrow 0.54\) & \(0.988 \rightarrow 0.815\) \\
+Wide MLP +S          & \(0.982 \pm 0.017 \rightarrow 0.953 \pm 0.027\) & \(0.32 \rightarrow 0.55\) & \(0.989 \rightarrow 0.809\) \\
+Stack (+S+W), mass-cal. & \(0.985 \pm 0.015 \rightarrow 0.964 \pm 0.014\) & \(0.29 \rightarrow 0.47\) & \(0.991 \rightarrow 0.840\) \\
 \hline
 \end{tabular}
 \end{table*}
@@ -982,11 +983,11 @@ Stack (+S+W), mass-cal. & $0.985 \pm 0.015 \rightarrow 0.964 \pm 0.014$ & $0.29 
 \begin{figure*}
 \centering
 \includegraphics[width=\textwidth]{figures/fig_feature_importance.png}
-\caption{XGBoost gain importance, mean $\pm$ std over the seven folds.
+\caption{XGBoost gain importance, mean \(\pm\) std over the seven folds.
 \emph{(a)} Pointwise model (15 local features): the solver-derived
-$\log\fshield$ dominates, followed by temperature and density.
+\(\log\fshield\) dominates, followed by temperature and density.
 \emph{(b)} Spatial-feature model, top 20 of 60 features (blue = local,
-red = neighbourhood means): $\fshield$ and its spatial averages fill the
+red = neighbourhood means): \(\fshield\) and its spatial averages fill the
 top ranks. \emph{(c)} Importance aggregated per base field over all
 scales. Velocity and magnetic-field components are negligible in every
 view.}
@@ -1001,44 +1002,44 @@ Tables~\ref{tab:main}--\ref{tab:summary}: it is simultaneously the best
 interpolator and the least reliable extrapolator under the
 physical-field metrics. On the five
 interior folds it is the most accurate model evaluated ---
-$\Rsq = 0.995$, RMSE $0.19\dex$, beating the mass-calibrated weighted
-stack (0.984, 0.31\dex) on every one of them --- direct evidence that a
+\(\Rsq = 0.995\), RMSE \(0.19\dex\), beating the mass-calibrated weighted
+stack (0.984, 0.31\dex) in aggregate --- direct evidence that a
 learned volumetric representation extracts non-local information the
 box-filter features do not. At the boundaries the picture inverts: mean
-edge-fold $\Rsq$ drops to 0.907 (RMSE 0.62\dex) against 0.988
-(0.25\dex) for the calibrated stack, and at $\Gzero = 0.1$ its skill
-against even the \emph{pointwise} XGBoost baseline is $-1.14$: outside
+edge-fold \(\Rsq\) drops to 0.907 (RMSE 0.62\dex) against 0.988
+(0.25\dex) for the calibrated stack, and at \(\Gzero = 0.1\) its skill
+against even the \emph{pointwise} XGBoost baseline is \(-1.14\): outside
 its training range the volumetric model is worse than the simplest
 tabular one.
 
 The physical-field metrics make the extrapolation failure qualitative,
-not merely quantitative. At $\Gzero = 6.4$ the U-Net's molecular-phase
-bias is $+1.09\dex$ and its fold mass ratio exceeds 170 (a lower bound;
-its unbounded output is clipped at truth $+1\dex$ before the mass
-integral, Section~\ref{sec:metrics}); at $\Gzero = 0.1$ it
-under-predicts by $-0.63\dex$ overall. Its interior-fold mass ratios
+not merely quantitative. At \(\Gzero = 6.4\) the U-Net's molecular-phase
+bias is \(+1.09\dex\) and its fold mass ratio exceeds 170 (a lower bound;
+its unbounded output is clipped at truth \(+1\dex\) before the mass
+integral, Section~\ref{sec:metrics}); at \(\Gzero = 0.1\) it
+under-predicts by \(-0.63\dex\) overall. Its interior-fold mass ratios
 are also uncontrolled (0.94--16.7), consistent with its unweighted,
 unbounded training. Crucially, this failure is \emph{not} repairable by
 the calibration of Section~\ref{sec:ensemble}: the U-Net's held-out
-bias is phase-localised (molecular $+1.09\dex$ against a small diffuse
-bias at $\Gzero = 6.4$) and wildly non-monotonic in $\Gzero$ (fold mass
+bias is phase-localised (molecular \(+1.09\dex\) against a small diffuse
+bias at \(\Gzero = 6.4\)) and wildly non-monotonic in \(\Gzero\) (fold mass
 ratios 0.81, 3.9, 0.94, 1.8, 2.8, 16.7, 172), whereas the stack's bias
-is a global, $\Gzero$-smooth offset --- the difference between a
+is a global, \(\Gzero\)-smooth offset --- the difference between a
 correctable systematic and a genuine extrapolation breakdown.
 
 Two practical considerations reinforce the tabular default for suites of
 this size. \emph{Configuration sensitivity}: in a dedicated
-configuration study conducted at reduced ($64^3$) resolution, U-Net mean
-$\Rsq$ ranged from 0.80 to 0.97 across capacity variants (16, 32, 64
+configuration study conducted at reduced (\(64^3\)) resolution, U-Net mean
+\(\Rsq\) ranged from 0.80 to 0.97 across capacity variants (16, 32, 64
 base channels; 1.5\,M--23\,M parameters) and training protocols, with a
 dropout-regularised residual variant losing most of its accuracy at the
 extrapolation folds (0.87/0.82 versus 0.90/0.95 for the dropout-free
 baseline); with 48 augmented training volumes against millions of
 parameters, training noise is large, and any single U-Net number carries
 a wide implicit error bar. XGBoost results are bit-identical across
-runs and MLP variation stays within $\sim$0.01. \emph{Cost}: the
-seven-fold U-Net training takes $\approx$4.6\,h on an RTX 3090, versus
-$\approx$1\,h for the \emph{entire} 17-variant tabular comparison
+runs and MLP variation stays within \(\sim\)0.01. \emph{Cost}: the
+seven-fold U-Net training takes \(\approx\)4.6\,h on an RTX 3090, versus
+\(\approx\)1\,h for the \emph{entire} 17-variant tabular comparison
 including spatial-feature construction. We did not pursue CNN-specific
 remedies (density-weighted volumetric losses, deeper augmentation,
 pretraining) and therefore make no claim about the ultimate capability
@@ -1053,40 +1054,49 @@ small fraction of the cost.
 For per-cell and field-level analysis we use the deployed pipeline: the
 density-weighted spatial stack with fully nested stacking and mass
 calibration (Section~\ref{sec:ensemble}), which saves full \(128^3\)
-prediction volumes for each held-out fold. Its per-fold $\Rsq$ is
+prediction volumes for each held-out fold. Its per-fold \(\Rsq\) is
 0.977, 0.988, 0.990, 0.987, 0.995, 0.996, 0.998 for
-$\Gzero = 0.1$--6.4 (mean $0.990 \pm 0.006$; RMSE $0.25\dex$; the
+\(\Gzero = 0.1\)--6.4 (mean \(0.990 \pm 0.006\); RMSE \(0.25\dex\); the
 nested protocol scores slightly above the comparison-table row, as
 noted in Section~\ref{sec:ensemble}). The mass budget is closed in
-every fold ($\Mratio = 0.985$--1.090), the molecular-phase $\Rsq$ is
-0.979--0.994, the cell-mean bias is $+0.02\dex$, and the mass-weighted
+every fold (\(\Mratio = 0.985\)--1.090), the molecular-phase \(\Rsq\) is
+0.979--0.994, the cell-mean bias is \(+0.02\dex\), and the mass-weighted
 MAE is 0.06\dex. The metric-level clip of Section~\ref{sec:metrics} is
 never active for these volumes: no predicted cell falls outside the
-held-out cube's true range $\pm 1\dex$ in any fold, so all linear-space
-quantities are computed from unclipped predictions. Figures~\ref{fig:massbudget}
+held-out cube's true range \(\pm 1\dex\) in any fold, so all linear-space
+quantities are computed from unclipped predictions. Within-fold sampling
+uncertainty is small against the fold-to-fold spread: bootstrap 95 per
+cent intervals (200 replicates per fold) span at most 0.0002 in per-fold
+\(\Rsq\) when resampling cells and \(\la\)0.004 when resampling \(16^3\)
+blocks to respect the field's spatial correlation --- an order of
+magnitude below the 0.006 fold-to-fold standard deviation --- and the
+per-fold mass-ratio intervals, the widest of any metric because the mass
+integral is dominated by the densest cells, stay within 0.93--1.14 in
+every fold. Fold-to-fold variation therefore dominates the uncertainty
+of every cross-fold mean quoted in this paper. Figures~\ref{fig:massbudget}
 and~\ref{fig:scatter}--\ref{fig:spatial} are derived from these
 volumes.
 
-Figure~\ref{fig:scatter} shows predicted versus true $\logn$ for all
+Figure~\ref{fig:scatter} shows predicted versus true \(\logn\) for all
 seven folds: the model reproduces the bimodal structure in every fold,
 with scatter concentrated in the diffuse UV-exposed population and a
 tight locus along the identity for the shielded population.
 Figure~\ref{fig:residuals} shows the residual distributions: narrow
-cores (widths 0.04--0.44\dex, shrinking monotonically with $\Gzero$)
-with per-fold means between $-0.16$ and $+0.16\dex$. The residual
-structure identifies $\Gzero = 0.8$ as the hardest fold for this
-pipeline --- its bias ($+0.16\dex$) and its fraction of cells within
+cores (widths 0.04--0.44\dex, shrinking monotonically with \(\Gzero\))
+with per-fold means between \(-0.16\) and \(+0.16\dex\). The residual
+structure identifies \(\Gzero = 0.8\) as the hardest fold for this
+pipeline --- its bias (\(+0.16\dex\)) and its fraction of cells within
 0.1\dex{} (38 per cent, against 60--99 per cent elsewhere) are the
-weakest in the suite even though its $\Rsq$ is 0.987 --- a reminder
+weakest in the suite even though its \(\Rsq\) is 0.987 --- a reminder
 that interior folds are not automatically easy.
 
 \begin{figure*}
 \centering
 \includegraphics[width=\textwidth]{figures/fig2_scatter.png}
-\caption{Predicted versus true $\logn$ per held-out fold
+\caption{Predicted versus true \(\logn\) per held-out fold
 (two-dimensional histograms, log colour scale; dashed line = identity),
-for the deployed mass-calibrated pipeline. Per-fold $\Rsq$, Pearson
-$r$, and bias are annotated. The bimodal target structure is reproduced
+for the deployed mass-calibrated pipeline. Per-fold \(\Rsq\), Pearson
+\(r\), and bias are annotated. The bimodal target structure is reproduced
 in every fold; scatter is dominated by the diffuse UV-exposed
 population.}
 \label{fig:scatter}
@@ -1095,10 +1105,10 @@ population.}
 \begin{figure*}
 \centering
 \includegraphics[width=\textwidth]{figures/fig3_error_dist.png}
-\caption{Residual distributions (predicted $-$ true, dex) per fold, with
-best-fit normal curves and their $(\mu, \sigma)$ annotated. Distribution
-widths decrease monotonically with $\Gzero$; per-fold means lie between
-$-0.16$ and $+0.16\dex$ after mass calibration. The multi-modal
+\caption{Residual distributions (predicted \(-\) true, dex) per fold, with
+best-fit normal curves and their \((\mu, \sigma)\) annotated. Distribution
+widths decrease monotonically with \(\Gzero\); per-fold means lie between
+\(-0.16\) and \(+0.16\dex\) after mass calibration. The multi-modal
 structure at several folds means the Gaussian curves summarise location
 and scale only and should not be read as a claim of normality.}
 \label{fig:residuals}
@@ -1106,34 +1116,34 @@ and scale only and should not be read as a claim of normality.}
 
 Figure~\ref{fig:stratified} stratifies the errors by gas density. The
 largest mean absolute errors occur in the \emph{low}-density deciles of
-the low-$\Gzero$ folds, where small shielding-column differences move
+the low-\(\Gzero\) folds, where small shielding-column differences move
 cells across the steep atomic-to-molecular transition; this is the same
 diffuse-phase weakness seen in the phase-conditional panel of
-Figure~\ref{fig:massbudget} (diffuse $\Rsq$ of 0.74 at $\Gzero = 0.1$,
-rising to $\ge 0.97$ for $\Gzero \ge 1.6$). Conversely, restricting the
-evaluation to the densest cells \emph{lowers} $\Rsq$ (panels a and d)
+Figure~\ref{fig:massbudget} (diffuse \(\Rsq\) of 0.74 at \(\Gzero = 0.1\),
+rising to \(\ge 0.97\) for \(\Gzero \ge 1.6\)). Conversely, restricting the
+evaluation to the densest cells \emph{lowers} \(\Rsq\) (panels a and d)
 even though absolute errors there are small: within the shielded cores
-the target variance is small, so $\Rsq$ --- a variance-normalised
+the target variance is small, so \(\Rsq\) --- a variance-normalised
 metric --- is a harsh statistic in the high-density tail. Both views are
 shown to avoid the misleading impression either one gives alone.
 Figure~\ref{fig:distributions} compares predicted and true marginal
 distributions per fold: the bimodal shape and peak locations are
-reproduced, with $W_1$ distances of 0.02--0.17\dex{} (mean 0.08).
+reproduced, with \(W_1\) distances of 0.02--0.17\dex{} (mean 0.08).
 
 \begin{figure*}
 \centering
 \includegraphics[width=\textwidth]{figures/fig4_stratified.png}
 \caption{Density-stratified error analysis of the deployed pipeline.
-\emph{(a)} $\Rsq$ on the subset of cells above a minimum-density
-percentile: $\Rsq$ \emph{decreases} toward the dense tail because the
+\emph{(a)} \(\Rsq\) on the subset of cells above a minimum-density
+percentile: \(\Rsq\) \emph{decreases} toward the dense tail because the
 within-subset target variance shrinks faster than the errors.
 \emph{(b)} Fraction of cells with absolute residual below fixed
-thresholds versus $\Gzero$; the dip at $\Gzero = 0.8$ reflects that
-fold's residual $+0.16\dex$ bias.
+thresholds versus \(\Gzero\); the dip at \(\Gzero = 0.8\) reflects that
+fold's residual \(+0.16\dex\) bias.
 \emph{(c)} MAE per true-density decile: errors peak in the low-density
-deciles of the low-$\Gzero$ folds, at the steep atomic-to-molecular
-transition; high-$\Gzero$ folds are flat at $\la$0.1\dex.
-\emph{(d)} $\Rsq$ within the top-$N$ per cent densest cells.}
+deciles of the low-\(\Gzero\) folds, at the steep atomic-to-molecular
+transition; high-\(\Gzero\) folds are flat at \(\la\)0.1\dex.
+\emph{(d)} \(\Rsq\) within the top-\(N\) per cent densest cells.}
 \label{fig:stratified}
 \end{figure*}
 
@@ -1141,29 +1151,29 @@ transition; high-$\Gzero$ folds are flat at $\la$0.1\dex.
 \centering
 \includegraphics[width=\textwidth]{figures/fig6_distributions.png}
 \caption{True (filled) versus predicted (outline) marginal distributions
-of $\logn$ per fold for the deployed pipeline, annotated with the
+of \(\logn\) per fold for the deployed pipeline, annotated with the
 two-sample Kolmogorov--Smirnov statistic and the Wasserstein distance
-$W_1$ (dex). The bimodal structure and peak positions are reproduced in
+\(W_1\) (dex). The bimodal structure and peak positions are reproduced in
 every fold.}
 \label{fig:distributions}
 \end{figure*}
 
 Figure~\ref{fig:spatial} shows mid-plane slices of truth, prediction,
-and absolute error. At low $\Gzero$ the field is rich in filamentary
+and absolute error. At low \(\Gzero\) the field is rich in filamentary
 shielded structure and the residuals concentrate at cloud boundaries ---
 the spatial expression of the transition-region errors of
-Figure~\ref{fig:stratified} --- while at high $\Gzero$ the field is
+Figure~\ref{fig:stratified} --- while at high \(\Gzero\) the field is
 nearly uniform and residuals are small and unstructured.
 
 \begin{figure*}
 \centering
 \includegraphics[width=\textwidth,height=0.85\textheight,keepaspectratio]{figures/fig8_slices.png}
-\caption{Mid-plane ($z = 64$) slices of the $\logn$ field for each
-$\Gzero$ (rows): ground truth, prediction, and absolute error
+\caption{Mid-plane (\(z = 64\)) slices of the \(\logn\) field for each
+\(\Gzero\) (rows): ground truth, prediction, and absolute error
 (columns), for the deployed pipeline. Truth and prediction share one
 colour scale per row; the error column has its own scale. Residuals
-trace the boundaries of shielded filaments at low $\Gzero$; at high
-$\Gzero$ the field is nearly uniform.}
+trace the boundaries of shielded filaments at low \(\Gzero\); at high
+\(\Gzero\) the field is nearly uniform.}
 \label{fig:spatial}
 \end{figure*}
 
@@ -1171,40 +1181,40 @@ $\Gzero$ the field is nearly uniform.}
 \section{Supplementary experiments}
 \label{sec:supp}
 
-\subsection{Single-cube transfer across \texorpdfstring{$\Gzero$}{G0}}
+\subsection{Single-cube transfer across \texorpdfstring{\(\Gzero\)}{G0}}
 \label{sec:single_cube}
 
 To measure how far the learned mapping transfers across the UV
 parameter, we train the weighted spatial stack on each individual cube
-and predict all seven, producing a $7 \times 7$ matrix of log-space
-$\Rsq$ (Figure~\ref{fig:heatmap}). In-sample (diagonal) fits average
-$\Rsq = 0.997$. Transfer degrades systematically with $\Gzero$
+and predict all seven, producing a \(7 \times 7\) matrix of log-space
+\(\Rsq\) (Figure~\ref{fig:heatmap}). In-sample (diagonal) fits average
+\(\Rsq = 0.997\). Transfer degrades systematically with \(\Gzero\)
 separation: averaged over the matrix, one geometric step
-($\times 2$ in $\Gzero$) gives $\Rsq = 0.966$, two steps 0.888, three
+(\(\times 2\) in \(\Gzero\)) gives \(\Rsq = 0.966\), two steps 0.888, three
 steps 0.732, four steps 0.457, five steps 0.171, and the full 64-fold
-separation $-0.013$, with substantial spread between directions and cube
-pairs at the larger separations. The mean off-diagonal $\Rsq$ is 0.708.
+separation \(-0.013\), with substantial spread between directions and cube
+pairs at the larger separations. The mean off-diagonal \(\Rsq\) is 0.708.
 The primary metrics decay in step: in-sample fits have
-RMSE $= 0.15\dex$ and total-mass ratios of 0.99--1.01; one geometric
-step gives RMSE $= 0.39\dex$ with mass ratios of 0.66--1.4; and four or
-more steps reach RMSE $= 1.3$--$1.7\dex$, biases up to $\pm 1.3\dex$,
-and mass ratios up to $\sim$5, bias and scatter growing together.
+RMSE \(= 0.15\dex\) and total-mass ratios of 0.99--1.01; one geometric
+step gives RMSE \(= 0.39\dex\) with mass ratios of 0.66--1.4; and four or
+more steps reach RMSE \(= 1.3\)--\(1.7\dex\), biases up to \(\pm 1.3\dex\),
+and mass ratios up to \(\sim\)5, bias and scatter growing together.
 The learned local mapping is thus approximately universal within a
-factor of $\sim$2--4 in $\Gzero$ and degrades beyond it, which
-(i) validates leave-one-$\Gzero$-out as a non-trivial protocol --- each
+factor of \(\sim\)2--4 in \(\Gzero\) and degrades beyond it, which
+(i) validates leave-one-\(\Gzero\)-out as a non-trivial protocol --- each
 held-out cube is one step from its nearest training neighbour, so single-cube
 knowledge alone would cap performance near 0.97, below what the six-cube
 training sets achieve --- and (ii) confirms that none of the seven
-$\Gzero$ values is redundant in the training set.
+\(\Gzero\) values is redundant in the training set.
 
 \begin{figure*}
 \centering
 \includegraphics[width=\textwidth]{logs/single_cube_extrapolation/heatmap_20260705_114057.png}
-\caption{Single-cube transfer: log-space $\Rsq$ for models trained on
+\caption{Single-cube transfer: log-space \(\Rsq\) for models trained on
 one cube (rows) and evaluated on each cube (columns), for XGBoost
 (\emph{left}), MLP (\emph{centre}), and the stacked ensemble
 (\emph{right}). Diagonal cells are in-sample fits. Transfer quality
-decays with $\Gzero$ separation; values for separations of four or more
+decays with \(\Gzero\) separation; values for separations of four or more
 geometric steps are poor and can be strongly negative.}
 \label{fig:heatmap}
 \end{figure*}
@@ -1212,12 +1222,12 @@ geometric steps are poor and can be strongly negative.}
 \subsection{Within-cube sampling geometry}
 \label{sec:intra_cube}
 
-We next ask how reconstruction of a \emph{single} cube's $\nHH$ field
+We next ask how reconstruction of a \emph{single} cube's \(\nHH\) field
 depends on which cells are used for training --- a question about
 sampling geometry in the simulation volume, not (we emphasise) a claim
 about observational survey design, since real observations deliver
 projected, beam-convolved, noisy quantities rather than simulation
-fields, and $\fshield$ is not an observable. For each cube we train the
+fields, and \(\fshield\) is not an observable. For each cube we train the
 weighted spatial stack on a subset of cells and evaluate on the
 complement, comparing uniformly random subsets (1--75 per cent),
 contiguous half-cube slabs along each axis, and compact cubic
@@ -1239,7 +1249,7 @@ equation~(\ref{eq:boxfilter}) is applied to the masked volume,
   \label{eq:maskedfilter}
 \end{equation}
 with \emph{no} renormalisation by the local sample count
-$\sum_j m_j$: a neighbourhood with no sampled cells yields zero, and a
+\(\sum_j m_j\): a neighbourhood with no sampled cells yields zero, and a
 sparsely sampled neighbourhood yields its sampled-cell sum diluted by
 the full kernel volume. The local (unfiltered) features of test cells
 use their true values; only the target labels and the neighbourhood
@@ -1252,48 +1262,48 @@ matters for interpreting the sparse-coverage results below.
 Figure~\ref{fig:intra_cube} and the run statistics give a consistent
 picture across all seven cubes. Uniformly random coverage reconstructs
 the field accurately from small budgets: at 10 per cent the stack
-reaches a mean test $\Rsq$ of 0.991 with RMSE $= 0.24\dex$, 78 per cent
-of cells within $0.1\dex$, total-mass ratios of 0.82--1.23, and
-molecular-phase $\Rsq = 0.97$ (at 5 per cent: 0.983 and $0.31\dex$; at
-50 per cent: 0.994 and $0.19\dex$). Even at 1 per cent coverage, where
-the expected number of sampled cells inside a $7^3$ kernel is only
-$\sim$3.4 and the diluted spatial features carry little signal, the
-local features alone sustain a mean $\Rsq$ of 0.90 (range 0.79--0.94
+reaches a mean test \(\Rsq\) of 0.991 with RMSE \(= 0.24\dex\), 78 per cent
+of cells within \(0.1\dex\), total-mass ratios of 0.82--1.23, and
+molecular-phase \(\Rsq = 0.97\) (at 5 per cent: 0.983 and \(0.31\dex\); at
+50 per cent: 0.994 and \(0.19\dex\)). Even at 1 per cent coverage, where
+the expected number of sampled cells inside a \(7^3\) kernel is only
+\(\sim\)3.4 and the diluted spatial features carry little signal, the
+local features alone sustain a mean \(\Rsq\) of 0.90 (range 0.79--0.94
 across cubes) --- although the primary metrics are less forgiving
-there: RMSE $= 0.69\dex$, 21 per cent of cells within $0.1\dex$, and
+there: RMSE \(= 0.69\dex\), 21 per cent of cells within \(0.1\dex\), and
 mass ratios of 0.52--2.5.
 
 Contiguous geometries illustrate why the metric hierarchy of
-Section~\ref{sec:metrics} matters. Judged by log-space $\Rsq$ alone
+Section~\ref{sec:metrics} matters. Judged by log-space \(\Rsq\) alone
 they merely pay a penalty: half-cube slabs --- 50 per cent of the
-volume --- average $\Rsq$ of 0.85, 0.89, 0.85 for $x$, $y$, $z$, with
+volume --- average \(\Rsq\) of 0.85, 0.89, 0.85 for \(x\), \(y\), \(z\), with
 the worst cube--axis combination at 0.42, and compact boxes range from
-0.84 (1 per cent) to 0.96 ($\geq$25 per cent). The primary metrics
-reveal the failure that $\Rsq$ forgives: slabs average
-RMSE $= 0.86\dex$ with only 7--18 per cent of cells within $0.1\dex$,
-molecular-phase $\Rsq \leq 0.13$, and total-mass ratios from 0.006 to
+0.84 (1 per cent) to 0.96 (\(\geq\)25 per cent). The primary metrics
+reveal the failure that \(\Rsq\) forgives: slabs average
+RMSE \(= 0.86\dex\) with only 7--18 per cent of cells within \(0.1\dex\),
+molecular-phase \(\Rsq \leq 0.13\), and total-mass ratios from 0.006 to
 4.4 --- the unsampled half contains physical regimes under-represented
 in training, and those regimes are precisely the dense cells that carry
 the mass. Small compact boxes are worse still, predicting essentially
 zero total mass in their worst cubes. Geometry, not volume, is the
 controlling variable: 1 per cent random coverage beats a 50 per cent
-contiguous slab on every metric ($\Rsq$ 0.90 versus 0.86;
-RMSE 0.69 versus $0.86\dex$), and uniformly random sampling is the only
+contiguous slab on every metric (\(\Rsq\) 0.90 versus 0.86;
+RMSE 0.69 versus \(0.86\dex\)), and uniformly random sampling is the only
 geometry tested that preserves the mass budget --- and then only at
-$\geq$10 per cent coverage. We note that the MLP alone can fail
-strongly on contiguous geometries (negative $\Rsq$); the Ridge stack
+\(\geq\)10 per cent coverage. We note that the MLP alone can fail
+strongly on contiguous geometries (negative \(\Rsq\)); the Ridge stack
 tracks the more robust XGBoost in those configurations.
 
 \begin{figure*}
 \centering
 \includegraphics[width=\textwidth]{logs/intra_cube_section/run_20260705_121037_heatmap.png}
-\caption{Within-cube sampling geometry: test $\Rsq$ per training
+\caption{Within-cube sampling geometry: test \(\Rsq\) per training
 geometry (columns) and cube (rows) for XGBoost (\emph{left}), MLP
 (\emph{centre}), and the stacked ensemble (\emph{right}). Random
-coverage $\geq$5 per cent reconstructs the held-out cells to
-$\Rsq \geq 0.97$ in every cube; contiguous half-cube slabs and small
+coverage \(\geq\)5 per cent reconstructs the held-out cells to
+\(\Rsq \geq 0.97\) in every cube; contiguous half-cube slabs and small
 compact boxes are systematically worse despite far larger volume
-(down to $\Rsq \approx 0.4$--0.6 in the worst cubes). The MLP alone
+(down to \(\Rsq \approx 0.4\)--0.6 in the worst cubes). The MLP alone
 can fail strongly on contiguous geometries; the stacked ensemble
 follows the more robust XGBoost.}
 \label{fig:intra_cube}
@@ -1309,8 +1319,8 @@ On this suite, input representation dominates architecture choice among
 the tabular models. The spatial features cut the RMSE of both tabular
 families by 23--38 per cent --- an improvement several times larger than
 any architecture variation we tested (tree depth, MLP width and depth,
-residual connections, all $\la 0.01$ in $\Rsq$ with no consistent
-ordering) --- and stacking plus calibration buys a further $\sim$9 per
+residual connections, all \(\la 0.01\) in \(\Rsq\) with no consistent
+ordering) --- and stacking plus calibration buys a further \(\sim\)9 per
 cent of RMSE over the best single model. This is consistent with the
 broader observation that tree-based models with appropriate features
 remain highly competitive on tabular problems \citep{Grinsztajn2022}.
@@ -1335,10 +1345,10 @@ that we leave to future work.
 
 The comparison sharpens into a clean division of regimes. Inside the
 training range the U-Net is the best model evaluated --- interior-fold
-$\Rsq = 0.995$ against 0.984 for the calibrated stack --- so the learned
+\(\Rsq = 0.995\) against 0.984 for the calibrated stack --- so the learned
 volumetric representation demonstrably extracts non-local structure the
 box filters miss. Outside it, the U-Net fails in a way no global
-correction can repair: phase-localised, non-monotonic in $\Gzero$, with
+correction can repair: phase-localised, non-monotonic in \(\Gzero\), with
 mass-budget violations reaching two orders of magnitude, while the
 stack's out-of-distribution error is a smooth, two-parameter-correctable
 offset. The practical reading for limited-data suites is not
@@ -1347,7 +1357,7 @@ features plus calibration give robust extrapolation; the volumetric
 model gives the best interpolation and should be preferred only within
 a densely sampled parameter range. We also note the evaluation-scale
 dependence of these statements: scoring the same stacked predictions
-against a $2\times2\times2$ box-averaged target raises its $\Rsq$ from
+against a \(2\times2\times2\) box-averaged target raises its \(\Rsq\) from
 0.962 to 0.991, i.e.\ roughly half of the residual error variance lives
 at the smallest resolved scales, where cell-level structure is partly
 unpredictable from the available inputs. Applications consuming
@@ -1360,16 +1370,16 @@ The metric hierarchy supports use-dependent recommendations rather than
 a single winner. For physical fidelity of the predicted field --- mass
 budgets, phase statistics --- the mass-calibrated weighted stack is the
 clear choice (in the Table~\ref{tab:summary} comparison:
-RMSE 0.29\dex, mass within 7 per cent, molecular $\Rsq$ 0.991; its
-deployed nested version reaches RMSE $0.25\dex$ and mass within
+RMSE 0.29\dex, mass within 7 per cent, molecular \(\Rsq\) 0.991; its
+deployed nested version reaches RMSE \(0.25\dex\) and mass within
 9 per cent, Section~\ref{sec:per_fold}). For applications weighting
 all cells equally, the mean-calibrated stack minimises cell-mean error
-(bias $-0.01\dex$, skill $+0.60$) at the price of a 20--50 per cent
-mass deficit. For generating statistically realistic $\nHH$ fields
+(bias \(-0.01\dex\), skill \(+0.60\)) at the price of a 20--50 per cent
+mass deficit. For generating statistically realistic \(\nHH\) fields
 (synthetic observations, sub-grid realisations) the deployed nested
-pipeline is also the best option (mean $W_1 = 0.08\dex$); among the
+pipeline is also the best option (mean \(W_1 = 0.08\dex\)); among the
 single models the weighted spatial MLP is the strongest
-($W_1 = 0.109\dex$), and the shortcut stacks are slightly worse
+(\(W_1 = 0.109\dex\)), and the shortcut stacks are slightly worse
 because Ridge averaging narrows the predicted distribution. And for
 interpolation-only use within a well-sampled parameter range, the
 volumetric U-Net is the most accurate option available.
@@ -1379,19 +1389,19 @@ volumetric U-Net is the most accurate option available.
 
 The ablation of Section~\ref{sec:ablation_fh2} addresses the most
 delicate methodological question in this study: whether the surrogate's
-accuracy is borrowed from the solver through $\fshield$. The answer is
+accuracy is borrowed from the solver through \(\fshield\). The answer is
 use-dependent. For aggregate statistics the dependence is modest: the
-solver-independent final model retains $\Rsq = 0.964$ with a closed
+solver-independent final model retains \(\Rsq = 0.964\) with a closed
 mass budget, because neighbourhood averages of the deployable
 column-type fields substitute for much of the shielding information.
 For per-cell accuracy inside the molecular phase the dependence is
-strong (molecular $\Rsq$ $0.991 \rightarrow 0.840$, and 0.70 in the
+strong (molecular \(\Rsq\) \(0.991 \rightarrow 0.840\), and 0.70 in the
 most molecular cube): resolving \emph{which} cells cross the
 atomic-to-molecular transition requires genuine shielding information.
 Deployment therefore has a spectrum of options: with a cheap
 approximate shielding estimate (e.g.\ from extinction), accuracy should
 fall between the two blocks of Table~\ref{tab:fh2}; with no shielding
-estimate at all, the without-$\fshield$ block applies directly. What
+estimate at all, the without-\(\fshield\) block applies directly. What
 our data cannot quantify is the effect of using an \emph{inconsistent}
 shielding estimator (one with different systematics from the solver's),
 which would require forward-modelling the estimator itself.
@@ -1400,14 +1410,14 @@ which would require forward-modelling the estimator itself.
 \label{sec:limitations}
 
 \textit{Dataset scope.} The seven simulations grow from one turbulent
-initial realisation and differ only in their imposed $\Gzero$, so their
+initial realisation and differ only in their imposed \(\Gzero\), so their
 structures are strongly correlated even though the evolved fields are
 not identical (Section~\ref{sec:suite}). All generalisation claims are
 therefore claims about the UV-field axis; transfer across turbulence
 realisations, metallicities, dust models, or resolutions is untested and
 plausibly harder. The suite is also quasi-equilibrium and uniformly
 illuminated; time-dependent or anisotropic radiation fields would
-invalidate the $z$-preserving augmentation and may change the role of
+invalidate the \(z\)-preserving augmentation and may change the role of
 the spatial features.
 
 \textit{Simulation provenance.} This paper characterises surrogate
@@ -1420,7 +1430,7 @@ network, box size, resolution, metallicity, dust-to-gas ratio, driving
 
 \textit{Boundary treatment.} The spatial features reflect
 neighbourhoods at the box faces and the U-Net zero-pads its
-convolutions; cells within three voxels of a face ($\approx$13 per cent
+convolutions; cells within three voxels of a face (\(\approx\)13 per cent
 of the volume at the largest kernel) therefore receive approximate
 context. Matching the treatment to the simulations' true boundary
 conditions is a straightforward refinement we have not evaluated.
@@ -1428,7 +1438,7 @@ conditions is a straightforward refinement we have not evaluated.
 \textit{CNN comparison.} The U-Net was trained with an unweighted loss
 and an unbounded output, receives per-cube input normalisation at test
 time through its instance-normalisation layers, and its reported
-checkpoint is selected on held-out-volume loss (worth $\le$12 per cent
+checkpoint is selected on held-out-volume loss (worth \(\le\)12 per cent
 in RMSE; Section~\ref{sec:cnn}) --- a mixture of disadvantages and
 advantages relative to the tabular protocol. A density-weighted,
 range-bounded U-Net would be the fairer mass-budget comparison and is
@@ -1436,11 +1446,11 @@ left to future work; the configuration-sensitivity results suggest any
 single U-Net number carries a wide error bar regardless.
 
 \textit{Calibration hyperparameters.} The density-weighting anchors
-($q_{99}$, $q_{99.99}$, $\alpha = 100$) are a designed choice whose
+(\(q_{99}\), \(q_{99.99}\), \(\alpha = 100\)) are a designed choice whose
 sensitivity we have not mapped; the calibration itself is a
-two-parameter linear model in $\log\Gzero$ and inherits the smoothness
-assumption it encodes. The residual $+0.16\dex$ bias of the deployed
-model at $\Gzero = 0.8$ (Section~\ref{sec:per_fold}) marks the
+two-parameter linear model in \(\log\Gzero\) and inherits the smoothness
+assumption it encodes. The residual \(+0.16\dex\) bias of the deployed
+model at \(\Gzero = 0.8\) (Section~\ref{sec:per_fold}) marks the
 limit of what a global linear correction captures on this suite.
 
 % ============================================================
@@ -1448,66 +1458,66 @@ limit of what a global linear correction captures on this suite.
 \label{sec:conc}
 
 We evaluated machine-learning surrogates for the molecular hydrogen
-number density in a controlled suite of seven $128^3$ UV-only ISM
-chemistry simulations under leave-one-$\Gzero$-out cross-validation,
-scoring every model on the same native $128^3$ cells with a metric
+number density in a controlled suite of seven \(128^3\) UV-only ISM
+chemistry simulations under leave-one-\(\Gzero\)-out cross-validation,
+scoring every model on the same native \(128^3\) cells with a metric
 hierarchy built around the physical uses of the predicted field.
 The main conclusions are:
 
 (i) How a surrogate is scored determines what one learns about it.
-Models separated by $\la$0.03 in log-space $\Rsq$ differ by factors of
-several in recovered H$_2$ mass; the minimum-squared-error stacked
-ensemble carries a $+0.32\dex$ held-out bias (mass over-prediction up
-to 80 per cent) that $\Rsq$ does not register. RMSE decomposed into
+Models separated by \(\la\)0.03 in log-space \(\Rsq\) differ by factors of
+several in recovered H\(_2\) mass; the minimum-squared-error stacked
+ensemble carries a \(+0.32\dex\) held-out bias (mass over-prediction up
+to 80 per cent) that \(\Rsq\) does not register. RMSE decomposed into
 bias and scatter, the mass budget, and phase-conditional errors should
 be standard reporting for field-level emulators.
 
 (ii) The ingredients of the final model act on distinct error
 components: multi-scale box-filter features (computed in
-$\approx$30\,s) cut \emph{scatter} by roughly a third; density-weighted
+\(\approx\)30\,s) cut \emph{scatter} by roughly a third; density-weighted
 training closes the pointwise models' \emph{mass budgets} at zero
-$\Rsq$ cost; and a two-parameter, mass-weighted bias calibration in
-$\log\Gzero$, fitted on training cubes alone, removes the stack's
-\emph{bias}. The deployed pipeline reaches RMSE $= 0.25\dex$,
-$\Rsq = 0.990 \pm 0.006$, total H$_2$ mass within 9 per cent, and
-molecular-phase $\Rsq \ge 0.98$ on every held-out fold.
+\(\Rsq\) cost; and a two-parameter, mass-weighted bias calibration in
+\(\log\Gzero\), fitted on training cubes alone, removes the stack's
+\emph{bias}. The deployed pipeline reaches RMSE \(= 0.25\dex\),
+\(\Rsq = 0.990 \pm 0.006\), total H\(_2\) mass within 9 per cent, and
+molecular-phase \(\Rsq \ge 0.98\) on every held-out fold.
 
 (iii) The choice of calibration functional is a physical decision, not
 a technicality: centring the cell-mean error overshoots the mass budget
 by 20--50 per cent because the surrogate's residuals are
 density-dependent; centring the mass-weighted residual closes the
-budget at the cost of a $+0.09\dex$ diffuse-phase offset. We recommend
+budget at the cost of a \(+0.09\dex\) diffuse-phase offset. We recommend
 reporting both.
 
 (iv) The solver-derived self-shielding factor is dispensable for
 morphology but not for molecular-phase chemistry: without it the final
-model retains $\Rsq = 0.964$ and a closed mass budget, but its
-molecular-phase $\Rsq$ falls from 0.991 to 0.840 (0.70 in the most
+model retains \(\Rsq = 0.964\) and a closed mass budget, but its
+molecular-phase \(\Rsq\) falls from 0.991 to 0.840 (0.70 in the most
 molecular cube) and its RMSE grows by 60 per cent.
 
-(v) The H$_2$ \emph{morphology} is largely inferable without any
+(v) The H\(_2\) \emph{morphology} is largely inferable without any
 chemistry-adjacent input: a U-Net given only temperature, velocity,
-magnetic field, and $\Gzero$ reaches $\Rsq = 0.893$ --- yet with
-$0.61\dex$ scatter, near-zero molecular-phase $\Rsq$, and fold mass
-ratios from 0.27 to a clipped $\times$800. The gap between that number
+magnetic field, and \(\Gzero\) reaches \(\Rsq = 0.893\) --- yet with
+\(0.61\dex\) scatter, near-zero molecular-phase \(\Rsq\), and fold mass
+ratios from 0.27 to a clipped \(\times\)800. The gap between that number
 and the full-input models quantifies how much of the surrogate's skill
 is chemistry rather than memorised density structure.
 
 (vi) The volumetric 3D U-Net is the best interpolator in the comparison
-(interior-fold $\Rsq = 0.995$, beating every tabular model) and the
+(interior-fold \(\Rsq = 0.995\), beating every tabular model) and the
 least reliable extrapolator under the physical-field metrics: at the
 boundary folds it falls below the pointwise
-XGBoost baseline, with phase-localised biases up to $+1.1\dex$ and
+XGBoost baseline, with phase-localised biases up to \(+1.1\dex\) and
 mass-budget violations exceeding two orders of magnitude that a global
 calibration cannot repair --- at roughly two orders of magnitude higher
-training cost. On suites of this size, engineered spatial context plus
+per-model training cost. On suites of this size, engineered spatial context plus
 calibration is the robust default; the volumetric model is preferable
 only within a densely sampled parameter range.
 
 (vii) The learned local mapping transfers across a factor of
-$\sim$2--4 in $\Gzero$ (single-cube transfer $\Rsq = 0.966$ at one
+\(\sim\)2--4 in \(\Gzero\) (single-cube transfer \(\Rsq = 0.966\) at one
 geometric step, 0.888 at two) and degrades beyond it, validating
-leave-one-$\Gzero$-out as a non-trivial protocol and confirming that
+leave-one-\(\Gzero\)-out as a non-trivial protocol and confirming that
 none of the seven simulations is redundant.
 
 (viii) Within a cube --- in a sparse-label setting where cell-local
@@ -1515,9 +1525,9 @@ inputs are available everywhere but labels and neighbourhood context
 are restricted to the training sample --- reconstruction quality is
 controlled by sampling geometry rather than sample volume: 1 per cent
 uniformly random
-coverage achieves $\Rsq = 0.90$, matching 50 per cent contiguous slabs
-($\Rsq = 0.86$ on average), and the primary metrics widen the gap ---
-contiguous geometries retain acceptable log-space $\Rsq$ but lose
+coverage achieves \(\Rsq = 0.90\), matching 50 per cent contiguous slabs
+(\(\Rsq = 0.86\) on average), and the primary metrics widen the gap ---
+contiguous geometries retain acceptable log-space \(\Rsq\) but lose
 molecular-phase fidelity and corrupt the mass budget by up to two
 orders of magnitude, while random coverage of 10 per cent or more
 preserves all metrics. These are simulation-space

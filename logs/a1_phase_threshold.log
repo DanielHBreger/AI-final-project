@@ -1,0 +1,16 @@
+G0=0.1 done (predictions\pred_g0_0.1_20260704_220118.npz)
+G0=0.2 done (predictions\pred_g0_0.2_20260704_221925.npz)
+G0=0.4 done (predictions\pred_g0_0.4_20260704_223722.npz)
+G0=0.8 done (predictions\pred_g0_0.8_20260704_225425.npz)
+G0=1.6 done (predictions\pred_g0_1.6_20260704_231317.npz)
+G0=3.2 done (predictions\pred_g0_3.2_20260704_233212.npz)
+G0=6.4 done (predictions\pred_g0_6.4_20260704_235053.npz)
+
+  thr  R2_mol R2_mol_min RMSE_mol bias_mol  R2_dif R2_dif_min  f_mol%
+ -5.0  0.9759     0.9405    0.221   -0.053  0.8809     0.6398   26.47
+ -4.5  0.9813     0.9571    0.173   -0.038  0.8918     0.6842   25.54
+ -4.0  0.9902     0.9785    0.112   -0.021  0.9049     0.7350   24.62
+ -3.5  0.9945     0.9914    0.078   -0.014  0.9184     0.7864   23.81
+ -3.0  0.9946     0.9931    0.071   -0.013  0.9320     0.8366   22.97
+
+Saved -> results/a1_phase_threshold_20260705_191051.json
