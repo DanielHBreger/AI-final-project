@@ -1,24 +1,24 @@
 # Fdb version 4
-["bibtex paper"] 1783199883.27961 "paper.aux" "paper.bbl" "paper" 1783200279.45358 0
+["bibtex paper"] 1783199883.27961 "paper.aux" "paper.bbl" "paper" 1783239299.62578 0
   "./rasti.bst" 1734527431 34137 817f91bd5901f7e3d76ebb88d13af665 ""
   "./references.bib" 1782935792 8712 e193f7cbabd5b1b643c96372742fb373 ""
-  "paper.aux" 1783200278 27629 3192e48d43b8dd476378041804d869d9 "pdflatex"
+  "paper.aux" 1783239298 27629 3192e48d43b8dd476378041804d869d9 "pdflatex"
   (generated)
   "paper.bbl"
   "paper.blg"
   (rewritten before read)
-["pdflatex"] 1783200273.17057 "paper.tex" "paper.pdf" "paper" 1783200279.45426 0
-  "../analysis_output/fig2_scatter.png" 1783198560 346773 5b26c13a6a55f43f8ba3e54b843d1158 ""
-  "../analysis_output/fig3_error_dist.png" 1783198562 262894 97f749983095c70d7193df59360f3d6c ""
-  "../analysis_output/fig4_stratified.png" 1783198564 342131 46e92836be78cb013c1a1ca34fb2adf8 ""
-  "../analysis_output/fig6_distributions.png" 1783198573 278588 f4eaadf470e4be65a4ae6e97c2378cfa ""
-  "../analysis_output/fig7_massbudget.png" 1783198574 186443 c40d46b194118d2244b687bfa3418367 ""
-  "../analysis_output/fig8_slices.png" 1783198577 1306192 f30712687a32ad5af6db691082c6b9b1 ""
-  "../analysis_output/fig_feature_importance.png" 1783198474 153922 d6da417dd94ea669bd0fa8c2bb9d0afc ""
-  "../analysis_output/fig_model_comparison.png" 1783174538 355987 bb5bf96fc60255dfbea68abc1be7227a ""
+["pdflatex"] 1783239292.4863 "paper.tex" "paper.pdf" "paper" 1783239299.6264 0
+  "../figures/fig2_scatter.png" 1783198560 346773 5b26c13a6a55f43f8ba3e54b843d1158 ""
+  "../figures/fig3_error_dist.png" 1783198562 262894 97f749983095c70d7193df59360f3d6c ""
+  "../figures/fig4_stratified.png" 1783198564 342131 46e92836be78cb013c1a1ca34fb2adf8 ""
+  "../figures/fig6_distributions.png" 1783198573 278588 f4eaadf470e4be65a4ae6e97c2378cfa ""
+  "../figures/fig7_massbudget.png" 1783198574 186443 c40d46b194118d2244b687bfa3418367 ""
+  "../figures/fig8_slices.png" 1783198577 1306192 f30712687a32ad5af6db691082c6b9b1 ""
+  "../figures/fig_feature_importance.png" 1783198474 153922 d6da417dd94ea669bd0fa8c2bb9d0afc ""
+  "../figures/fig_model_comparison.png" 1783174538 355987 bb5bf96fc60255dfbea68abc1be7227a ""
+  "../figures/nH2_histograms.png" 1777287730 69159 9aef2f27c1b230dc5d63ed656ebe322b ""
   "../logs/intra_cube_section/run_20260313_142443_heatmap.png" 1777287730 239885 d8372217005e80f88665ffe2e3b02a8c ""
   "../logs/single_cube_extrapolation/heatmap_20260313_022129.png" 1777287730 349386 53eaeadffda34d5ea4de0c49d5e912c3 ""
-  "../nH2_histograms.png" 1777287730 69159 9aef2f27c1b230dc5d63ed656ebe322b ""
   "c:/texlive/2026/texmf-dist/fonts/enc/dvips/newtx/ntx-ec-tlf.enc" 1775912880 2914 fdbc4a54b9bc76f4551b5303f2737d33 ""
   "c:/texlive/2026/texmf-dist/fonts/enc/dvips/newtx/ntx-ot1-tlf.enc" 1775912880 2083 60e36f8eac802fcaf19eabe2633b406e ""
   "c:/texlive/2026/texmf-dist/fonts/enc/dvips/tex-gyre/q-ts1.enc" 1775916563 3124 3813fd4c981d99822890a2861b0d274c ""
@@ -181,10 +181,10 @@
   "c:/texlive/2026/texmf-var/web2c/pdftex/pdflatex.fmt" 1775918869 3648464 f5d0d39dc2a579f705dfd6ee709a0d5c ""
   "c:/texlive/2026/texmf.cnf" 1775918767 713 e69b156964470283e0530f5060668171 ""
   "fig_method_diagram.png" 1777287730 93095 ecda681dc3828b385cefe947d42873e6 ""
-  "paper.aux" 1783200278 27629 3192e48d43b8dd476378041804d869d9 "pdflatex"
+  "paper.aux" 1783239298 27629 3192e48d43b8dd476378041804d869d9 "pdflatex"
   "paper.bbl" 1783199883 7631 7fe44f27e364cf9a9636a6b97f25fb87 "bibtex paper"
-  "paper.out" 1783200278 5099 725de7d2015674466eb3e2affcb439c8 "pdflatex"
-  "paper.tex" 1783200121 80130 d9c5476f13e4bd681e5af15402d2a835 ""
+  "paper.out" 1783239298 5099 725de7d2015674466eb3e2affcb439c8 "pdflatex"
+  "paper.tex" 1783239276 80074 4a3aea6e002096589012081eef064311 ""
   "rasti.cls" 1734527431 62977 3a18086d13989cda17d6ae57c5e20575 ""
   (generated)
   "paper.aux"

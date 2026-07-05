@@ -1,7 +1,7 @@
 # Instructions: updating or rewriting the paper with the new results
 
 Audience: a future Claude Code session asked to take the rerun results and
-figures (see `../RUN_PLAN.md`) and either revise `paper/paper.tex` in place
+figures (see `../docs/RUN_PLAN.md`) and either revise `paper/paper.tex` in place
 or write a new version. Written 2026-07-03 by the session that did the
 metrics/figure overhaul.
 
@@ -255,25 +255,25 @@ two stacking protocols (disclosure 7).
 
 | Paper element | Source | Notes |
 |---|---|---|
-| Table 1 (all classical + ensemble rows) | `arch_comparison_20260703_234017.json` (run 1b) | native-128³ eval; mwcal variants; importance blocks |
-| Table 1 U-Net row | `cnn_test_20260704_122206.json` (run 3) | R² 0.970±0.039; skill vs xgb computed cross-log (valid: same native cells); quote mass ratio as range/median, never mean |
-| Table 2 (f_H2 ablation) | `ablation_nofh2_128eval.json` (run 2b) | pointwise rows bit-match run 2; NEVER quote run 2's pooled ensemble rows |
-| §5.2 11-input upper bound | `cnn_test_20260704_170833.json` (run 4) | R² 0.893±0.088; "morphology yes, chemistry no" |
+| Table 1 (all classical + ensemble rows) | `results/arch_comparison_20260703_234017.json` (run 1b) | native-128³ eval; mwcal variants; importance blocks |
+| Table 1 U-Net row | `results/cnn_test_20260704_122206.json` (run 3) | R² 0.970±0.039; skill vs xgb computed cross-log (valid: same native cells); quote mass ratio as range/median, never mean |
+| Table 2 (f_H2 ablation) | `results/ablation_nofh2_128eval.json` (run 2b) | pointwise rows bit-match run 2; NEVER quote run 2's pooled ensemble rows |
+| §5.2 11-input upper bound | `results/cnn_test_20260704_170833.json` (run 4) | R² 0.893±0.088; "morphology yes, chemistry no" |
 | §5.4 error analysis + D2/D3 | `predictions/pred_g0_*_20260704_*.npz` (run 5) | nested weighted stack + mwcal; R² 0.9901±0.0064, mass 0.985–1.090; independent check = merit_metrics table 2026-07-05 |
 | §6.1 single-cube matrix | archived `logs/single_cube_extrapolation/` | rerun (run 10) only if new metrics quoted there |
 | §6.2 intra-cube section | archived `logs/intra_cube_section/` | same (run 11) |
-| U-Net config sensitivity | archived `cnn_test_20260322_221728.json`, `cnn_test_20260323_010315.json`, `cnn_training_*` | 64³ — say so explicitly |
+| U-Net config sensitivity | archived `results/cnn_test_20260322_221728.json`, `results/cnn_test_20260323_010315.json`, `results/cnn_training_*` | 64³ — say so explicitly |
 | Fig 1 (histograms) | `plot_nH2_histograms.py` | data unchanged |
 | Fig 2 (method diagram) | static | |
-| Fig 3 replacement (model comparison) | `analysis_output/fig_model_comparison.png` | run 1b + run 3 via `--cnn-log`; regenerate with `python plot_model_comparison.py --log arch_comparison_20260703_234017.json --cnn-log cnn_test_20260704_122206.json --variants ...` |
-| Figs 4–8 (scatter, residuals, stratified, marginals, slices) | `analysis_output/fig2_scatter, fig3_error_dist, fig4_stratified, fig6_distributions, fig8_slices` (2026-07-05, from run-5 volumes) | fig6 caption must cite KS/W1, not KL |
-| Mass-budget evidence (new) | `analysis_output/fig7_massbudget.png` | raw ×1.65–1.90 vs recal ≈1; phase panel |
-| Feature importance (new, D4) | `analysis_output/fig_feature_importance.png` | from run 1b importance blocks |
+| Fig 3 replacement (model comparison) | `figures/fig_model_comparison.png` | run 1b + run 3 via `--cnn-log`; regenerate with `python plot_model_comparison.py --log results/arch_comparison_20260703_234017.json --cnn-log results/cnn_test_20260704_122206.json --variants ...` |
+| Figs 4–8 (scatter, residuals, stratified, marginals, slices) | `figures/fig2_scatter, fig3_error_dist, fig4_stratified, fig6_distributions, fig8_slices` (2026-07-05, from run-5 volumes) | fig6 caption must cite KS/W1, not KL |
+| Mass-budget evidence (new) | `figures/fig7_massbudget.png` | raw ×1.65–1.90 vs recal ≈1; phase panel |
+| Feature importance (new, D4) | `figures/fig_feature_importance.png` | from run 1b importance blocks |
 | Figs 9–10 (§6 heatmaps) | archived heatmaps in `logs/` | update timestamped paths in paper.tex if runs 10/11 happen |
 
 ## Audit-mandated disclosures (2026-07-04 design audit)
 
-Full rationale per item in `DESIGN_DECISIONS.md` (repo root); this is the
+Full rationale per item in `docs/DESIGN_DECISIONS.md`; this is the
 checklist the rewritten paper must satisfy. All are text-only — none
 require new runs. Items marked (VERIFY) depend on answers from the
 simulation collaborators (see RUN_PLAN "Verification items"); draft the
@@ -363,20 +363,20 @@ sentence with a placeholder if the answer is pending.
 
 | Paper slot | File | Action |
 |---|---|---|
-| Fig 1 | `nH2_histograms.png` | keep as-is |
+| Fig 1 | `figures/nH2_histograms.png` | keep as-is |
 | Fig 2 | `fig_method_diagram.png` | keep as-is |
-| Fig 3 | `analysis_output/fig1_summary.png` | **REMOVE** — replace with `fig_model_comparison.png` (per-fold R²/RMSE/skill curves; caption: grey bands = extrapolation folds) |
+| Fig 3 | `figures/fig1_summary.png` | **REMOVE** — replace with `fig_model_comparison.png` (per-fold R²/RMSE/skill curves; caption: grey bands = extrapolation folds) |
 | Fig 4 | `fig2_scatter.png` | keep, regenerate |
 | Fig 5 | `fig3_error_dist.png` | keep, regenerate; caption must reflect post-recalibration biases |
 | Fig 6 | `fig4_stratified.png` | keep, regenerate |
 | Fig 7 | `fig6_distributions.png` | keep, regenerate; **caption bug**: currently cites KL divergence, the figure annotates KS D, p, and W1 — rewrite caption |
-| Fig 8 | `analysis_output/fig8_slices.png` | **path change** (was a stale PNG the old code couldn't regenerate); caption already matches this layout |
-| NEW | `analysis_output/fig7_massbudget.png` | insert in §5.4: mass ratio + bias raw-vs-recalibrated + phase-conditional R² |
-| NEW | `analysis_output/fig_feature_importance.png` | insert in Methods or Discussion (closes review D4) |
+| Fig 8 | `figures/fig8_slices.png` | **path change** (was a stale PNG the old code couldn't regenerate); caption already matches this layout |
+| NEW | `figures/fig7_massbudget.png` | insert in §5.4: mass ratio + bias raw-vs-recalibrated + phase-conditional R² |
+| NEW | `figures/fig_feature_importance.png` | insert in Methods or Discussion (closes review D4) |
 | Fig 9 | `logs/single_cube_extrapolation/heatmap_20260313_022129.png` | keep; update path only if rerun |
 | Fig 10 | `logs/intra_cube_section/run_20260313_142443_heatmap.png` | keep; update path only if rerun |
 
-`\graphicspath` in paper.tex is `{./}{../}` — analysis_output/ and logs/
+`\graphicspath` in paper.tex is `{./}{../}` — figures/ and logs/
 paths resolve via `../` from `paper/`. Verify every `\includegraphics`
 target exists before building.
 

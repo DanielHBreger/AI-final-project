@@ -17,7 +17,7 @@ Panels
 
 Usage
 -----
-  python plot_feature_importance.py                    # latest arch_comparison_*.json
+  python plot_feature_importance.py                    # latest results/arch_comparison_*.json
   python plot_feature_importance.py --log <path> --top-n 20
 """
 
@@ -44,7 +44,7 @@ _C_SPATIAL = '#d6604d'   # neighbourhood-mean features
 
 
 def _latest_log() -> str | None:
-    logs = sorted(glob.glob('arch_comparison_*.json'))
+    logs = sorted(glob.glob('results/arch_comparison_*.json'))
     return logs[-1] if logs else None
 
 
@@ -70,16 +70,16 @@ def main() -> None:
     parser = argparse.ArgumentParser(
         description='XGBoost feature-importance figure from an arch_comparison JSON.')
     parser.add_argument('--log', default=None,
-                        help='arch_comparison JSON (default: latest in cwd)')
+                        help='arch_comparison JSON (default: latest in results/)')
     parser.add_argument('--top-n', type=int, default=20,
                         help='Features shown in the spatial-variant panel (default 20)')
-    parser.add_argument('--save', default='analysis_output/fig_feature_importance.png',
+    parser.add_argument('--save', default='figures/fig_feature_importance.png',
                         help='Output PNG path')
     args = parser.parse_args()
 
     log_path = args.log or _latest_log()
     if log_path is None or not os.path.exists(log_path):
-        print('No arch_comparison_*.json found; pass one with --log', file=sys.stderr)
+        print('No results/arch_comparison_*.json found; pass one with --log', file=sys.stderr)
         sys.exit(1)
     with open(log_path) as f:
         log = json.load(f)

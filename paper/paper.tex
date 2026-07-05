@@ -341,7 +341,7 @@ target distribution shifted relative to everything seen in training.
 
 \begin{figure*}
 \centering
-\includegraphics[width=\textwidth]{nH2_histograms.png}
+\includegraphics[width=\textwidth]{figures/nH2_histograms.png}
 \caption{Distribution of $\logn$ across six UV field strengths. The
 seventh cube, $\Gzero = 0.2$, closely resembles $\Gzero = 0.1$ and is
 omitted from this figure only to avoid visual redundancy; it is included
@@ -804,7 +804,7 @@ Stack (+S+W), mass-cal.    & 0.294 & $+0.09$ & 0.26 & 0.93--1.07 & 0.991 & 0.86 
 
 \begin{figure*}
 \centering
-\includegraphics[width=\textwidth]{analysis_output/fig_model_comparison.png}
+\includegraphics[width=\textwidth]{figures/fig_model_comparison.png}
 \caption{Per-fold behaviour of representative models across the
 $\Gzero$ sweep: log-space $\Rsq$ (\emph{a}), RMSE (\emph{b}), and skill
 against the pointwise XGBoost baseline (\emph{c}). Grey bands mark the
@@ -855,7 +855,7 @@ picture holds fold by fold.
 
 \begin{figure*}
 \centering
-\includegraphics[width=\textwidth]{analysis_output/fig7_massbudget.png}
+\includegraphics[width=\textwidth]{figures/fig7_massbudget.png}
 \caption{Mass budget and phase-conditional accuracy of the deployed
 (fully nested) pipeline of Section~\ref{sec:per_fold}.
 \emph{(a)} Total H$_2$ mass ratio per held-out fold: the raw stack
@@ -943,7 +943,7 @@ Stack (+S+W), mass-cal. & $0.985 \pm 0.015 \rightarrow 0.964 \pm 0.014$ & $0.29 
 
 \begin{figure*}
 \centering
-\includegraphics[width=\textwidth]{analysis_output/fig_feature_importance.png}
+\includegraphics[width=\textwidth]{figures/fig_feature_importance.png}
 \caption{XGBoost gain importance, mean $\pm$ std over the seven folds.
 \emph{(a)} Pointwise model (15 local features): the solver-derived
 $\log\fshield$ dominates, followed by temperature and density.
@@ -1040,7 +1040,7 @@ that interior folds are not automatically easy.
 
 \begin{figure*}
 \centering
-\includegraphics[width=\textwidth]{analysis_output/fig2_scatter.png}
+\includegraphics[width=\textwidth]{figures/fig2_scatter.png}
 \caption{Predicted versus true $\logn$ per held-out fold
 (two-dimensional histograms, log colour scale; dashed line = identity),
 for the deployed mass-calibrated pipeline. Per-fold $\Rsq$, Pearson
@@ -1052,7 +1052,7 @@ population.}
 
 \begin{figure*}
 \centering
-\includegraphics[width=\textwidth]{analysis_output/fig3_error_dist.png}
+\includegraphics[width=\textwidth]{figures/fig3_error_dist.png}
 \caption{Residual distributions (predicted $-$ true, dex) per fold, with
 best-fit normal curves and their $(\mu, \sigma)$ annotated. Distribution
 widths decrease monotonically with $\Gzero$; per-fold means lie between
@@ -1080,7 +1080,7 @@ reproduced, with $W_1$ distances of 0.02--0.17\dex{} (mean 0.08).
 
 \begin{figure*}
 \centering
-\includegraphics[width=\textwidth]{analysis_output/fig4_stratified.png}
+\includegraphics[width=\textwidth]{figures/fig4_stratified.png}
 \caption{Density-stratified error analysis of the deployed pipeline.
 \emph{(a)} $\Rsq$ on the subset of cells above a minimum-density
 percentile: $\Rsq$ \emph{decreases} toward the dense tail because the
@@ -1097,7 +1097,7 @@ transition; high-$\Gzero$ folds are flat at $\la$0.1\dex.
 
 \begin{figure*}
 \centering
-\includegraphics[width=\textwidth]{analysis_output/fig6_distributions.png}
+\includegraphics[width=\textwidth]{figures/fig6_distributions.png}
 \caption{True (filled) versus predicted (outline) marginal distributions
 of $\logn$ per fold for the deployed pipeline, annotated with the
 two-sample Kolmogorov--Smirnov statistic and the Wasserstein distance
@@ -1115,7 +1115,7 @@ nearly uniform and residuals are small and unstructured.
 
 \begin{figure*}
 \centering
-\includegraphics[width=\textwidth,height=0.85\textheight,keepaspectratio]{analysis_output/fig8_slices.png}
+\includegraphics[width=\textwidth,height=0.85\textheight,keepaspectratio]{figures/fig8_slices.png}
 \caption{Mid-plane ($z = 64$) slices of the $\logn$ field for each
 $\Gzero$ (rows): ground truth, prediction, and absolute error
 (columns), for the deployed pipeline. Truth and prediction share one

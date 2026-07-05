@@ -64,7 +64,7 @@ def _parse_g0(dir_name: str) -> float:
     return float(dir_name.replace('_', '.'))
 
 
-def load_all_cubes(data_root: str = 'icedrive-dl-182bd/UVonly') -> list[pd.DataFrame]:
+def load_all_cubes(data_root: str = 'data/UVonly') -> list[pd.DataFrame]:
     """
     Load all simulation cubes from the UVonly directory.
 
@@ -154,7 +154,7 @@ def cube_to_volumes(df: pd.DataFrame, cols: list[str]) -> dict[str, np.ndarray]:
     return volumes
 
 
-def compute_data_checksum(data_root: str = 'icedrive-dl-182bd/UVonly') -> dict:
+def compute_data_checksum(data_root: str = 'data/UVonly') -> dict:
     """Compute a reproducibility fingerprint of the dataset CSV files.
 
     Hashes the first 8 KB + file size of every CSV to detect any change in
@@ -185,7 +185,7 @@ def get_g0_values(cubes: list[pd.DataFrame]) -> list[float]:
     return [df['G0'].iloc[0] for df in cubes]
 
 
-def load_single_cube(g0: float, data_root: str = 'icedrive-dl-182bd/UVonly') -> pd.DataFrame:
+def load_single_cube(g0: float, data_root: str = 'data/UVonly') -> pd.DataFrame:
     """Load a single simulation cube for the given G0 value.
 
     Applies the same preprocessing as load_all_cubes (log_fh2, log_nH2)

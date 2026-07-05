@@ -50,7 +50,7 @@ import os
 import sys
 import numpy as np
 
-# Ensure relative data paths (icedrive-dl-182bd/UVonly) resolve correctly
+# Ensure relative data paths (data/UVonly) resolve correctly
 # regardless of which directory Code Runner / the shell launches from.
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 import torch

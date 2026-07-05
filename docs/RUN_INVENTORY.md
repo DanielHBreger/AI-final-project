@@ -1,6 +1,7 @@
 # Experiment Run Inventory
 
 Complete reference for features, hyperparameters, and results across all logged runs.
+The JSON logs referenced below live in `results/` (moved there from the repo root in the 2026-07-05 reorganization).
 
 ---
 

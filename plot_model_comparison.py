@@ -18,8 +18,8 @@ Panels
 
 Usage
 -----
-  python plot_model_comparison.py                          # latest arch_comparison_*.json
-  python plot_model_comparison.py --log arch_comparison_20260311_125636.json
+  python plot_model_comparison.py                          # latest results/arch_comparison_*.json
+  python plot_model_comparison.py --log results/arch_comparison_20260311_125636.json
   python plot_model_comparison.py --variants xgb_standard mlp_wide stacked_sp
 """
 
@@ -65,7 +65,7 @@ DEFAULT_VARIANTS = ['xgb_standard', 'mlp_wide', 'xgb_standard_sp',
 
 
 def _latest_log() -> str | None:
-    logs = sorted(glob.glob('arch_comparison_*.json'))
+    logs = sorted(glob.glob('results/arch_comparison_*.json'))
     return logs[-1] if logs else None
 
 
@@ -113,7 +113,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(
         description='Per-fold model comparison figure from an arch_comparison JSON.')
     parser.add_argument('--log', default=None,
-                        help='arch_comparison JSON (default: latest in cwd)')
+                        help='arch_comparison JSON (default: latest in results/)')
     parser.add_argument('--cnn-log', default=None,
                         help='Optional cnn_test_*.json whose U-Net variants '
                              'are merged into the comparison (skill vs the '
@@ -122,7 +122,7 @@ def main() -> None:
     parser.add_argument('--variants', nargs='+', default=None,
                         help=f'Variants to plot (default: those of '
                              f'{DEFAULT_VARIANTS} present in the log)')
-    parser.add_argument('--save', default='analysis_output/fig_model_comparison.png',
+    parser.add_argument('--save', default='figures/fig_model_comparison.png',
                         help='Output PNG path')
     parser.add_argument('--r2-min', type=float, default=None,
                         help='Lower y-limit for the R2 panel (e.g. 0.85), for '
@@ -131,7 +131,7 @@ def main() -> None:
 
     log_path = args.log or _latest_log()
     if log_path is None or not os.path.exists(log_path):
-        print('No arch_comparison_*.json found; pass one with --log', file=sys.stderr)
+        print('No results/arch_comparison_*.json found; pass one with --log', file=sys.stderr)
         sys.exit(1)
     with open(log_path) as f:
         log = json.load(f)

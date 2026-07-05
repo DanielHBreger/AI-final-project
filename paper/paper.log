@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.29 (TeX Live 2026) (preloaded format=pdflatex 2026.4.11)  5 JUL 2026 00:24
+This is pdfTeX, Version 3.141592653-2.6-1.40.29 (TeX Live 2026) (preloaded format=pdflatex 2026.4.11)  5 JUL 2026 11:14
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -1017,10 +1017,11 @@ LaTeX Font Info:    Font shape `T1/ntxtt/m/n' will be
 (Font)              scaled to size 8.0pt on input line 295.
 LaTeX Font Info:    Font shape `T1/ntxtt/m/n' will be
 (Font)              scaled to size 9.0pt on input line 321.
-<../nH2_histograms.png, id=232, 932.7648pt x 492.3996pt>
-File: ../nH2_histograms.png Graphic file (type png)
-<use ../nH2_histograms.png>
-Package pdftex.def Info: ../nH2_histograms.png  used on input line 344.
+<../figures/nH2_histograms.png, id=232, 932.7648pt x 492.3996pt>
+File: ../figures/nH2_histograms.png Graphic file (type png)
+<use ../figures/nH2_histograms.png>
+Package pdftex.def Info: ../figures/nH2_histograms.png  used on input line 344.
+
 (pdftex.def)             Requested size: 508.0pt x 268.16838pt.
 
 Underfull \hbox (badness 2512) in paragraph at lines 362--374
@@ -1047,18 +1048,18 @@ s been already used, duplicate ignored
 <argument> ...shipout:D \box_use:N \l_shipout_box 
                                                   \__shipout_drop_firstpage_...
 l.539 \begin{equation}
-                       <../nH2_histograms.png>] [5
+                       <../figures/nH2_histograms.png>] [5
 pdfTeX warning (ext4): destination with the same identifier (name{figure.2}) ha
 s been already used, duplicate ignored
 <argument> ...shipout:D \box_use:N \l_shipout_box 
                                                   \__shipout_drop_firstpage_...
 l.611 
        <./fig_method_diagram.png>]
-<../analysis_output/fig_model_comparison.png, id=331, 764.8575pt x 222.3507pt>
-File: ../analysis_output/fig_model_comparison.png Graphic file (type png)
-<use ../analysis_output/fig_model_comparison.png>
-Package pdftex.def Info: ../analysis_output/fig_model_comparison.png  used on i
-nput line 807.
+<../figures/fig_model_comparison.png, id=331, 764.8575pt x 222.3507pt>
+File: ../figures/fig_model_comparison.png Graphic file (type png)
+<use ../figures/fig_model_comparison.png>
+Package pdftex.def Info: ../figures/fig_model_comparison.png  used on input lin
+e 807.
 (pdftex.def)             Requested size: 508.0pt x 147.68153pt.
  [6]
 Underfull \vbox (badness 10000) has occurred while \output is active []
@@ -1081,34 +1082,32 @@ s been already used, duplicate ignored
 <argument> ...shipout:D \box_use:N \l_shipout_box 
                                                   \__shipout_drop_firstpage_...
 l.833 
-       <../analysis_output/fig_model_comparison.png>]
-<../analysis_output/fig7_massbudget.png, id=355, 764.1348pt x 223.3143pt>
-File: ../analysis_output/fig7_massbudget.png Graphic file (type png)
-<use ../analysis_output/fig7_massbudget.png>
-Package pdftex.def Info: ../analysis_output/fig7_massbudget.png  used on input 
-line 858.
+       <../figures/fig_model_comparison.png>]
+<../figures/fig7_massbudget.png, id=355, 764.1348pt x 223.3143pt>
+File: ../figures/fig7_massbudget.png Graphic file (type png)
+<use ../figures/fig7_massbudget.png>
+Package pdftex.def Info: ../figures/fig7_massbudget.png  used on input line 858
+.
 (pdftex.def)             Requested size: 508.0pt x 148.46124pt.
-<../analysis_output/fig_feature_importance.png, id=360, 774.0117pt x 289.5618pt
->
-File: ../analysis_output/fig_feature_importance.png Graphic file (type png)
-<use ../analysis_output/fig_feature_importance.png>
-Package pdftex.def Info: ../analysis_output/fig_feature_importance.png  used on
- input line 946.
+<../figures/fig_feature_importance.png, id=360, 774.0117pt x 289.5618pt>
+File: ../figures/fig_feature_importance.png Graphic file (type png)
+<use ../figures/fig_feature_importance.png>
+Package pdftex.def Info: ../figures/fig_feature_importance.png  used on input l
+ine 946.
 (pdftex.def)             Requested size: 508.0pt x 190.04654pt.
  [8]
 Underfull \vbox (badness 10000) has occurred while \output is active []
 
-<../analysis_output/fig2_scatter.png, id=381, 1008.1665pt x 472.164pt>
-File: ../analysis_output/fig2_scatter.png Graphic file (type png)
-<use ../analysis_output/fig2_scatter.png>
-Package pdftex.def Info: ../analysis_output/fig2_scatter.png  used on input lin
-e 1043.
+<../figures/fig2_scatter.png, id=381, 1008.1665pt x 472.164pt>
+File: ../figures/fig2_scatter.png Graphic file (type png)
+<use ../figures/fig2_scatter.png>
+Package pdftex.def Info: ../figures/fig2_scatter.png  used on input line 1043.
 (pdftex.def)             Requested size: 508.0pt x 237.91139pt.
-<../analysis_output/fig3_error_dist.png, id=382, 1011.5391pt x 452.6511pt>
-File: ../analysis_output/fig3_error_dist.png Graphic file (type png)
-<use ../analysis_output/fig3_error_dist.png>
-Package pdftex.def Info: ../analysis_output/fig3_error_dist.png  used on input 
-line 1055.
+<../figures/fig3_error_dist.png, id=382, 1011.5391pt x 452.6511pt>
+File: ../figures/fig3_error_dist.png Graphic file (type png)
+<use ../figures/fig3_error_dist.png>
+Package pdftex.def Info: ../figures/fig3_error_dist.png  used on input line 105
+5.
 (pdftex.def)             Requested size: 508.0pt x 227.31958pt.
 
 Underfull \vbox (badness 10000) has occurred while \output is active []
@@ -1131,21 +1130,21 @@ s been already used, duplicate ignored
 <argument> ...shipout:D \box_use:N \l_shipout_box 
                                                   \__shipout_drop_firstpage_...
 l.1080 
-        <../analysis_output/fig7_massbudget.png> <../analysis_output/fig_featur
-e_importance.png>]
+        <../figures/fig7_massbudget.png> <../figures/fig_feature_importance.png
+>]
 Underfull \vbox (badness 10000) has occurred while \output is active []
 
-<../analysis_output/fig4_stratified.png, id=397, 423.984pt x 406.3983pt>
-File: ../analysis_output/fig4_stratified.png Graphic file (type png)
-<use ../analysis_output/fig4_stratified.png>
-Package pdftex.def Info: ../analysis_output/fig4_stratified.png  used on input 
-line 1083.
+<../figures/fig4_stratified.png, id=397, 423.984pt x 406.3983pt>
+File: ../figures/fig4_stratified.png Graphic file (type png)
+<use ../figures/fig4_stratified.png>
+Package pdftex.def Info: ../figures/fig4_stratified.png  used on input line 108
+3.
 (pdftex.def)             Requested size: 508.0pt x 486.94379pt.
-<../analysis_output/fig6_distributions.png, id=398, 1010.8164pt x 445.665pt>
-File: ../analysis_output/fig6_distributions.png Graphic file (type png)
-<use ../analysis_output/fig6_distributions.png>
-Package pdftex.def Info: ../analysis_output/fig6_distributions.png  used on inp
-ut line 1100.
+<../figures/fig6_distributions.png, id=398, 1010.8164pt x 445.665pt>
+File: ../figures/fig6_distributions.png Graphic file (type png)
+<use ../figures/fig6_distributions.png>
+Package pdftex.def Info: ../figures/fig6_distributions.png  used on input line 
+1100.
 (pdftex.def)             Requested size: 508.0pt x 223.9744pt.
 
 Underfull \vbox (badness 10000) has occurred while \output is active []
@@ -1162,13 +1161,11 @@ s been already used, duplicate ignored
 <argument> ...shipout:D \box_use:N \l_shipout_box 
                                                   \__shipout_drop_firstpage_...
 l.1115 
-        <../analysis_output/fig2_scatter.png> <../analysis_output/fig3_error_di
-st.png>]
-<../analysis_output/fig8_slices.png, id=411, 589.2414pt x 1166.9196pt>
-File: ../analysis_output/fig8_slices.png Graphic file (type png)
-<use ../analysis_output/fig8_slices.png>
-Package pdftex.def Info: ../analysis_output/fig8_slices.png  used on input line
- 1118.
+        <../figures/fig2_scatter.png> <../figures/fig3_error_dist.png>]
+<../figures/fig8_slices.png, id=411, 589.2414pt x 1166.9196pt>
+File: ../figures/fig8_slices.png Graphic file (type png)
+<use ../figures/fig8_slices.png>
+Package pdftex.def Info: ../figures/fig8_slices.png  used on input line 1118.
 (pdftex.def)             Requested size: 292.73184pt x 579.71916pt.
 
 Underfull \vbox (badness 10000) has occurred while \output is active []
@@ -1182,7 +1179,7 @@ s been already used, duplicate ignored
 <argument> ...shipout:D \box_use:N \l_shipout_box 
                                                   \__shipout_drop_firstpage_...
 l.1152 
-        <../analysis_output/fig4_stratified.png>]
+        <../figures/fig4_stratified.png>]
 <../logs/single_cube_extrapolation/heatmap_20260313_022129.png, id=421, 933.246
 6pt x 325.4559pt>
 File: ../logs/single_cube_extrapolation/heatmap_20260313_022129.png Graphic fil
@@ -1205,7 +1202,7 @@ s been already used, duplicate ignored
 <argument> ...shipout:D \box_use:N \l_shipout_box 
                                                   \__shipout_drop_firstpage_...
 l.1271 
-        <../analysis_output/fig6_distributions.png>]
+        <../figures/fig6_distributions.png>]
 Underfull \vbox (badness 10000) has occurred while \output is active []
 
  [13
@@ -1214,7 +1211,7 @@ as been already used, duplicate ignored
 <argument> ...shipout:D \box_use:N \l_shipout_box 
                                                   \__shipout_drop_firstpage_...
 l.1271 
-        <../analysis_output/fig8_slices.png>] [14
+        <../figures/fig8_slices.png>] [14
 pdfTeX warning (ext4): destination with the same identifier (name{figure.11}) h
 as been already used, duplicate ignored
 <argument> ...shipout:D \box_use:N \l_shipout_box 
@@ -1248,8 +1245,8 @@ Package rerunfilecheck Info: File `paper.out' has not changed.
  ) 
 Here is how much of TeX's memory you used:
  19518 strings out of 467349
- 353742 string characters out of 5419862
- 765923 words of memory out of 5000000
+ 353238 string characters out of 5419862
+ 765915 words of memory out of 5000000
  48205 multiletter control sequences out of 15000+600000
  757286 words of font info for 227 fonts, out of 8000000 for 9000
  1141 hyphenation exceptions out of 8191

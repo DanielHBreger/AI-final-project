@@ -254,7 +254,7 @@ def main() -> None:
                         metavar='V',
                         help=f'Variants to run. Choices: {all_names}')
     parser.add_argument('--log', type=str, default=None,
-                        help='JSON output path (default: cnn_test_TIMESTAMP.json)')
+                        help='JSON output path (default: results/cnn_test_TIMESTAMP.json)')
     parser.add_argument('--downsample', action='store_true',
                         help='Average-pool volumes 128^3 -> 64^3 (legacy '
                              'behaviour for constrained VRAM; default trains '
@@ -283,7 +283,7 @@ def main() -> None:
     print(f"Symmetry ops: {len(ops)}  ({'safe z-preserving' if not args.all_ops else 'full Oh'})")
 
     ts       = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
-    log_path = args.log or f'cnn_test_{ts}.json'
+    log_path = args.log or f'results/cnn_test_{ts}.json'
 
     results: dict[str, dict] = {}
     for name in args.variants:

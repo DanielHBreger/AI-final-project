@@ -2,7 +2,7 @@
 plot_slide6_ablation.py
 Ablation bar chart for Slide 6: progressive feature-engineering gains.
 R² values from actual JSON logs (leave-one-G0-out, log-space metric).
-Saves slide6_ablation.png
+Saves figures/slide6_ablation.png
 """
 
 import json
@@ -14,8 +14,8 @@ import matplotlib.pyplot as plt
 # Step 1+2 from arch_comparison_20260309_085656  (single-scale 3³, no kernels key)
 # Step 3+4 from arch_comparison_20260309_121724  (kernels=[3,5,7])
 
-LOG1 = 'arch_comparison_20260309_085656.json'
-LOG2 = 'arch_comparison_20260309_121724.json'
+LOG1 = 'results/arch_comparison_20260309_085656.json'
+LOG2 = 'results/arch_comparison_20260309_121724.json'
 
 with open(LOG1) as f:
     d1 = json.load(f)
@@ -91,6 +91,6 @@ fig.text(0.99, 0.01,
          ha='right', va='bottom', fontsize=8, color='#666666')
 
 plt.tight_layout()
-plt.savefig('slide6_ablation.png', dpi=150, bbox_inches='tight')
-print("Saved: slide6_ablation.png")
+plt.savefig('figures/slide6_ablation.png', dpi=150, bbox_inches='tight')
+print("Saved: figures/slide6_ablation.png")
 plt.show()

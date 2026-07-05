@@ -166,7 +166,7 @@ The full pipeline is deterministic and runs end-to-end on a single GPU:
 | 3D volume viewer (PyVista, linked panels) | `load_and_compare.py` |
 | 2D slice browser (matplotlib, slider + textbox) | `slice_compare.py` |
 
-All experiment runs are logged to timestamped JSON (`arch_comparison_*.json`, `cnn_training_*.json`, `logs/**`). Predictions are stored as per-fold `.npz` files with embedded R² metadata.
+All experiment runs are logged to timestamped JSON (`results/arch_comparison_*.json`, `results/cnn_training_*.json`, `logs/**`). Predictions are stored as per-fold `.npz` files with embedded R² metadata.
 
 ---
 

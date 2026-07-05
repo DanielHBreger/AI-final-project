@@ -708,7 +708,7 @@ Built a production prediction script (`predict_and_visualize.py`) that trains en
 
 ### 11.1 Data Pipeline (`data_loader.py`)
 
-The entry point for all data. Loads 7 CSV files from `icedrive-dl-182bd/UVonly/{G0_dir}/*.csv`, where the directory name encodes G0 (e.g., `0_1` for G0=0.1, `3_2` for G0=3.2).
+The entry point for all data. Loads 7 CSV files from `data/UVonly/{G0_dir}/*.csv`, where the directory name encodes G0 (e.g., `0_1` for G0=0.1, `3_2` for G0=3.2).
 
 **`load_all_cubes()`**: Loads all 7 cubes, applies preprocessing (drop nH2, add log-transforms, add G0 features), returns a list of DataFrames sorted by G0.
 
@@ -790,8 +790,9 @@ AI-final-project/
 ├── logs/                              # Experiment result logs
 │   ├── single_cube_extrapolation/     # 7x7 extrapolation runs + heatmaps
 │   └── intra_cube_section/            # Spatial section runs + heatmaps
-├── arch_comparison_*.json             # Architecture comparison logs
-└── cnn_training_*.json                # CNN-specific training logs
+└── results/                           # Timestamped JSON run logs
+    ├── arch_comparison_*.json         # Architecture comparison logs
+    └── cnn_training_*.json            # CNN-specific training logs
 ```
 
 ---

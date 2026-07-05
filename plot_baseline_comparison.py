@@ -13,8 +13,8 @@ import matplotlib.pyplot as plt
 from data_loader import load_all_cubes, get_X_y, get_g0_values
 from classical_models import run_linear
 
-LOG    = 'arch_comparison_20260311_231200.json'
-OUTPNG = 'baseline_comparison.png'
+LOG    = 'results/arch_comparison_20260311_231200.json'
+OUTPNG = 'figures/baseline_comparison.png'
 COLORS = ['#4C72B0', '#55A868', '#C44E52']
 
 # ── load XGB / MLP folds from JSON ────────────────────────────────────────────

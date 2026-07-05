@@ -21,7 +21,7 @@ Usage
 -----
   python statistical_analysis.py
   python statistical_analysis.py --pred-dir predictions/
-  python statistical_analysis.py --pred-dir . --save-dir analysis_output/
+  python statistical_analysis.py --pred-dir . --save-dir figures/
 """
 
 import argparse
@@ -861,8 +861,8 @@ def main() -> None:
     parser.add_argument('--pred-dir', default=None,
                         help='Directory with .npz prediction files '
                              '(default: opens a folder-chooser dialog)')
-    parser.add_argument('--save-dir', default='analysis_output',
-                        help='Output directory for figures (default: analysis_output/)')
+    parser.add_argument('--save-dir', default='figures',
+                        help='Output directory for figures (default: figures/)')
     args = parser.parse_args()
 
     pred_dir  = args.pred_dir or _choose_directory()

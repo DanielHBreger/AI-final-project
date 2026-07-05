@@ -1,7 +1,7 @@
 """
 plot_slide6_diagram.py
 Key-idea concept diagram for Slide 6: spatial neighbourhood features.
-Saves slide6_diagram.png
+Saves figures/slide6_diagram.png
 """
 
 import matplotlib.pyplot as plt
@@ -175,6 +175,6 @@ ax_r.text(8.8, 0.9, r'$\hat{n}_{\mathrm{H_2}}$',
 #           ha='center', va='center', fontsize=9, color='#1B5E20', style='italic',
 #           bbox=dict(fc='#E8F5E9', ec='#A5D6A7', lw=1, boxstyle='round,pad=0.4'))
 
-plt.savefig('slide6_diagram.png', dpi=150, bbox_inches='tight', facecolor='white')
-print("Saved: slide6_diagram.png")
+plt.savefig('figures/slide6_diagram.png', dpi=150, bbox_inches='tight', facecolor='white')
+print("Saved: figures/slide6_diagram.png")
 plt.show()

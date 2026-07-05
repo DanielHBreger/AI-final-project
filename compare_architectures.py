@@ -839,7 +839,7 @@ if __name__ == '__main__':
     parser.set_defaults(spatial=True)
     parser.add_argument('--log',        type=str, default=None,
                         help='Output JSON path '
-                             '(default: arch_comparison_TIMESTAMP.json)')
+                             '(default: results/arch_comparison_TIMESTAMP.json)')
     add_drop_args(parser)
     args = parser.parse_args()
 
@@ -850,7 +850,7 @@ if __name__ == '__main__':
     env_info = _get_env_info()
 
     ts       = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
-    log_path = args.log or f'arch_comparison_{ts}.json'
+    log_path = args.log or f'results/arch_comparison_{ts}.json'
 
     print("Loading data...")
     cubes         = load_all_cubes()

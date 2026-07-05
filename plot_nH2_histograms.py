@@ -35,6 +35,6 @@ fig.suptitle(r'Distribution of $\log_{10}(n_{\mathrm{H_2}})$ across UV field str
              fontsize=13, y=0.97)
 
 plt.tight_layout()
-plt.savefig('nH2_histograms.png', dpi=150, bbox_inches='tight')
-print("Saved: nH2_histograms.png")
+plt.savefig('figures/nH2_histograms.png', dpi=150, bbox_inches='tight')
+print("Saved: figures/nH2_histograms.png")
 plt.show()

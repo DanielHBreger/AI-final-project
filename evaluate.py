@@ -79,7 +79,7 @@ def save_results_log(all_results: dict[str, list[dict]],
 
 def plot_r2_comparison(all_results: dict[str, list[dict]],
                        g0_values: list[float],
-                       save_path: str = 'r2_comparison.png') -> None:
+                       save_path: str = 'figures/r2_comparison.png') -> None:
     fig, ax = plt.subplots(figsize=(10, 5))
     x = np.arange(len(g0_values))
     width = 0.2
@@ -124,7 +124,7 @@ def plot_scatter(y_true_log: np.ndarray, y_pred_log: np.ndarray,
     ax.set_title(f'{model_name}  (G0={g0:.1f} held out)')
     ax.legend()
     plt.tight_layout()
-    path = save_path or f'scatter_{model_name.replace(" ", "_")}_G0{g0}.png'
+    path = save_path or f'figures/scatter_{model_name.replace(" ", "_")}_G0{g0}.png'
     plt.savefig(path, dpi=150)
     print(f"Saved scatter -> {path}")
     plt.close()
@@ -140,7 +140,7 @@ if __name__ == '__main__':
     parser.add_argument('--cnn-all-ops', action='store_true',
                         help='Use all 48 Oh ops for CNN augmentation')
     parser.add_argument('--log',         type=str, default=None,
-                        help='Path for JSON results log (default: evaluation_TIMESTAMP.json)')
+                        help='Path for JSON results log (default: results/evaluation_TIMESTAMP.json)')
     add_drop_args(parser)
     args = parser.parse_args()
 
@@ -192,7 +192,7 @@ if __name__ == '__main__':
     print_summary(all_results, g0_vals)
 
     # ── Results log ───────────────────────────────────────────────────────────
-    log_path = args.log or f'evaluation_{_ts}.json'
+    log_path = args.log or f'results/evaluation_{_ts}.json'
     save_results_log(all_results, g0_vals, _run_config, log_path)
 
     # ── Plots ─────────────────────────────────────────────────────────────────

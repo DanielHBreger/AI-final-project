@@ -8,7 +8,7 @@ overhaul (fig7/fig8 + two standalone figure scripts). Old JSON logs remain
 
 ## Before starting
 
-- Data: `icedrive-dl-182bd/UVonly/<G0>/`; loading all 7 cubes takes several
+- Data: `data/UVonly/<G0>/`; loading all 7 cubes takes several
   minutes per script invocation.
 - Python stdout is fully buffered when redirected — always use `python -u`
   and redirect to a log file for the long runs.
@@ -35,12 +35,12 @@ overhaul (fig7/fig8 + two standalone figure scripts). Old JSON logs remain
 
 | # | Command | Time | Output | Feeds |
 |---|---------|------|--------|-------|
-| 1 | `python -u compare_architectures.py > run_main.log` | ~2.5 h | `arch_comparison_<ts>.json` | Table 1 (all metrics + skill), model-comparison figure, feature-importance figure |
-| 2 | `python -u compare_architectures.py --no-fh2 --log ablation_nofh2_<date>.json > run_nofh2.log` | ~2.5 h | ablation JSON | Table 2 (f_H2 ablation) |
-| 3 | `python -u test_cnn.py --variants unet_baseline > run_cnn.log` | hours | `cnn_test_<ts>.json` | U-Net row of Table 1 |
-| 4 | `python -u test_cnn.py --no-fh2 --no-nH --no-nHp --no-ext --variants unet_baseline > run_cnn11.log` | hours | `cnn_test_<ts>.json` | 11-input U-Net upper-bound number (§5.2) |
+| 1 | `python -u compare_architectures.py > run_main.log` | ~2.5 h | `results/arch_comparison_<ts>.json` | Table 1 (all metrics + skill), model-comparison figure, feature-importance figure |
+| 2 | `python -u compare_architectures.py --no-fh2 --log results/ablation_nofh2_<date>.json > run_nofh2.log` | ~2.5 h | ablation JSON | Table 2 (f_H2 ablation) |
+| 3 | `python -u test_cnn.py --variants unet_baseline > run_cnn.log` | hours | `results/cnn_test_<ts>.json` | U-Net row of Table 1 |
+| 4 | `python -u test_cnn.py --no-fh2 --no-nH --no-nHp --no-ext --variants unet_baseline > run_cnn11.log` | hours | `results/cnn_test_<ts>.json` | 11-input U-Net upper-bound number (§5.2) |
 | 5 | `python -u predict_and_visualize.py --all > run_pred.log` | ~2–3 h | `predictions/pred_g0_*_<ts>.npz` (raw + recalibrated volumes, `metrics_json`) | §5.4 error analysis; closes review items D2 (full 100-epoch schedule) and D3 (bias recalibration) |
-| 6 | `python statistical_analysis.py --pred-dir predictions --save-dir analysis_output` | ~10 min | `analysis_output/fig1..fig8` | Figures (see below) |
+| 6 | `python statistical_analysis.py --pred-dir predictions --save-dir figures` | ~10 min | `figures/fig1..fig8` | Figures (see below) |
 | 7 | `python merit_metrics.py > merit_table.txt` | minutes | console table | independent mass-budget / phase check |
 
 ### Status (updated 2026-07-03 evening)
@@ -131,7 +131,7 @@ overhaul (fig7/fig8 + two standalone figure scripts). Old JSON logs remain
   R2_mol 0.979–0.994, R2_dif 0.735–0.996, MAE_mw 0.03–0.09. The
   scientific-merit review's complaints (mass ×1.63–1.85, diffuse R²
   down to 0.60) are resolved in the delivered volumes.
-- **Figures DONE** (2026-07-05): run 6 (`analysis_output/fig1..fig8`)
+- **Figures DONE** (2026-07-05): run 6 (`figures/fig1..fig8`)
   from the run-5 volumes; `fig_model_comparison.png` (run 1b + run 3 via
   `--cnn-log`); `fig_feature_importance.png` (run 1b — log_fh2 dominates
   ≈0.6 local/≈0.85 aggregated, then T/nH/nHp/G0; v and B negligible →
@@ -197,10 +197,10 @@ Feed the answers into the paper's §2 wording (see PAPER_UPDATE_INSTRUCTIONS
 ## Figures to produce
 
 Static / data-independent (no rerun needed):
-- `nH2_histograms.png` (`plot_nH2_histograms.py`) — paper Fig 1. Data unchanged.
+- `figures/nH2_histograms.png` (`plot_nH2_histograms.py`) — paper Fig 1. Data unchanged.
 - `fig_method_diagram.png` — paper Fig 2. Static diagram.
 
-From run 6 (`analysis_output/`):
+From run 6 (`figures/`):
 - `fig2_scatter.png` — paper Fig 4 (pred vs truth per fold)
 - `fig3_error_dist.png` — paper Fig 5 (residual distributions)
 - `fig4_stratified.png` — paper Fig 6 (density-stratified errors)
@@ -215,10 +215,10 @@ From run 6 (`analysis_output/`):
   (bar charts of table numbers), replaced by:
 
 Standalone figure scripts (after run 1):
-- `python plot_model_comparison.py` → `analysis_output/fig_model_comparison.png`
+- `python plot_model_comparison.py` → `figures/fig_model_comparison.png`
   — **NEW**, replaces paper Fig 3. Use `--r2-min 0.85` if a weak variant
   compresses the axis; `--variants ...` to select rows.
-- `python plot_feature_importance.py` → `analysis_output/fig_feature_importance.png`
+- `python plot_feature_importance.py` → `figures/fig_feature_importance.png`
   — **NEW** (needs the run-1 JSON; older logs have no importance blocks).
 
 From runs 10/11 (only if rerun):

@@ -3,7 +3,7 @@ animate_cubes.py
 3x2 grid (3 cols, 2 rows) of 3-D scatter plots of ground-truth nH2 in linear
 space, rotating 360 deg. Frames are rendered in parallel; panel data lives in
 shared memory so workers never copy it (no RAM multiplication).
-Saves cube_rotation.gif  (and optionally cube_rotation.mp4 if ffmpeg present).
+Saves media/cube_rotation.gif  (and optionally media/cube_rotation.mp4 if ffmpeg present).
 """
 
 import io
@@ -24,7 +24,7 @@ ELEV      = 22
 FRAMES    = 72          # 360 / 5 deg per frame
 FPS       = 20
 CMAP      = 'plasma'
-OUT_GIF   = 'cube_rotation.gif'
+OUT_GIF   = 'media/cube_rotation.gif'
 N_WORKERS = 24           # raise if you have RAM headroom; lower to use less RAM
 
 # ── worker globals ─────────────────────────────────────────────────────────────
@@ -168,9 +168,9 @@ def main():
                 'ffmpeg', '-y', '-framerate', str(FPS),
                 '-i', os.path.join(td, 'frame_%04d.png'),
                 '-c:v', 'libx264', '-pix_fmt', 'yuv420p',
-                'cube_rotation.mp4',
+                'media/cube_rotation.mp4',
             ], check=True, capture_output=True)
-        print("Saved: cube_rotation.mp4")
+        print("Saved: media/cube_rotation.mp4")
     except Exception:
         pass
 

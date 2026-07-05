@@ -308,7 +308,7 @@ def run_cnn_cv(safe_only:    bool = True,
     # ── Write JSON training log ────────────────────────────────────────────────
     if log_path is None:
         ts = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
-        log_path = f'cnn_training_{ts}.json'
+        log_path = f'results/cnn_training_{ts}.json'
 
     summary = {}
     for metric in ('R2', 'R2_lin', 'RMSE', 'MAE'):
@@ -344,7 +344,7 @@ if __name__ == '__main__':
                              'behaviour for constrained VRAM; default trains '
                              'at native 128^3)')
     parser.add_argument('--log',      type=str,   default=None,
-                        help='Path for JSON training log (default: cnn_training_TIMESTAMP.json)')
+                        help='Path for JSON training log (default: results/cnn_training_TIMESTAMP.json)')
     add_drop_args(parser)
     args = parser.parse_args()
 

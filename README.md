@@ -23,7 +23,7 @@ pipeline trains in minutes on one consumer GPU — roughly two orders of
 magnitude cheaper than the U-Net, with better robustness at the
 extrapolation boundaries.
 
-![Predicted vs true](analysis_output/fig2_scatter.png)
+![Predicted vs true](figures/fig2_scatter.png)
 
 ## Data
 
@@ -35,7 +35,7 @@ temperature, ionisation, dust extinction, H2 self-shielding factor, G0,
 velocity, face-centred magnetic field) and the target `nH2`, which spans
 ~16 orders of magnitude (all modelling is done in log space).
 
-The cubes live in `icedrive-dl-182bd/UVonly/<G0>/` as CSV files tracked
+The cubes live in `data/UVonly/<G0>/` as CSV files tracked
 with **Git LFS** — install [git-lfs](https://git-lfs.com/) before cloning,
 or the data files will be broken pointers:
 
@@ -79,7 +79,7 @@ python test_cnn.py --variants unet_baseline
 python predict_and_visualize.py --all
 
 # Publication figures from the saved prediction volumes
-python statistical_analysis.py --pred-dir predictions --save-dir analysis_output
+python statistical_analysis.py --pred-dir predictions --save-dir figures
 python plot_model_comparison.py               # per-fold comparison figure
 python plot_feature_importance.py             # XGBoost feature importances
 
@@ -89,9 +89,10 @@ python intra_cube_section.py                  # within-cube sampling geometry
 python merit_metrics.py                       # mass-budget / phase-conditional check
 ```
 
-Every experiment writes a timestamped JSON log with the full configuration,
-per-fold metrics, package versions, and a SHA-256 fingerprint of the input
-data. See `RUN_PLAN.md` for the complete run book used for the paper.
+Every experiment writes a timestamped JSON log (under `results/`) with the
+full configuration, per-fold metrics, package versions, and a SHA-256
+fingerprint of the input data. See `docs/RUN_PLAN.md` for the complete run
+book used for the paper.
 
 ## Repository layout
 
@@ -108,9 +109,13 @@ data. See `RUN_PLAN.md` for the complete run book used for the paper.
 | `plot_model_comparison.py` / `plot_feature_importance.py` | Standalone paper figures |
 | `single_cube_extrapolation.py` / `intra_cube_section.py` | Supplementary experiments |
 | `merit_metrics.py` | Independent astrophysical sanity check of saved predictions |
-| `arch_comparison_*.json`, `logs/`, `predictions/` | Archived experiment logs and outputs |
+| `data/UVonly/` | The seven simulation cubes (Git LFS) |
+| `results/`, `logs/`, `predictions/` | Archived experiment JSON logs and prediction volumes |
+| `figures/` | Generated figures (paper + slides) |
+| `docs/` | Reports and planning docs (`RUN_PLAN.md`, `DESIGN_DECISIONS.md`, …) |
+| `media/` | Presentation, summary PDF, cube-rotation animations |
 | `paper/` | RASTI LaTeX manuscript (`paper.tex`, `paper.pdf`) and review reports |
-| `RUN_PLAN.md` | Run book: every command needed to regenerate the paper's data |
+| `docs/RUN_PLAN.md` | Run book: every command needed to regenerate the paper's data |
 
 ## Evaluation protocol
 
