@@ -1,0 +1,75 @@
+{
+  "timestamp": "20260706_173659",
+  "folds": [
+    {
+      "g0": 0.1,
+      "pred_file": "predictions\\pred_g0_0.1_20260704_220118.npz",
+      "b_M": 0.2192916767379238,
+      "delta_exact": 0.2245607457278893,
+      "gap_dex": -0.005269068989965514,
+      "mass_ratio_if_bM_insample": 1.0122063767914293,
+      "applied_offset": 0.2204417586326599,
+      "mass_ratio_achieved": 1.0095293521881104
+    },
+    {
+      "g0": 0.2,
+      "pred_file": "predictions\\pred_g0_0.2_20260704_221925.npz",
+      "b_M": 0.23163453124299538,
+      "delta_exact": 0.2443121182289103,
+      "gap_dex": -0.012677586985914924,
+      "mass_ratio_if_bM_insample": 1.0296214627598934,
+      "applied_offset": 0.25067251920700073,
+      "mass_ratio_achieved": 0.9854612946510315
+    },
+    {
+      "g0": 0.4,
+      "pred_file": "predictions\\pred_g0_0.4_20260704_223722.npz",
+      "b_M": 0.2161602798971303,
+      "delta_exact": 0.2182882491209084,
+      "gap_dex": -0.0021279692237781145,
+      "mass_ratio_if_bM_insample": 1.0049118540112485,
+      "applied_offset": 0.20797985792160034,
+      "mass_ratio_achieved": 1.0240198373794556
+    },
+    {
+      "g0": 0.8,
+      "pred_file": "predictions\\pred_g0_0.8_20260704_225425.npz",
+      "b_M": 0.2746214091645127,
+      "delta_exact": 0.27850199932800845,
+      "gap_dex": -0.003880590163495734,
+      "mass_ratio_if_bM_insample": 1.0089754288194155,
+      "applied_offset": 0.2524418830871582,
+      "mass_ratio_achieved": 1.0618425607681274
+    },
+    {
+      "g0": 1.6,
+      "pred_file": "predictions\\pred_g0_1.6_20260704_231317.npz",
+      "b_M": 0.25099400295375474,
+      "delta_exact": 0.25766280065805464,
+      "gap_dex": -0.0066687977042999,
+      "mass_ratio_if_bM_insample": 1.0154739752455213,
+      "applied_offset": 0.22031858563423157,
+      "mass_ratio_achieved": 1.0897935628890991
+    },
+    {
+      "g0": 3.2,
+      "pred_file": "predictions\\pred_g0_3.2_20260704_233212.npz",
+      "b_M": 0.22293385816556965,
+      "delta_exact": 0.23931127172803865,
+      "gap_dex": -0.016377413562468995,
+      "mass_ratio_if_bM_insample": 1.0384304477497748,
+      "applied_offset": 0.237710639834404,
+      "mass_ratio_achieved": 1.003692388534546
+    },
+    {
+      "g0": 6.4,
+      "pred_file": "predictions\\pred_g0_6.4_20260704_235053.npz",
+      "b_M": 0.21377039808886958,
+      "delta_exact": 0.23192758756153478,
+      "gap_dex": -0.018157189472665203,
+      "mass_ratio_if_bM_insample": 1.042694756271775,
+      "applied_offset": 0.2261510044336319,
+      "mass_ratio_achieved": 1.0133899450302124
+    }
+  ]
+}

@@ -1,0 +1,174 @@
+Device:    cuda
+Epochs:    150
+Variants:  ['unet_baseline']
+Features:  11  (log_T, log_G0, vx, vy, vz, bxl, bxr, byl, byr, bzl, bzr)
+
+Loading cubes...
+  G0=0.1   | rows=2,097,152 | nH2=[9.58e-12, 2.33e+03] | fh2=[8.46e-25, 4.94e-01]
+  G0=0.2   | rows=2,097,152 | nH2=[7.41e-13, 9.74e+03] | fh2=[2.26e-30, 4.75e-01]
+  G0=0.4   | rows=2,097,152 | nH2=[3.08e-12, 2.28e+03] | fh2=[3.14e-24, 5.07e-01]
+  G0=0.8   | rows=2,097,152 | nH2=[3.38e-12, 2.49e+03] | fh2=[9.28e-26, 5.07e-01]
+  G0=1.6   | rows=2,097,152 | nH2=[3.83e-12, 2.26e+03] | fh2=[2.64e-24, 5.04e-01]
+  G0=3.2   | rows=2,097,152 | nH2=[2.29e-12, 1.29e+04] | fh2=[1.20e-30, 5.05e-01]
+  G0=6.4   | rows=2,097,152 | nH2=[4.75e-12, 9.24e+03] | fh2=[2.72e-30, 5.00e-01]
+Converting cubes to volumes (128^3)...
+Symmetry ops: 8  (safe z-preserving)
+
+==============================================================
+  unet_baseline  base_ch=32  dropout=0.0  warmup=0  lr=0.0005  params=5,953,953  grid=128^3
+==============================================================
+
+  [Fold 1/7]  Test G0=0.1  inner-val G0=0.8
+    epoch   1/150  train=0.4686  inner=0.2876  test=2.1299
+    epoch  10/150  train=0.0629  inner=0.0813  test=0.4390
+    epoch  20/150  train=0.0420  inner=0.0645  test=0.4672
+    epoch  30/150  train=0.0290  inner=0.0552  test=0.5730
+    epoch  40/150  train=0.0226  inner=0.0532  test=0.4506
+    epoch  50/150  train=0.0190  inner=0.0487  test=0.4555
+    epoch  60/150  train=0.0162  inner=0.0496  test=0.4792
+    epoch  70/150  train=0.0122  inner=0.0484  test=0.4825
+    epoch  80/150  train=0.0119  inner=0.0470  test=0.4624
+    epoch  90/150  train=0.0095  inner=0.0478  test=0.4792
+    epoch 100/150  train=0.0081  inner=0.0494  test=0.4864
+    epoch 110/150  train=0.0072  inner=0.0494  test=0.4977
+    epoch 120/150  train=0.0066  inner=0.0514  test=0.5020
+    epoch 130/150  train=0.0061  inner=0.0522  test=0.5082
+    epoch 140/150  train=0.0060  inner=0.0531  test=0.5120
+    epoch 150/150  train=0.0059  inner=0.0532  test=0.5124
+    best epoch 81: R2=0.6668  RMSE=1.8145e+00  (final epoch: R2=0.6501  RMSE=1.8593e+00)
+
+  [Fold 2/7]  Test G0=0.2  inner-val G0=0.8
+    epoch   1/150  train=0.6323  inner=0.1452  test=0.3932
+    epoch  10/150  train=0.0552  inner=0.0751  test=0.1472
+    epoch  20/150  train=0.0404  inner=0.0661  test=0.1270
+    epoch  30/150  train=0.0351  inner=0.0575  test=0.1135
+    epoch  40/150  train=0.0240  inner=0.0546  test=0.1420
+    epoch  50/150  train=0.0184  inner=0.0514  test=0.1151
+    epoch  60/150  train=0.0167  inner=0.0527  test=0.1264
+    epoch  70/150  train=0.0135  inner=0.0503  test=0.1176
+    epoch  80/150  train=0.0119  inner=0.0490  test=0.1148
+    epoch  90/150  train=0.0103  inner=0.0478  test=0.1184
+    epoch 100/150  train=0.0088  inner=0.0486  test=0.1177
+    epoch 110/150  train=0.0077  inner=0.0482  test=0.1135
+    epoch 120/150  train=0.0075  inner=0.0486  test=0.1156
+    epoch 130/150  train=0.0065  inner=0.0502  test=0.1199
+    epoch 140/150  train=0.0063  inner=0.0506  test=0.1214
+    epoch 150/150  train=0.0063  inner=0.0507  test=0.1219
+    best epoch 86: R2=0.9243  RMSE=9.5108e-01  (final epoch: R2=0.9213  RMSE=9.6940e-01)
+
+  [Fold 3/7]  Test G0=0.4  inner-val G0=0.8
+    epoch   1/150  train=0.5626  inner=0.2619  test=0.2559
+    epoch  10/150  train=0.0637  inner=0.0728  test=0.0942
+    epoch  20/150  train=0.0362  inner=0.0633  test=0.0830
+    epoch  30/150  train=0.0296  inner=0.0587  test=0.0809
+    epoch  40/150  train=0.0310  inner=0.0638  test=0.2088
+    epoch  50/150  train=0.0189  inner=0.0518  test=0.0722
+    epoch  60/150  train=0.0160  inner=0.0519  test=0.0716
+    epoch  70/150  train=0.0142  inner=0.0539  test=0.0725
+    epoch  80/150  train=0.0117  inner=0.0515  test=0.0740
+    epoch  90/150  train=0.0107  inner=0.0504  test=0.0708
+    epoch 100/150  train=0.0096  inner=0.0515  test=0.0714
+    epoch 110/150  train=0.0082  inner=0.0514  test=0.0726
+    epoch 120/150  train=0.0072  inner=0.0534  test=0.0770
+    epoch 130/150  train=0.0067  inner=0.0545  test=0.0783
+    epoch 140/150  train=0.0064  inner=0.0552  test=0.0793
+    epoch 150/150  train=0.0064  inner=0.0553  test=0.0794
+    best epoch 76: R2=0.9439  RMSE=7.6654e-01  (final epoch: R2=0.9376  RMSE=8.0806e-01)
+
+  [Fold 4/7]  Test G0=0.8  inner-val G0=0.4
+    epoch   1/150  train=0.6128  inner=0.1864  test=0.2306
+    epoch  10/150  train=0.0647  inner=0.1021  test=0.0824
+    epoch  20/150  train=0.0418  inner=0.0790  test=0.0639
+    epoch  30/150  train=0.0405  inner=0.0711  test=0.0572
+    epoch  40/150  train=0.0235  inner=0.0746  test=0.0527
+    epoch  50/150  train=0.0229  inner=0.0760  test=0.0532
+    epoch  60/150  train=0.0183  inner=0.0698  test=0.0505
+    epoch  70/150  train=0.0157  inner=0.0661  test=0.0474
+    epoch  80/150  train=0.0142  inner=0.0720  test=0.0503
+    epoch  90/150  train=0.0115  inner=0.0652  test=0.0475
+    epoch 100/150  train=0.0092  inner=0.0671  test=0.0471
+    epoch 110/150  train=0.0081  inner=0.0711  test=0.0492
+    epoch 120/150  train=0.0073  inner=0.0722  test=0.0499
+    epoch 130/150  train=0.0066  inner=0.0756  test=0.0518
+    epoch 140/150  train=0.0064  inner=0.0771  test=0.0526
+    epoch 150/150  train=0.0064  inner=0.0775  test=0.0528
+    best epoch 89: R2=0.9451  RMSE=6.1515e-01  (final epoch: R2=0.9370  RMSE=6.5868e-01)
+
+  [Fold 5/7]  Test G0=1.6  inner-val G0=0.4
+    epoch   1/150  train=0.5148  inner=0.1763  test=0.2100
+    epoch  10/150  train=0.0629  inner=0.0852  test=0.0497
+    epoch  20/150  train=0.0387  inner=0.0704  test=0.0445
+    epoch  30/150  train=0.0335  inner=0.0662  test=0.0383
+    epoch  40/150  train=0.0273  inner=0.0654  test=0.0416
+    epoch  50/150  train=0.0196  inner=0.0610  test=0.0307
+    epoch  60/150  train=0.0178  inner=0.0589  test=0.0329
+    epoch  70/150  train=0.0150  inner=0.0614  test=0.0291
+    epoch  80/150  train=0.0150  inner=0.0585  test=0.0360
+    epoch  90/150  train=0.0104  inner=0.0623  test=0.0308
+    epoch 100/150  train=0.0092  inner=0.0644  test=0.0306
+    epoch 110/150  train=0.0080  inner=0.0647  test=0.0302
+    epoch 120/150  train=0.0069  inner=0.0696  test=0.0311
+    epoch 130/150  train=0.0064  inner=0.0732  test=0.0320
+    epoch 140/150  train=0.0062  inner=0.0749  test=0.0323
+    epoch 150/150  train=0.0061  inner=0.0753  test=0.0324
+    best epoch 66: R2=0.9220  RMSE=5.5223e-01  (final epoch: R2=0.9283  RMSE=5.2961e-01)
+
+  [Fold 6/7]  Test G0=3.2  inner-val G0=0.4
+    epoch   1/150  train=0.4656  inner=0.1466  test=0.1075
+    epoch  10/150  train=0.0572  inner=0.0814  test=0.0450
+    epoch  20/150  train=0.0377  inner=0.0609  test=0.0297
+    epoch  30/150  train=0.0280  inner=0.0583  test=0.0264
+    epoch  40/150  train=0.0250  inner=0.0551  test=0.0288
+    epoch  50/150  train=0.0178  inner=0.0548  test=0.0240
+    epoch  60/150  train=0.0183  inner=0.0529  test=0.0228
+    epoch  70/150  train=0.0146  inner=0.0518  test=0.0253
+    epoch  80/150  train=0.0144  inner=0.0509  test=0.0229
+    epoch  90/150  train=0.0114  inner=0.0523  test=0.0210
+    epoch 100/150  train=0.0083  inner=0.0523  test=0.0211
+    epoch 110/150  train=0.0073  inner=0.0533  test=0.0216
+    epoch 120/150  train=0.0067  inner=0.0549  test=0.0215
+    epoch 130/150  train=0.0060  inner=0.0572  test=0.0221
+    epoch 140/150  train=0.0058  inner=0.0584  test=0.0223
+    epoch 150/150  train=0.0058  inner=0.0586  test=0.0224
+    best epoch 71: R2=0.9004  RMSE=4.5563e-01  (final epoch: R2=0.9039  RMSE=4.4746e-01)
+
+  [Fold 7/7]  Test G0=6.4  inner-val G0=0.4
+    epoch   1/150  train=0.4778  inner=0.1561  test=0.1729
+    epoch  10/150  train=0.0557  inner=0.0805  test=0.0631
+    epoch  20/150  train=0.0453  inner=0.0659  test=0.1036
+    epoch  30/150  train=0.0258  inner=0.0592  test=0.0328
+    epoch  40/150  train=0.0218  inner=0.0521  test=0.0353
+    epoch  50/150  train=0.0177  inner=0.0486  test=0.0318
+    epoch  60/150  train=0.0148  inner=0.0520  test=0.0301
+    epoch  70/150  train=0.0119  inner=0.0511  test=0.0272
+    epoch  80/150  train=0.0115  inner=0.0514  test=0.0256
+    epoch  90/150  train=0.0107  inner=0.0510  test=0.0243
+    epoch 100/150  train=0.0081  inner=0.0527  test=0.0258
+    epoch 110/150  train=0.0073  inner=0.0525  test=0.0258
+    epoch 120/150  train=0.0066  inner=0.0543  test=0.0259
+    epoch 130/150  train=0.0059  inner=0.0556  test=0.0264
+    epoch 140/150  train=0.0057  inner=0.0562  test=0.0266
+    epoch 150/150  train=0.0057  inner=0.0564  test=0.0266
+    best epoch 57: R2=0.6570  RMSE=5.2512e-01  (final epoch: R2=0.6997  RMSE=4.9134e-01)
+
+===========================================================================================
+  unet_baseline
+===========================================================================================
+  G0             R2     RMSE      MAE     bias     scat    massR     f0.3      CCC       W1
+  ---------------------------------------------------------------------------------------
+  0.1        0.6668   1.8145   1.3481   -1.281    1.285    0.289    0.107   0.8550    1.281
+  0.2        0.9243   0.9511   0.6301   +0.347    0.885    0.568    0.436   0.9600    0.371
+  0.4        0.9439   0.7665   0.5380   -0.018    0.766    0.968    0.435   0.9717    0.155
+  0.8        0.9451   0.6151   0.4665   -0.021    0.615    0.443    0.412   0.9709    0.129
+  1.6        0.9220   0.5522   0.4027   +0.070    0.548    3.831    0.482   0.9621    0.131
+  3.2        0.9004   0.4556   0.3491   -0.124    0.438    8.295    0.530   0.9503    0.131
+  6.4        0.6570   0.5251   0.3936   +0.239    0.468  513.418    0.476   0.8596    0.239
+  ---------------------------------------------------------------------------------------
+  Mean       0.8513   0.8115   0.5897   -0.113    0.715   75.402    0.411   0.9328    0.348
+  Std        0.1207   0.4378   0.3220   +0.500    0.276  178.840    0.129   0.0482    0.390
+
+Variant                R2 mean      +-  R2_lin mean   MAE mean
+--------------------------------------------------------------
+unet_baseline           0.8513  0.1207   -3468.8294  5.8975e-01
+
+Log saved -> results/cnn_test_20260706_205017.json

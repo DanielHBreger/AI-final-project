@@ -32,15 +32,16 @@ and `logs/deployed_row_metrics.log`.
 
 ## Protocol issues (both reviewers)
 
-4. **U-Net checkpoint selection on the held-out cube** — RUN (blocking).
-   Disposition upgraded from DISCLOSE to FIX: new RUN_PLAN run 16 = modify
-   `test_cnn.py` to select checkpoints on an inner validation cube (one of
-   the six training cubes) and also record final-epoch metrics, then rerun
-   the run-3 (and ideally run-4) configs (~4.6 h each). The existing
-   per-epoch `history` in the cnn_test JSONs audits the ≤12 % bound but
-   cannot produce final-epoch R²/mass without a rerun. Until run 16, the
-   disclosure stands; after it, Table 2/3's U-Net row and §5.4 numbers
-   should come from the leakage-free selection.
+4. **U-Net checkpoint selection on the held-out cube** — FIXED
+   2026-07-06/07 (runs 16b + 16c, central inner-val rule; RUN_PLAN run 16
+   entry has full numbers). All U-Net numbers in `paper.tex` and
+   `paper_short.tex` now come from leakage-free selection: 15-input
+   0.963 ± 0.047 (RMSE 0.348, skill +0.36), 11-input 0.851 ± 0.121. The
+   ≤12 % disclosure is replaced by the protocol description in §4.2.3
+   plus a rule-sensitivity disclosure (nearest-rule 0.914 vs central
+   0.963; §7.5). Selection vs final epoch is a no-op; the
+   interior-champion result survives (interior R² 0.992 vs stack 0.984),
+   the edge/mass failures worsen slightly.
 5. **Shortcut vs nested stacking in the main tables** — PARTIALLY DEFENDED.
    Accepted: deployed nested row added to Tables 2–3 and made the source of
    all abstract/conclusion headline numbers (it already was). Defended:
@@ -145,17 +146,25 @@ and `logs/deployed_row_metrics.log`.
     already say "XGBoost gain importance"; the importance figure is
     explicitly paired with the ablation as the reliability check.
     Permutation importance noted as possible future work, not required.
-24. **Figures 11–12 heatmap colour scaling (ChatGPT)** — RUN (analysis
-    item A3): replot from the saved run-10/11 JSONs with a diverging map
-    clipped at [−1, 1]; no retraining. Text size reviewed at the same
-    time.
+24. **Figures 11–12 heatmap colour scaling (ChatGPT)** — FIXED 2026-07-06
+    (analysis item A3): both heatmaps replotted in place from the saved
+    run-10/11 JSONs via a new `--replot` mode (RdBu diverging map clipped
+    to [−1, 1], white at 0, cells below −1 hatched with the true value
+    printed, in-cell text enlarged to 8 pt); clipping note added to both
+    captions. No retraining.
 25. **KS significance (ChatGPT, Fig 9)** — ALREADY CORRECT: the caption
     reports KS D and W₁ as effect sizes; no p-value significance claim is
     made.
 26. **References: Palud et al. 2023 (A&A, Meudon PDR emulation); Janssen,
-    Branca & Buck 2026 (A&A, surrogate benchmarking)** — DOCUMENTED: added
-    to the bib TODO (need ADS verification like KMT09/Sternberg2014/
-    Bialy2016 before insertion; do not cite unverified).
+    Branca & Buck 2026 (A&A, surrogate benchmarking)** — FIXED 2026-07-06:
+    both verified against arXiv/journal records and inserted. Palud et al.
+    2023, A&A 678, A198 (doi 10.1051/0004-6361/202347074) cited in the §1
+    emulator list; Janssen, Branca & Buck 2026, A&A 708, A227
+    (doi 10.1051/0004-6361/202658937) cited in the same paragraph for
+    systematic surrogate benchmarking. The "zero-dimensional" sentence
+    gained a one-dimensional parenthetical for the PDR emulator. Same
+    pass re-verified KMT09 (ApJ 693, 216–235), Sternberg2014 (ApJ 790,
+    10) and Bialy2016 (ApJ 822, 83) — all already correct in the bib.
 27. **Abstract ablation attribution (Claude #15)** — FIXED: §1(iv) now
     says "for the adopted configuration in the comparison protocol of
     Table 4"; the abstract keeps the bare numbers (they now have a table

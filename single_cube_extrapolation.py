@@ -157,7 +157,11 @@ def print_r2_table(mat: np.ndarray, g0_vals: list[float], title: str) -> None:
 
 def plot_heatmaps(all_records: list[list[dict]], g0_vals: list[float],
                   save_path: str) -> None:
-    """Save a 3-panel heatmap figure (XGB | MLP | stacked) as PNG."""
+    """Save a 3-panel heatmap figure (XGB | MLP | stacked) as PNG.
+
+    Colour scale is a diverging map clipped to R2 in [-1, 1] (white at 0);
+    cells whose true value falls below -1 keep their saturated colour and
+    are hatched, with the actual value printed in the cell."""
     keys   = ['xgb_r2', 'mlp_r2', 'stacked_r2']
     titles = ['XGBoost', 'MLP', 'Stacked (Ridge)']
     n      = len(g0_vals)
@@ -176,22 +180,31 @@ def plot_heatmaps(all_records: list[list[dict]], g0_vals: list[float],
     fig, axes = plt.subplots(1, 3, figsize=(13.0, 4.5))
     fig.suptitle('Single-cube extrapolation: R\u00b2 matrix\n'
                  '(row = training cube, column = target cube; '
-                 'diagonal = in-sample)', fontsize=9)
+                 'diagonal = in-sample; hatched cells: R\u00b2 < \u22121, '
+                 'colour saturated)', fontsize=9)
 
-    vmin, vmax = 0.0, 1.0
+    vmin, vmax = -1.0, 1.0
 
     for ax, key, title in zip(axes, keys, titles):
         mat = _r2_matrix(all_records, g0_vals, key)
-        im  = ax.imshow(mat, vmin=vmin, vmax=vmax, cmap='RdYlGn', aspect='equal')
+        im  = ax.imshow(np.clip(mat, vmin, vmax), vmin=vmin, vmax=vmax,
+                        cmap='RdBu', aspect='equal')
 
-        # Annotate each cell
+        # Annotate each cell with the TRUE (unclipped) value
         for i in range(n):
             for j in range(n):
-                val  = mat[i, j]
-                text = f'{val:.3f}' if not np.isnan(val) else ''
-                col  = 'black' if 0.3 < val < 0.75 else 'white'
+                val = mat[i, j]
+                if np.isnan(val):
+                    continue
+                text = f'{val:.3f}' if val >= -1.0 else f'{val:.1f}'
+                col  = 'white' if abs(np.clip(val, vmin, vmax)) > 0.65 else 'black'
                 ax.text(j, i, text, ha='center', va='center',
-                        fontsize=7, color=col)
+                        fontsize=8, color=col, zorder=6)
+                if val < vmin:   # mark clipped cells
+                    ax.add_patch(plt.Rectangle(
+                        (j - 0.5, i - 0.5), 1, 1, fill=False,
+                        hatch='///', edgecolor='0.75', linewidth=0, zorder=4,
+                    ))
 
         # Outline diagonal cells (in-sample)
         for k in range(n):
@@ -232,8 +245,19 @@ def main() -> None:
                         help='Spatial filter kernel sizes (default: 3 5 7)')
     parser.add_argument('--quiet', action='store_true',
                         help='Suppress per-epoch MLP training messages')
+    parser.add_argument('--replot', type=str, default=None, metavar='JSON',
+                        help='Regenerate the heatmap PNG from a saved run '
+                             'JSON and exit (no training)')
     add_drop_args(parser)
     args = parser.parse_args()
+
+    if args.replot:
+        with open(args.replot) as f:
+            log = json.load(f)
+        fig_path = os.path.join(os.path.dirname(args.replot),
+                                f"heatmap_{log['timestamp']}.png")
+        plot_heatmaps(log['results'], log['g0_values'], fig_path)
+        return
 
     feat_cols = get_feature_cols(build_drop_set(args))
 

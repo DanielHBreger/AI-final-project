@@ -1,10 +1,5 @@
-\begin{thebibliography}{31}
+\begin{thebibliography}{20}
 \expandafter\ifx\csname natexlab\endcsname\relax\def\natexlab#1{#1}\fi
-
-\bibitem[Bialy \& Sternberg(2016)]{Bialy2016}
-Bialy, S. \& Sternberg, A., 2016.
-\newblock Analytic {HI}-to-{H}$_2$ photodissociation transition profiles, {\it
-  ApJ\/}, {\bf 822}, 83.
 
 \bibitem[Branca \& Pallottini(2024)]{Branca2024}
 Branca, L. \& Pallottini, A., 2024.
@@ -41,22 +36,6 @@ Draine, B.~T. \& Bertoldi, F., 1996.
 \newblock Structure of stationary photodissociation fronts, {\it ApJ\/}, {\bf
   468}, 269--289.
 
-\bibitem[Glover \& Mac~Low(2007)]{Glover2007}
-Glover, S.~C.~O. \& Mac~Low, M.-M., 2007.
-\newblock Simulating the formation of molecular clouds. {I.} slow formation by
-  gravitational collapse from static initial conditions, {\it ApJS\/}, {\bf
-  169}, 239--268.
-
-\bibitem[Glover et~al.(2010)Glover, Federrath, Mac~Low, \& Klessen]{Glover2010}
-Glover, S.~C.~O., Federrath, C., Mac~Low, M.-M., \& Klessen, R.~S., 2010.
-\newblock Modelling {CO} formation in the turbulent interstellar medium, {\it
-  MNRAS\/}, {\bf 404}, 2--29.
-
-\bibitem[Gnedin \& Kravtsov(2011)]{Gnedin2011}
-Gnedin, N.~Y. \& Kravtsov, A.~V., 2011.
-\newblock Environmental dependence of the {Kennicutt--Schmidt} relation in
-  galaxies, {\it ApJ\/}, {\bf 728}, 88.
-
 \bibitem[Grassi et~al.(2014)Grassi, Bovino, Schleicher, Prieto, Seifried,
   Simoncini, \& Gianturco]{Grassi2014}
 Grassi, T., Bovino, S., Schleicher, D.~R.~G., Prieto, J., Seifried, D.,
@@ -87,11 +66,6 @@ Habing, H.~J., 1968.
 Harris, C.~R., Millman, K.~J., van~der Walt, S.~J., et~al., 2020.
 \newblock Array programming with {NumPy}, {\it Nature\/}, {\bf 585}, 357--362.
 
-\bibitem[He et~al.(2016)He, Zhang, Ren, \& Sun]{He2016}
-He, K., Zhang, X., Ren, S., \& Sun, J., 2016.
-\newblock Deep residual learning for image recognition, in {\em Proc.\ IEEE
-  Conference on Computer Vision and Pattern Recognition\/}, pp. 770--778.
-
 \bibitem[Holdship et~al.(2021)Holdship, Viti, Haworth, \& Ilee]{Holdship2021}
 Holdship, J., Viti, S., Haworth, T.~J., \& Ilee, J.~D., 2021.
 \newblock Chemulator: Fast, accurate thermochemistry for dynamical models
@@ -102,32 +76,10 @@ Hunter, J.~D., 2007.
 \newblock Matplotlib: A {2D} graphics environment, {\it Computing in Science \&
   Engineering\/}, {\bf 9}, 90--95.
 
-\bibitem[Ioffe \& Szegedy(2015)]{Ioffe2015}
-Ioffe, S. \& Szegedy, C., 2015.
-\newblock Batch normalization: Accelerating deep network training by reducing
-  internal covariate shift, {\it arXiv e-prints\/}, p. arXiv:1502.03167.
-
 \bibitem[Janssen et~al.(2026)Janssen, Branca, \& Buck]{Janssen2026}
 Janssen, R., Branca, L., \& Buck, T., 2026.
 \newblock Systematic selection of surrogate models for nonequilibrium
   chemistry, {\it A\&A\/}, {\bf 708}, A227.
-
-\bibitem[Kingma \& Ba(2015)]{Kingma2015}
-Kingma, D.~P. \& Ba, J., 2015.
-\newblock Adam: A method for stochastic optimization, in {\em Proc.\ 3rd
-  International Conference on Learning Representations (ICLR)\/}.
-
-\bibitem[Krumholz et~al.(2009)Krumholz, McKee, \& Tumlinson]{Krumholz2009}
-Krumholz, M.~R., McKee, C.~F., \& Tumlinson, J., 2009.
-\newblock The atomic-to-molecular transition in galaxies. {II:} {HI} and
-  {H}$_2$ column densities, {\it ApJ\/}, {\bf 693}, 216--235.
-
-\bibitem[Narayanan et~al.(2012)Narayanan, Krumholz, Ostriker, \&
-  Hernquist]{Narayanan2012}
-Narayanan, D., Krumholz, M.~R., Ostriker, E.~C., \& Hernquist, L., 2012.
-\newblock A general model for the {CO--H}$_2$ conversion factor in galaxies
-  with applications to the star formation law, {\it MNRAS\/}, {\bf 421},
-  3127--3138.
 
 \bibitem[Palud et~al.(2023)Palud, Einig, Le~Petit, Bron, Chainais,
   et~al.]{Palud2023}
@@ -153,17 +105,6 @@ Ronneberger, O., Fischer, P., \& Brox, T., 2015.
 \newblock {U-Net}: Convolutional networks for biomedical image segmentation, in
   {\em Medical Image Computing and Computer-Assisted Intervention -- MICCAI
   2015, LNCS\/}, vol. 9351, pp. 234--241, Springer.
-
-\bibitem[Sternberg et~al.(2014)Sternberg, Le~Petit, Roueff, \&
-  Le~Bourlot]{Sternberg2014}
-Sternberg, A., Le~Petit, F., Roueff, E., \& Le~Bourlot, J., 2014.
-\newblock {HI}-to-{H}$_2$ transitions and {HI} column densities in galaxy
-  star-forming regions, {\it ApJ\/}, {\bf 790}, 10.
-
-\bibitem[Ulyanov et~al.(2017)Ulyanov, Vedaldi, \& Lempitsky]{Ulyanov2017}
-Ulyanov, D., Vedaldi, A., \& Lempitsky, V., 2017.
-\newblock Instance normalization: The missing ingredient for fast stylization,
-  {\it arXiv e-prints\/}, p. arXiv:1607.08022.
 
 \bibitem[Virtanen et~al.(2020)Virtanen, Gommers, Oliphant,
   et~al.]{Virtanen2020}

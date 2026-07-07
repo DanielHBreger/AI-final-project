@@ -70,10 +70,10 @@ Ablating the solver-provided self-shielding factor costs little in
 aggregate (\(\Rsq\) \(0.985 \rightarrow 0.964\)) but most of the
 molecular-phase fidelity (molecular \(\Rsq\) \(0.991 \rightarrow 0.840\)).
 A 3D U-Net trained on the same suite is the best interpolator in the
-comparison (interior-fold \(\Rsq = 0.995\), RMSE \(0.19\dex\)) but collapses
-at both extrapolation boundaries and over-predicts the H\(_2\) mass of the
-hardest fold by more than two orders of magnitude, a failure mode the
-global calibration cannot repair. Within-cube sampling experiments --- with cell-local inputs available
+comparison (interior-fold \(\Rsq = 0.992\), RMSE \(0.22\dex\)) but degrades
+at both extrapolation boundaries (\(\Rsq = 0.88\)--0.90) and over-predicts
+the H\(_2\) mass of the hardest fold by more than two orders of magnitude,
+a failure mode the global calibration cannot repair. Within-cube sampling experiments --- with cell-local inputs available
 everywhere but labels and neighbourhood context restricted to the
 sample --- show that reconstruction quality is controlled by sampling
 geometry rather than sample volume: 10 per cent uniformly random
@@ -114,16 +114,20 @@ these are fast and interpretable, but each is tied to the equilibrium
 assumptions, geometry, and averaging scale for which it was derived. The
 newer family trains machine-learning (ML) surrogates on solver outputs:
 \citet{deMijolla2019} emulate UCLCHEM abundances for molecular-line
-modelling, \citet{Holdship2021} advance a thermochemical state through a
-time-step with the Chemulator network, \citet{Grassi2022} compress a
-chemical network onto a learned low-dimensional manifold, and, closest
-to this work, \citet{Branca2024} train DeepONet emulators on KROME
-\citep{Grassi2014} integrations to reproduce the \emph{time evolution}
-of a nine-species ISM photochemistry network at a single point, reaching
-mean relative errors below 3 per cent with a \(\sim\)128\(\times\) speed-up
-over the stiff ODE solver. All of these emulators are zero-dimensional:
-they map a local initial state to a local final state and treat every
-cell independently. The present work addresses a complementary question
+modelling, \citet{Palud2023} emulate the Meudon photodissociation-region
+code for observational inference, \citet{Holdship2021} advance a
+thermochemical state through a time-step with the Chemulator network,
+\citet{Grassi2022} compress a chemical network onto a learned
+low-dimensional manifold, and, closest to this work, \citet{Branca2024}
+train DeepONet emulators on KROME \citep{Grassi2014} integrations to
+reproduce the \emph{time evolution} of a nine-species ISM photochemistry
+network at a single point, reaching mean relative errors below 3 per
+cent with a \(\sim\)128\(\times\) speed-up over the stiff ODE solver;
+\citet{Janssen2026} benchmark such chemistry surrogates systematically
+across architectures and reaction networks. All of these emulators are
+zero-dimensional (or, for the PDR emulator, one-dimensional): they map a
+local state or a small parameter vector to a local output and treat
+every cell or sightline independently. The present work addresses a complementary question
 that a zero-dimensional emulator cannot: how should a per-cell surrogate
 represent the \emph{non-local} information --- principally UV shielding
 by surrounding gas \citep[cf.][]{Glover2007,Glover2010} --- that couples
@@ -197,8 +201,8 @@ molecular-phase accuracy bears most of it (molecular \(\Rsq\)
 approach is and is not competitive: the 3D U-Net is the best
 interpolator in the comparison but degrades sharply at both
 extrapolation boundaries, over-predicts the H\(_2\) mass of the hardest
-fold by more than two orders of magnitude, and is roughly two orders of
-magnitude more expensive to train.
+fold by more than two orders of magnitude, and carries roughly two
+orders of magnitude higher per-model training cost.
 
 The paper is structured as follows. Section~\ref{sec:data} describes the
 data. Section~\ref{sec:protocol} defines the evaluation protocol,
@@ -601,14 +605,19 @@ otherwise dominates the loss. Training uses Adam (learning rate
 \(5\times10^{-4}\), weight decay \(10^{-5}\)), gradient-norm clipping at
 1.0, an unweighted mean-squared-error loss, and 150 epochs per fold.
 
-Two protocol properties of the U-Net favour it relative to the tabular
-models and should be kept in mind when reading its results. First, the
-reported checkpoint is the epoch with the lowest loss on the held-out
-cube --- a model-selection step the fixed-epoch tabular models do not
-get; the per-epoch training histories bound its advantage at \(\le\)12 per
-cent in RMSE (final-epoch versus best-epoch validation loss ratios of
-1.01--1.25 across folds and configurations), so U-Net numbers should be
-read as mild upper bounds. Second, the U-Net output is unbounded ---
+Two protocol properties of the U-Net should be kept in mind when
+reading its results. First, its reported checkpoint is selected per
+fold by the loss on an inner validation cube drawn from the six
+training cubes --- the cube closest to the median \(\log\Gzero\) of the
+training set, a rule that keeps every fold's adjacent-\(\Gzero\)
+neighbour in training --- so no held-out-cube information enters model
+selection; the selection is nearly a no-op relative to simply taking
+the final epoch (mean \(\Rsq\) 0.963 versus 0.962). The U-Net's numbers
+are nonetheless sensitive to validation design: selecting instead the
+training cube \emph{nearest} the held-out \(\Gzero\) removes the
+boundary folds' only adjacent cube from training, turning those folds
+into two-step extrapolation, and drops the mean \(\Rsq\) to 0.914.
+Second, the U-Net output is unbounded ---
 unlike the range-clamped MLP and the inherently bounded trees --- which
 matters for its mass-budget behaviour
 (Section~\ref{sec:results_cnn}). Convolutions use zero padding at the
@@ -670,9 +679,12 @@ methodological decision we evaluate explicitly:
   the same dense cells dominate both the weights and the mass budget.
   Exact per-cube mass closure would instead subtract the log mass
   ratio \(\log_{10}(\sum_i 10^{\hat{y}_i} / \sum_i 10^{y_i})\); the two
-  functionals coincide to first order in the residuals, and the
-  approximation is validated out of sample by the deployed pipeline's
-  fold mass ratios of 0.985--1.090 (Section~\ref{sec:per_fold}).
+  functionals coincide to first order in the residuals --- evaluated on
+  the raw deployed volumes of Section~\ref{sec:per_fold} they differ by
+  at most 0.018\dex{} (mass closure within 5 per cent) in every fold ---
+  and the approximation is validated out of sample by the deployed
+  pipeline's fold mass ratios of 0.985--1.090
+  (Section~\ref{sec:per_fold}).
 \end{itemize}
 If the model's residual were independent of density the two would
 coincide; their fitted offsets differ by 0.1--0.15\dex{} for the stacks
@@ -762,7 +774,9 @@ rows give the Ridge-stacked ensemble of the indicated base pair, raw and
 with the two bias calibrations of Section~\ref{sec:ensemble}. The
 best value in each column is bold. Tabular rows are from the master
 comparison log; the U-Net row is its best configuration (32 base
-channels, 150 epochs, no dropout) trained at native \(128^3\). The final
+channels, 150 epochs, no dropout) trained at native \(128^3\), with the
+checkpoint selected on an inner validation cube
+(Section~\ref{sec:cnn}). The final
 row, set off by a rule, is the deployed fully nested pipeline of
 Section~\ref{sec:per_fold}; it is excluded from the per-column
 bolding, which compares rows under the shared CV-OOF stacking protocol
@@ -787,7 +801,7 @@ Stack (+S), mass-cal.      & 0.972 & 0.017 & 0.982 & 0.987 & 0.980 & 0.952 & 0.9
 Stack (+S+W), raw          & 0.959 & 0.026 & 0.980 & 0.981 & 0.974 & 0.921 & 0.975 & 0.965 & 0.916 \\
 Stack (+S+W), mean-cal.    & 0.984 & 0.011 & 0.973 & 0.989 & 0.988 & 0.961 & \textbf{0.995} & 0.994 & 0.985 \\
 Stack (+S+W), mass-cal.    & \textbf{0.985} & 0.015 & 0.980 & 0.989 & 0.987 & 0.952 & \textbf{0.995} & \textbf{0.996} & 0.996 \\
-3D U-Net (32 ch.)          & 0.970 & 0.039 & 0.905 & \textbf{0.993} & \textbf{0.995} & \textbf{0.996} & \textbf{0.995} & 0.994 & 0.910 \\
+3D U-Net (32 ch.)          & 0.963 & 0.047 & 0.896 & \textbf{0.992} & \textbf{0.993} & \textbf{0.991} & \textbf{0.995} & 0.992 & 0.882 \\
 \hline
 Deployed stack (+S+W), nested, mass-cal. & 0.990 & 0.006 & 0.977 & 0.988 & 0.990 & 0.987 & 0.995 & 0.996 & 0.998 \\
 \hline
@@ -828,7 +842,7 @@ Stack (+S), mass-cal.      & 0.359 & \(+0.20\) & 0.25 & 0.92--1.22 & 0.982 & 0.8
 Stack (+S+W), raw          & 0.433 & \(+0.32\) & 0.26 & 1.65--1.84 & 0.955 & 0.74 & 0.03 & 0.33 & \(+0.02\) \\
 Stack (+S+W), mean-cal.    & 0.301 & \(-0.01\) & 0.26 & 0.71--0.89 & 0.981 & 0.86 & 0.52 & 0.16 & \(+0.57\) \\
 Stack (+S+W), mass-cal.    & 0.294 & \(+0.09\) & 0.26 & 0.93--1.07 & 0.991 & 0.86 & 0.68 & 0.13 & \(+0.55\) \\
-3D U-Net (32 ch.)          & 0.310 & \(-0.06\) & 0.26 & 0.81--172\(^\dagger\) & 0.79 & 0.83 & 0.51 & 0.17 & \(+0.48\) \\
+3D U-Net (32 ch.)          & 0.348 & \(-0.09\) & 0.29 & 0.71--291\(^\dagger\) & 0.74 & 0.80 & 0.38 & 0.20 & \(+0.36\) \\
 \hline
 Deployed stack (+S+W), nested, mass-cal. & 0.250 & \(+0.02\) & 0.24 & 0.99--1.09 & 0.990 & 0.90 & 0.73 & 0.08 & \(+0.74\) \\
 \hline
@@ -947,14 +961,14 @@ different kind: a U-Net trained on only 11 inputs --- temperature,
 \(\Gzero\), velocity, and magnetic field, i.e.\ \emph{no}
 chemistry-adjacent quantities at all (no \(n_{\mathrm{H}}\),
 \(n_{\mathrm{H^+}}\), extinction, or \(\fshield\)) --- still reaches
-\(\Rsq = 0.893 \pm 0.088\). Roughly 90 per cent of the log-density
+\(\Rsq = 0.851 \pm 0.121\). Roughly 85 per cent of the log-density
 variance is thus recoverable from dynamics, thermodynamics, and the UV
 strength alone: the H\(_2\) \emph{morphology} is largely inferable without
 chemical inputs. The field-level metrics show what that number hides ---
-residual scatter of 0.61\dex, only 17 per cent of cells within
+residual scatter of 0.72\dex, only 15 per cent of cells within
 0.1\dex, molecular-phase \(\Rsq\) near zero on average and negative at
-both extrapolation folds, and fold mass ratios from 0.27 to a clipped
-\(\times\)800 --- the large-scale morphology is retained, but chemically
+both extrapolation folds, and fold mass ratios from 0.29 to a clipped
+\(\times\)510 --- the large-scale morphology is retained, but chemically
 precise molecular-phase prediction is lost.
 
 \begin{table*}
@@ -1002,28 +1016,30 @@ Tables~\ref{tab:main}--\ref{tab:summary}: it is simultaneously the best
 interpolator and the least reliable extrapolator under the
 physical-field metrics. On the five
 interior folds it is the most accurate model evaluated ---
-\(\Rsq = 0.995\), RMSE \(0.19\dex\), beating the mass-calibrated weighted
+\(\Rsq = 0.992\), RMSE \(0.22\dex\), beating the mass-calibrated weighted
 stack (0.984, 0.31\dex) in aggregate --- direct evidence that a
 learned volumetric representation extracts non-local information the
 box-filter features do not. At the boundaries the picture inverts: mean
-edge-fold \(\Rsq\) drops to 0.907 (RMSE 0.62\dex) against 0.988
-(0.25\dex) for the calibrated stack, and at \(\Gzero = 0.1\) its skill
-against even the \emph{pointwise} XGBoost baseline is \(-1.14\): outside
-its training range the volumetric model is worse than the simplest
-tabular one.
+edge-fold \(\Rsq\) drops to 0.889 (RMSE 0.66\dex) against 0.988
+(0.25\dex) for the calibrated stack, and against even the
+\emph{pointwise} XGBoost baseline the U-Net's skill is \(-1.37\) at
+\(\Gzero = 0.1\) and \(-0.01\) at \(\Gzero = 6.4\): outside its training
+range the volumetric model does no better than the simplest tabular
+one, and at the molecular-rich boundary substantially worse.
 
 The physical-field metrics make the extrapolation failure qualitative,
 not merely quantitative. At \(\Gzero = 6.4\) the U-Net's molecular-phase
-bias is \(+1.09\dex\) and its fold mass ratio exceeds 170 (a lower bound;
+bias is \(+1.13\dex\) and its fold mass ratio exceeds 290 (a lower bound;
 its unbounded output is clipped at truth \(+1\dex\) before the mass
 integral, Section~\ref{sec:metrics}); at \(\Gzero = 0.1\) it
-under-predicts by \(-0.63\dex\) overall. Its interior-fold mass ratios
-are also uncontrolled (0.94--16.7), consistent with its unweighted,
+under-predicts by \(-0.65\dex\) overall. Its interior-fold mass ratios
+are also uncontrolled (0.71--19.0), consistent with its unweighted,
 unbounded training. Crucially, this failure is \emph{not} repairable by
 the calibration of Section~\ref{sec:ensemble}: the U-Net's held-out
-bias is phase-localised (molecular \(+1.09\dex\) against a small diffuse
-bias at \(\Gzero = 6.4\)) and wildly non-monotonic in \(\Gzero\) (fold mass
-ratios 0.81, 3.9, 0.94, 1.8, 2.8, 16.7, 172), whereas the stack's bias
+bias is phase-localised (molecular \(+1.13\dex\) against a diffuse
+\(+0.23\dex\) at \(\Gzero = 6.4\)) and wildly non-monotonic
+in \(\Gzero\) (fold mass
+ratios 1.7, 2.1, 1.1, 0.71, 1.8, 19.0, 291), whereas the stack's bias
 is a global, \(\Gzero\)-smooth offset --- the difference between a
 correctable systematic and a genuine extrapolation breakdown.
 
@@ -1213,7 +1229,9 @@ training sets achieve --- and (ii) confirms that none of the seven
 \caption{Single-cube transfer: log-space \(\Rsq\) for models trained on
 one cube (rows) and evaluated on each cube (columns), for XGBoost
 (\emph{left}), MLP (\emph{centre}), and the stacked ensemble
-(\emph{right}). Diagonal cells are in-sample fits. Transfer quality
+(\emph{right}). Diagonal cells are in-sample fits. The colour scale is clipped to
+\(\Rsq \in [-1, 1]\); hatched cells fall below \(-1\), with the actual
+value printed. Transfer quality
 decays with \(\Gzero\) separation; values for separations of four or more
 geometric steps are poor and can be strongly negative.}
 \label{fig:heatmap}
@@ -1303,7 +1321,9 @@ geometry (columns) and cube (rows) for XGBoost (\emph{left}), MLP
 coverage \(\geq\)5 per cent reconstructs the held-out cells to
 \(\Rsq \geq 0.97\) in every cube; contiguous half-cube slabs and small
 compact boxes are systematically worse despite far larger volume
-(down to \(\Rsq \approx 0.4\)--0.6 in the worst cubes). The MLP alone
+(down to \(\Rsq \approx 0.4\)--0.6 in the worst cubes). The colour
+scale is clipped to \(\Rsq \in [-1, 1]\); hatched cells fall below
+\(-1\), with the actual value printed. The MLP alone
 can fail strongly on contiguous geometries; the stacked ensemble
 follows the more robust XGBoost.}
 \label{fig:intra_cube}
@@ -1345,7 +1365,7 @@ that we leave to future work.
 
 The comparison sharpens into a clean division of regimes. Inside the
 training range the U-Net is the best model evaluated --- interior-fold
-\(\Rsq = 0.995\) against 0.984 for the calibrated stack --- so the learned
+\(\Rsq = 0.992\) against 0.984 for the calibrated stack --- so the learned
 volumetric representation demonstrably extracts non-local structure the
 box filters miss. Outside it, the U-Net fails in a way no global
 correction can repair: phase-localised, non-monotonic in \(\Gzero\), with
@@ -1436,11 +1456,13 @@ context. Matching the treatment to the simulations' true boundary
 conditions is a straightforward refinement we have not evaluated.
 
 \textit{CNN comparison.} The U-Net was trained with an unweighted loss
-and an unbounded output, receives per-cube input normalisation at test
-time through its instance-normalisation layers, and its reported
-checkpoint is selected on held-out-volume loss (worth \(\le\)12 per cent
-in RMSE; Section~\ref{sec:cnn}) --- a mixture of disadvantages and
-advantages relative to the tabular protocol. A density-weighted,
+and an unbounded output, and receives per-cube input normalisation at
+test time through its instance-normalisation layers --- a mixture of
+disadvantages and advantages relative to the tabular protocol. Its
+checkpoint selection is leakage-free (inner validation cube,
+Section~\ref{sec:cnn}), but the choice of validation cube visibly moves
+its numbers (mean \(\Rsq\) 0.914--0.963 across the two selection rules
+we evaluated). A density-weighted,
 range-bounded U-Net would be the fairer mass-budget comparison and is
 left to future work; the configuration-sensitivity results suggest any
 single U-Net number carries a wide error bar regardless.
@@ -1497,17 +1519,19 @@ molecular cube) and its RMSE grows by 60 per cent.
 
 (v) The H\(_2\) \emph{morphology} is largely inferable without any
 chemistry-adjacent input: a U-Net given only temperature, velocity,
-magnetic field, and \(\Gzero\) reaches \(\Rsq = 0.893\) --- yet with
-\(0.61\dex\) scatter, near-zero molecular-phase \(\Rsq\), and fold mass
-ratios from 0.27 to a clipped \(\times\)800. The gap between that number
+magnetic field, and \(\Gzero\) reaches \(\Rsq = 0.851\) --- yet with
+\(0.72\dex\) scatter, near-zero molecular-phase \(\Rsq\), and fold mass
+ratios from 0.29 to a clipped \(\times\)510. The gap between that number
 and the full-input models quantifies how much of the surrogate's skill
 is chemistry rather than memorised density structure.
 
 (vi) The volumetric 3D U-Net is the best interpolator in the comparison
-(interior-fold \(\Rsq = 0.995\), beating every tabular model) and the
+(interior-fold \(\Rsq = 0.992\), beating every tabular model in
+aggregate) and the
 least reliable extrapolator under the physical-field metrics: at the
-boundary folds it falls below the pointwise
-XGBoost baseline, with phase-localised biases up to \(+1.1\dex\) and
+boundary folds it does no better than the pointwise XGBoost baseline
+(and at the molecular-rich boundary substantially worse),
+with phase-localised biases up to \(+1.1\dex\) and
 mass-budget violations exceeding two orders of magnitude that a global
 calibration cannot repair --- at roughly two orders of magnitude higher
 per-model training cost. On suites of this size, engineered spatial context plus

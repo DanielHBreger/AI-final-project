@@ -9,10 +9,12 @@
 \citation{Grassi2014}
 \citation{Krumholz2009,Gnedin2011,Sternberg2014,Bialy2016}
 \citation{deMijolla2019}
+\citation{Palud2023}
 \citation{Holdship2021}
 \citation{Grassi2022}
 \citation{Branca2024}
 \citation{Grassi2014}
+\citation{Janssen2026}
 \citation{Glover2007,Glover2010}
 \newlabel{firstpage}{{}{1}{}{Doc-Start}{}}
 \@writefile{toc}{\contentsline {section}{\numberline {1}Introduction}{1}{section.1}\protected@file@percent }
@@ -52,13 +54,13 @@
 \@writefile{toc}{\contentsline {subsection}{\numberline {4.1}Multi-scale spatial neighbourhood features}{4}{subsection.4.1}\protected@file@percent }
 \newlabel{sec:spatial}{{4.1}{4}{}{subsection.4.1}{}}
 \newlabel{eq:boxfilter}{{6}{4}{}{equation.6}{}}
-\newlabel{eq:featurevec}{{7}{4}{}{equation.7}{}}
 \citation{Chen2016}
 \citation{Ioffe2015}
 \citation{Kingma2015}
 \citation{He2016}
 \citation{Ronneberger2015,Cicek2016}
 \citation{Ulyanov2017}
+\newlabel{eq:featurevec}{{7}{5}{}{equation.7}{}}
 \@writefile{toc}{\contentsline {subsection}{\numberline {4.2}Density-weighted training}{5}{subsection.4.2}\protected@file@percent }
 \newlabel{sec:weighting}{{4.2}{5}{}{subsection.4.2}{}}
 \newlabel{eq:weights}{{8}{5}{}{equation.8}{}}
@@ -82,8 +84,8 @@
 \newlabel{sec:ablation_fh2}{{5.3}{7}{}{subsection.5.3}{}}
 \@writefile{toc}{\contentsline {subsection}{\numberline {5.4}The volumetric baseline}{7}{subsection.5.4}\protected@file@percent }
 \newlabel{sec:results_cnn}{{5.4}{7}{}{subsection.5.4}{}}
-\@writefile{lot}{\contentsline {table}{\numberline {2}{\ignorespaces Leave-one-\(G_0\)-out log-space \(R^2\) per held-out fold for all evaluated models, on the same native \(128^3\) cells. ``+S'' appends the 45 multi-scale spatial features (Section~\ref {sec:spatial}); ``+W'' uses density-weighted training (Section~\ref {sec:weighting}). Stack rows give the Ridge-stacked ensemble of the indicated base pair, raw and with the two bias calibrations of Section~\ref {sec:ensemble}. The best value in each column is bold. Tabular rows are from the master comparison log; the U-Net row is its best configuration (32 base channels, 150 epochs, no dropout) trained at native \(128^3\). The final row, set off by a rule, is the deployed fully nested pipeline of Section~\ref {sec:per_fold}; it is excluded from the per-column bolding, which compares rows under the shared CV-OOF stacking protocol of Section~\ref {sec:ensemble}.}}{8}{table.2}\protected@file@percent }
-\newlabel{tab:main}{{2}{8}{Leave-one-\(\Gzero \)-out log-space \(\Rsq \) per held-out fold for all evaluated models, on the same native \(128^3\) cells. ``+S'' appends the 45 multi-scale spatial features (Section~\ref {sec:spatial}); ``+W'' uses density-weighted training (Section~\ref {sec:weighting}). Stack rows give the Ridge-stacked ensemble of the indicated base pair, raw and with the two bias calibrations of Section~\ref {sec:ensemble}. The best value in each column is bold. Tabular rows are from the master comparison log; the U-Net row is its best configuration (32 base channels, 150 epochs, no dropout) trained at native \(128^3\). The final row, set off by a rule, is the deployed fully nested pipeline of Section~\ref {sec:per_fold}; it is excluded from the per-column bolding, which compares rows under the shared CV-OOF stacking protocol of Section~\ref {sec:ensemble}}{table.2}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {2}{\ignorespaces Leave-one-\(G_0\)-out log-space \(R^2\) per held-out fold for all evaluated models, on the same native \(128^3\) cells. ``+S'' appends the 45 multi-scale spatial features (Section~\ref {sec:spatial}); ``+W'' uses density-weighted training (Section~\ref {sec:weighting}). Stack rows give the Ridge-stacked ensemble of the indicated base pair, raw and with the two bias calibrations of Section~\ref {sec:ensemble}. The best value in each column is bold. Tabular rows are from the master comparison log; the U-Net row is its best configuration (32 base channels, 150 epochs, no dropout) trained at native \(128^3\), with the checkpoint selected on an inner validation cube (Section~\ref {sec:cnn}). The final row, set off by a rule, is the deployed fully nested pipeline of Section~\ref {sec:per_fold}; it is excluded from the per-column bolding, which compares rows under the shared CV-OOF stacking protocol of Section~\ref {sec:ensemble}.}}{8}{table.2}\protected@file@percent }
+\newlabel{tab:main}{{2}{8}{Leave-one-\(\Gzero \)-out log-space \(\Rsq \) per held-out fold for all evaluated models, on the same native \(128^3\) cells. ``+S'' appends the 45 multi-scale spatial features (Section~\ref {sec:spatial}); ``+W'' uses density-weighted training (Section~\ref {sec:weighting}). Stack rows give the Ridge-stacked ensemble of the indicated base pair, raw and with the two bias calibrations of Section~\ref {sec:ensemble}. The best value in each column is bold. Tabular rows are from the master comparison log; the U-Net row is its best configuration (32 base channels, 150 epochs, no dropout) trained at native \(128^3\), with the checkpoint selected on an inner validation cube (Section~\ref {sec:cnn}). The final row, set off by a rule, is the deployed fully nested pipeline of Section~\ref {sec:per_fold}; it is excluded from the per-column bolding, which compares rows under the shared CV-OOF stacking protocol of Section~\ref {sec:ensemble}}{table.2}{}}
 \@writefile{lot}{\contentsline {table}{\numberline {3}{\ignorespaces Physical-field metrics for the models of Table~\ref {tab:main} (cross-fold means; mass ratio \(\mathcal  {M}\) as the min--max range over folds). RMSE decomposes as \(\mathrm  {RMSE}^2 = b^2 + s^2\) (equation~\ref {eq:rmse}); \(R^2_{\mathrm  {mol}}\)/\(R^2_{\mathrm  {dif}}\) are phase-conditional at \(\log _{10}(n_{\mathrm  {H_2}})= -4\); \(f_{0.1}\) is the fraction of cells within 0.1\,\text  {dex}; \(W_1\) the Wasserstein distance between marginals; skill is measured against the pointwise XGBoost row (equation~\ref {eq:skill}). \(^\dagger \)The U-Net's mass range is a lower bound on its violation (predictions clipped at truth \(+1\,\text  {dex}\); Section~\ref {sec:metrics}). The final row, set off by a rule, is the deployed fully nested pipeline of Section~\ref {sec:per_fold}, for which the clip is never active.}}{8}{table.3}\protected@file@percent }
 \newlabel{tab:summary}{{3}{8}{Physical-field metrics for the models of Table~\ref {tab:main} (cross-fold means; mass ratio \(\Mratio \) as the min--max range over folds). RMSE decomposes as \(\mathrm {RMSE}^2 = b^2 + s^2\) (equation~\ref {eq:rmse}); \(\Rsq _{\mathrm {mol}}\)/\(\Rsq _{\mathrm {dif}}\) are phase-conditional at \(\logn = -4\); \(f_{0.1}\) is the fraction of cells within 0.1\dex ; \(W_1\) the Wasserstein distance between marginals; skill is measured against the pointwise XGBoost row (equation~\ref {eq:skill}). \(^\dagger \)The U-Net's mass range is a lower bound on its violation (predictions clipped at truth \(+1\dex \); Section~\ref {sec:metrics}). The final row, set off by a rule, is the deployed fully nested pipeline of Section~\ref {sec:per_fold}, for which the clip is never active}{table.3}{}}
 \@writefile{lot}{\contentsline {table}{\numberline {4}{\ignorespaces Ablation of the solver-derived self-shielding factor \(f_{\mathrm  {H_2}}\): key metrics with the full feature set (left of each arrow) and with \(f_{\mathrm  {H_2}}\) excluded from the local features and the spatial averages (right). \(R^2\) entries give mean \(\pm \) fold std.; RMSE and molecular-phase entries are cross-fold means. All runs use the identical pipeline, seeds, and hyperparameters; the without-\(f_{\mathrm  {H_2}}\) mass-calibrated stack keeps fold mass ratios of 0.93--1.16.}}{8}{table.4}\protected@file@percent }
@@ -96,39 +98,41 @@
 \newlabel{sec:per_fold}{{5.5}{9}{}{subsection.5.5}{}}
 \@writefile{lof}{\contentsline {figure}{\numberline {5}{\ignorespaces XGBoost gain importance, mean \(\pm \) std over the seven folds. \emph  {(a)} Pointwise model (15 local features): the solver-derived \(\log f_{\mathrm  {H_2}}\) dominates, followed by temperature and density. \emph  {(b)} Spatial-feature model, top 20 of 60 features (blue = local, red = neighbourhood means): \(f_{\mathrm  {H_2}}\) and its spatial averages fill the top ranks. \emph  {(c)} Importance aggregated per base field over all scales. Velocity and magnetic-field components are negligible in every view.}}{10}{figure.5}\protected@file@percent }
 \newlabel{fig:importance}{{5}{10}{XGBoost gain importance, mean \(\pm \) std over the seven folds. \emph {(a)} Pointwise model (15 local features): the solver-derived \(\log \fshield \) dominates, followed by temperature and density. \emph {(b)} Spatial-feature model, top 20 of 60 features (blue = local, red = neighbourhood means): \(\fshield \) and its spatial averages fill the top ranks. \emph {(c)} Importance aggregated per base field over all scales. Velocity and magnetic-field components are negligible in every view}{figure.5}{}}
-\@writefile{lof}{\contentsline {figure}{\numberline {6}{\ignorespaces Predicted versus true \(\log _{10}(n_{\mathrm  {H_2}})\) per held-out fold (two-dimensional histograms, log colour scale; dashed line = identity), for the deployed mass-calibrated pipeline. Per-fold \(R^2\), Pearson \(r\), and bias are annotated. The bimodal target structure is reproduced in every fold; scatter is dominated by the diffuse UV-exposed population.}}{10}{figure.6}\protected@file@percent }
-\newlabel{fig:scatter}{{6}{10}{Predicted versus true \(\logn \) per held-out fold (two-dimensional histograms, log colour scale; dashed line = identity), for the deployed mass-calibrated pipeline. Per-fold \(\Rsq \), Pearson \(r\), and bias are annotated. The bimodal target structure is reproduced in every fold; scatter is dominated by the diffuse UV-exposed population}{figure.6}{}}
 \@writefile{toc}{\contentsline {section}{\numberline {6}Supplementary experiments}{10}{section.6}\protected@file@percent }
 \newlabel{sec:supp}{{6}{10}{}{section.6}{}}
 \@writefile{toc}{\contentsline {subsection}{\numberline {6.1}Single-cube transfer across \(G_0\)}{10}{subsection.6.1}\protected@file@percent }
 \newlabel{sec:single_cube}{{6.1}{10}{}{subsection.6.1}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.2}Within-cube sampling geometry}{10}{subsection.6.2}\protected@file@percent }
+\newlabel{sec:intra_cube}{{6.2}{10}{}{subsection.6.2}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {6}{\ignorespaces Predicted versus true \(\log _{10}(n_{\mathrm  {H_2}})\) per held-out fold (two-dimensional histograms, log colour scale; dashed line = identity), for the deployed mass-calibrated pipeline. Per-fold \(R^2\), Pearson \(r\), and bias are annotated. The bimodal target structure is reproduced in every fold; scatter is dominated by the diffuse UV-exposed population.}}{11}{figure.6}\protected@file@percent }
+\newlabel{fig:scatter}{{6}{11}{Predicted versus true \(\logn \) per held-out fold (two-dimensional histograms, log colour scale; dashed line = identity), for the deployed mass-calibrated pipeline. Per-fold \(\Rsq \), Pearson \(r\), and bias are annotated. The bimodal target structure is reproduced in every fold; scatter is dominated by the diffuse UV-exposed population}{figure.6}{}}
 \@writefile{lof}{\contentsline {figure}{\numberline {7}{\ignorespaces Residual distributions (predicted \(-\) true, dex) per fold, with best-fit normal curves and their \((\mu , \sigma )\) annotated. Distribution widths decrease monotonically with \(G_0\); per-fold means lie between \(-0.16\) and \(+0.16\,\text  {dex}\) after mass calibration. The multi-modal structure at several folds means the Gaussian curves summarise location and scale only and should not be read as a claim of normality.}}{11}{figure.7}\protected@file@percent }
 \newlabel{fig:residuals}{{7}{11}{Residual distributions (predicted \(-\) true, dex) per fold, with best-fit normal curves and their \((\mu , \sigma )\) annotated. Distribution widths decrease monotonically with \(\Gzero \); per-fold means lie between \(-0.16\) and \(+0.16\dex \) after mass calibration. The multi-modal structure at several folds means the Gaussian curves summarise location and scale only and should not be read as a claim of normality}{figure.7}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {6.2}Within-cube sampling geometry}{11}{subsection.6.2}\protected@file@percent }
-\newlabel{sec:intra_cube}{{6.2}{11}{}{subsection.6.2}{}}
 \newlabel{eq:maskedfilter}{{9}{11}{}{equation.9}{}}
-\citation{Grinsztajn2022}
-\citation{Krumholz2009,Gnedin2011,Bialy2016}
 \@writefile{lof}{\contentsline {figure}{\numberline {8}{\ignorespaces Density-stratified error analysis of the deployed pipeline. \emph  {(a)} \(R^2\) on the subset of cells above a minimum-density percentile: \(R^2\) \emph  {decreases} toward the dense tail because the within-subset target variance shrinks faster than the errors. \emph  {(b)} Fraction of cells with absolute residual below fixed thresholds versus \(G_0\); the dip at \(G_0= 0.8\) reflects that fold's residual \(+0.16\,\text  {dex}\) bias. \emph  {(c)} MAE per true-density decile: errors peak in the low-density deciles of the low-\(G_0\) folds, at the steep atomic-to-molecular transition; high-\(G_0\) folds are flat at \(\,\rlap  {\raise 0.5ex\hbox {$<$}}{\lower 1.0ex\hbox {$\sim $}}\,\)0.1\,\text  {dex}. \emph  {(d)} \(R^2\) within the top-\(N\) per cent densest cells.}}{12}{figure.8}\protected@file@percent }
 \newlabel{fig:stratified}{{8}{12}{Density-stratified error analysis of the deployed pipeline. \emph {(a)} \(\Rsq \) on the subset of cells above a minimum-density percentile: \(\Rsq \) \emph {decreases} toward the dense tail because the within-subset target variance shrinks faster than the errors. \emph {(b)} Fraction of cells with absolute residual below fixed thresholds versus \(\Gzero \); the dip at \(\Gzero = 0.8\) reflects that fold's residual \(+0.16\dex \) bias. \emph {(c)} MAE per true-density decile: errors peak in the low-density deciles of the low-\(\Gzero \) folds, at the steep atomic-to-molecular transition; high-\(\Gzero \) folds are flat at \(\la \)0.1\dex . \emph {(d)} \(\Rsq \) within the top-\(N\) per cent densest cells}{figure.8}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {7}Discussion}{12}{section.7}\protected@file@percent }
-\newlabel{sec:discussion}{{7}{12}{}{section.7}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {7.1}Feature engineering versus architecture}{12}{subsection.7.1}\protected@file@percent }
+\citation{Grinsztajn2022}
+\citation{Krumholz2009,Gnedin2011,Bialy2016}
 \@writefile{lof}{\contentsline {figure}{\numberline {9}{\ignorespaces True (filled) versus predicted (outline) marginal distributions of \(\log _{10}(n_{\mathrm  {H_2}})\) per fold for the deployed pipeline, annotated with the two-sample Kolmogorov--Smirnov statistic and the Wasserstein distance \(W_1\) (dex). The bimodal structure and peak positions are reproduced in every fold.}}{13}{figure.9}\protected@file@percent }
 \newlabel{fig:distributions}{{9}{13}{True (filled) versus predicted (outline) marginal distributions of \(\logn \) per fold for the deployed pipeline, annotated with the two-sample Kolmogorov--Smirnov statistic and the Wasserstein distance \(W_1\) (dex). The bimodal structure and peak positions are reproduced in every fold}{figure.9}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {7}Discussion}{13}{section.7}\protected@file@percent }
+\newlabel{sec:discussion}{{7}{13}{}{section.7}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {7.1}Feature engineering versus architecture}{13}{subsection.7.1}\protected@file@percent }
 \@writefile{toc}{\contentsline {subsection}{\numberline {7.2}Volumetric versus per-cell representations}{13}{subsection.7.2}\protected@file@percent }
 \@writefile{toc}{\contentsline {subsection}{\numberline {7.3}Which model for which use}{13}{subsection.7.3}\protected@file@percent }
 \newlabel{sec:whichmodel}{{7.3}{13}{}{subsection.7.3}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {7.4}Deployability and the shielding factor}{13}{subsection.7.4}\protected@file@percent }
-\newlabel{sec:deploy}{{7.4}{13}{}{subsection.7.4}{}}
 \@writefile{lof}{\contentsline {figure}{\numberline {10}{\ignorespaces Mid-plane (\(z = 64\)) slices of the \(\log _{10}(n_{\mathrm  {H_2}})\) field for each \(G_0\) (rows): ground truth, prediction, and absolute error (columns), for the deployed pipeline. Truth and prediction share one colour scale per row; the error column has its own scale. Residuals trace the boundaries of shielded filaments at low \(G_0\); at high \(G_0\) the field is nearly uniform.}}{14}{figure.10}\protected@file@percent }
 \newlabel{fig:spatial}{{10}{14}{Mid-plane (\(z = 64\)) slices of the \(\logn \) field for each \(\Gzero \) (rows): ground truth, prediction, and absolute error (columns), for the deployed pipeline. Truth and prediction share one colour scale per row; the error column has its own scale. Residuals trace the boundaries of shielded filaments at low \(\Gzero \); at high \(\Gzero \) the field is nearly uniform}{figure.10}{}}
-\@writefile{lof}{\contentsline {figure}{\numberline {11}{\ignorespaces Single-cube transfer: log-space \(R^2\) for models trained on one cube (rows) and evaluated on each cube (columns), for XGBoost (\emph  {left}), MLP (\emph  {centre}), and the stacked ensemble (\emph  {right}). Diagonal cells are in-sample fits. Transfer quality decays with \(G_0\) separation; values for separations of four or more geometric steps are poor and can be strongly negative.}}{15}{figure.11}\protected@file@percent }
-\newlabel{fig:heatmap}{{11}{15}{Single-cube transfer: log-space \(\Rsq \) for models trained on one cube (rows) and evaluated on each cube (columns), for XGBoost (\emph {left}), MLP (\emph {centre}), and the stacked ensemble (\emph {right}). Diagonal cells are in-sample fits. Transfer quality decays with \(\Gzero \) separation; values for separations of four or more geometric steps are poor and can be strongly negative}{figure.11}{}}
-\@writefile{lof}{\contentsline {figure}{\numberline {12}{\ignorespaces Within-cube sampling geometry: test \(R^2\) per training geometry (columns) and cube (rows) for XGBoost (\emph  {left}), MLP (\emph  {centre}), and the stacked ensemble (\emph  {right}). Random coverage \(\geq \)5 per cent reconstructs the held-out cells to \(R^2\geq 0.97\) in every cube; contiguous half-cube slabs and small compact boxes are systematically worse despite far larger volume (down to \(R^2\approx 0.4\)--0.6 in the worst cubes). The MLP alone can fail strongly on contiguous geometries; the stacked ensemble follows the more robust XGBoost.}}{15}{figure.12}\protected@file@percent }
-\newlabel{fig:intra_cube}{{12}{15}{Within-cube sampling geometry: test \(\Rsq \) per training geometry (columns) and cube (rows) for XGBoost (\emph {left}), MLP (\emph {centre}), and the stacked ensemble (\emph {right}). Random coverage \(\geq \)5 per cent reconstructs the held-out cells to \(\Rsq \geq 0.97\) in every cube; contiguous half-cube slabs and small compact boxes are systematically worse despite far larger volume (down to \(\Rsq \approx 0.4\)--0.6 in the worst cubes). The MLP alone can fail strongly on contiguous geometries; the stacked ensemble follows the more robust XGBoost}{figure.12}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {11}{\ignorespaces Single-cube transfer: log-space \(R^2\) for models trained on one cube (rows) and evaluated on each cube (columns), for XGBoost (\emph  {left}), MLP (\emph  {centre}), and the stacked ensemble (\emph  {right}). Diagonal cells are in-sample fits. The colour scale is clipped to \(R^2\in [-1, 1]\); hatched cells fall below \(-1\), with the actual value printed. Transfer quality decays with \(G_0\) separation; values for separations of four or more geometric steps are poor and can be strongly negative.}}{15}{figure.11}\protected@file@percent }
+\newlabel{fig:heatmap}{{11}{15}{Single-cube transfer: log-space \(\Rsq \) for models trained on one cube (rows) and evaluated on each cube (columns), for XGBoost (\emph {left}), MLP (\emph {centre}), and the stacked ensemble (\emph {right}). Diagonal cells are in-sample fits. The colour scale is clipped to \(\Rsq \in [-1, 1]\); hatched cells fall below \(-1\), with the actual value printed. Transfer quality decays with \(\Gzero \) separation; values for separations of four or more geometric steps are poor and can be strongly negative}{figure.11}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {12}{\ignorespaces Within-cube sampling geometry: test \(R^2\) per training geometry (columns) and cube (rows) for XGBoost (\emph  {left}), MLP (\emph  {centre}), and the stacked ensemble (\emph  {right}). Random coverage \(\geq \)5 per cent reconstructs the held-out cells to \(R^2\geq 0.97\) in every cube; contiguous half-cube slabs and small compact boxes are systematically worse despite far larger volume (down to \(R^2\approx 0.4\)--0.6 in the worst cubes). The colour scale is clipped to \(R^2\in [-1, 1]\); hatched cells fall below \(-1\), with the actual value printed. The MLP alone can fail strongly on contiguous geometries; the stacked ensemble follows the more robust XGBoost.}}{15}{figure.12}\protected@file@percent }
+\newlabel{fig:intra_cube}{{12}{15}{Within-cube sampling geometry: test \(\Rsq \) per training geometry (columns) and cube (rows) for XGBoost (\emph {left}), MLP (\emph {centre}), and the stacked ensemble (\emph {right}). Random coverage \(\geq \)5 per cent reconstructs the held-out cells to \(\Rsq \geq 0.97\) in every cube; contiguous half-cube slabs and small compact boxes are systematically worse despite far larger volume (down to \(\Rsq \approx 0.4\)--0.6 in the worst cubes). The colour scale is clipped to \(\Rsq \in [-1, 1]\); hatched cells fall below \(-1\), with the actual value printed. The MLP alone can fail strongly on contiguous geometries; the stacked ensemble follows the more robust XGBoost}{figure.12}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {7.4}Deployability and the shielding factor}{15}{subsection.7.4}\protected@file@percent }
+\newlabel{sec:deploy}{{7.4}{15}{}{subsection.7.4}{}}
 \@writefile{toc}{\contentsline {subsection}{\numberline {7.5}Limitations}{15}{subsection.7.5}\protected@file@percent }
 \newlabel{sec:limitations}{{7.5}{15}{}{subsection.7.5}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {8}Conclusions}{16}{section.8}\protected@file@percent }
+\newlabel{sec:conc}{{8}{16}{}{section.8}{}}
 \citation{Paszke2019}
 \citation{Chen2016}
 \citation{Harris2020}
@@ -138,8 +142,6 @@
 \bibstyle{rasti}
 \bibdata{references}
 \bibcite{Bialy2016}{{1}{2016}{{Bialy \& Sternberg}}{{}}}
-\@writefile{toc}{\contentsline {section}{\numberline {8}Conclusions}{16}{section.8}\protected@file@percent }
-\newlabel{sec:conc}{{8}{16}{}{section.8}{}}
 \bibcite{Branca2024}{{2}{2024}{{Branca \& Pallottini}}{{}}}
 \bibcite{Cazaux2004}{{3}{2004}{{Cazaux \& Tielens}}{{}}}
 \bibcite{Chen2016}{{4}{2016}{{Chen \& Guestrin}}{{}}}
@@ -158,15 +160,17 @@
 \bibcite{Holdship2021}{{17}{2021}{{Holdship et~al.}}{{Holdship, Viti, Haworth, \& Ilee}}}
 \bibcite{Hunter2007}{{18}{2007}{{Hunter}}{{}}}
 \bibcite{Ioffe2015}{{19}{2015}{{Ioffe \& Szegedy}}{{}}}
-\bibcite{Kingma2015}{{20}{2015}{{Kingma \& Ba}}{{}}}
-\bibcite{Krumholz2009}{{21}{2009}{{Krumholz et~al.}}{{Krumholz, McKee, \& Tumlinson}}}
-\bibcite{Narayanan2012}{{22}{2012}{{Narayanan et~al.}}{{Narayanan, Krumholz, Ostriker, \& Hernquist}}}
-\bibcite{Paszke2019}{{23}{2019}{{Paszke et~al.}}{{Paszke, Gross, Massa, et~al.}}}
-\bibcite{Pedregosa2011}{{24}{2011}{{Pedregosa et~al.}}{{Pedregosa, Varoquaux, Gramfort, et~al.}}}
-\bibcite{Ronneberger2015}{{25}{2015}{{Ronneberger et~al.}}{{Ronneberger, Fischer, \& Brox}}}
-\bibcite{Sternberg2014}{{26}{2014}{{Sternberg et~al.}}{{Sternberg, Le~Petit, Roueff, \& Le~Bourlot}}}
-\bibcite{Ulyanov2017}{{27}{2017}{{Ulyanov et~al.}}{{Ulyanov, Vedaldi, \& Lempitsky}}}
-\bibcite{Virtanen2020}{{28}{2020}{{Virtanen et~al.}}{{Virtanen, Gommers, Oliphant, et~al.}}}
-\bibcite{Wolcott-Green2011}{{29}{2011}{{Wolcott-Green et~al.}}{{Wolcott-Green, Haiman, \& Bryan}}}
+\bibcite{Janssen2026}{{20}{2026}{{Janssen et~al.}}{{Janssen, Branca, \& Buck}}}
+\bibcite{Kingma2015}{{21}{2015}{{Kingma \& Ba}}{{}}}
+\bibcite{Krumholz2009}{{22}{2009}{{Krumholz et~al.}}{{Krumholz, McKee, \& Tumlinson}}}
+\bibcite{Narayanan2012}{{23}{2012}{{Narayanan et~al.}}{{Narayanan, Krumholz, Ostriker, \& Hernquist}}}
+\bibcite{Palud2023}{{24}{2023}{{Palud et~al.}}{{Palud, Einig, Le~Petit, Bron, Chainais, et~al.}}}
+\bibcite{Paszke2019}{{25}{2019}{{Paszke et~al.}}{{Paszke, Gross, Massa, et~al.}}}
+\bibcite{Pedregosa2011}{{26}{2011}{{Pedregosa et~al.}}{{Pedregosa, Varoquaux, Gramfort, et~al.}}}
+\bibcite{Ronneberger2015}{{27}{2015}{{Ronneberger et~al.}}{{Ronneberger, Fischer, \& Brox}}}
+\bibcite{Sternberg2014}{{28}{2014}{{Sternberg et~al.}}{{Sternberg, Le~Petit, Roueff, \& Le~Bourlot}}}
+\bibcite{Ulyanov2017}{{29}{2017}{{Ulyanov et~al.}}{{Ulyanov, Vedaldi, \& Lempitsky}}}
+\bibcite{Virtanen2020}{{30}{2020}{{Virtanen et~al.}}{{Virtanen, Gommers, Oliphant, et~al.}}}
+\bibcite{Wolcott-Green2011}{{31}{2011}{{Wolcott-Green et~al.}}{{Wolcott-Green, Haiman, \& Bryan}}}
 \newlabel{lastpage}{{8}{17}{}{section.8}{}}
 \gdef \@abspage@last{17}

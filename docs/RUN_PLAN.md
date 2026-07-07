@@ -202,16 +202,38 @@ Notes:
   (hold out the training cube nearest the median training log-G0: edge folds
   hold out 0.8/0.4 and KEEP their neighbours; every fold keeps a one-step
   neighbour; assignments 0.1→0.8, 0.2→0.8, 0.4→0.8, 0.8→0.4, 1.6→0.4,
-  3.2→0.4, 6.4→0.4). **Run 16b (central rule) was launched 2026-07-05 and
-  stopped by the user during data loading — rerun next session:**
-  `python -u test_cnn.py --variants unet_baseline --inner-val-rule central >
-  logs/run16b_cnn_innerval_central.log` (~4.6 h). Recommendation: adopt the
-  central-rule numbers for Tables 2–3 (defensible: preserves the CV design's
-  extrapolation geometry; validation representative of training), report the
-  nearest-rule run as rule-sensitivity in the disclosure. Then rerun run-4
-  (11-input) with the adopted rule, and only then rewrite the paper's U-Net
-  content (Tables 2–3 rows, §5.4, §5.3 11-input paragraph, §7.5 disclosure,
-  abstract, conclusion vi). Paper NOT yet updated with any run-16 numbers.
+  3.2→0.4, 6.4→0.4).
+- **Run 16b DONE** (2026-07-06, ~4.5 h) →
+  `results/cnn_test_20260706_170201.json`
+  (`checkpoint_selection: inner_val_central_log_g0`; log
+  `logs/run16b_cnn_innerval_central.log`). **Central rule ADOPTED for the
+  paper.** With the two-step-extrapolation confound removed, leakage-free
+  selection costs little vs the old test-based selection: mean R²
+  0.963 ± 0.047 (run 3: 0.970 ± 0.039), RMSE 0.348 (0.310), skill vs
+  pointwise XGBoost +0.36 (mean-per-fold; run 3: +0.48). Per-fold R²
+  0.896 / 0.992 / 0.993 / 0.991 / 0.995 / 0.992 / 0.882. **"Best
+  interpolator" survives**: interior R² 0.992 / RMSE 0.223 still beats the
+  shortcut mass-cal stack (0.984/0.31) in aggregate. Edges: R² 0.889 mean,
+  skill −1.37 (G0=0.1) / −0.01 (6.4). Mass ratios remain uncontrolled and
+  non-monotonic: 1.7 / 2.1 / 1.1 / 0.71 / 1.8 / 19.0 / **290.7** (clipped
+  lower bound); bias_mol +1.13 at 6.4. Selection vs final epoch a no-op
+  (0.9627 vs 0.9625). Nearest-rule run 16 kept as rule-sensitivity
+  (0.914–0.963 across rules, disclosed in §4.2.3 + §7.5).
+- **Run 16c DONE** (2026-07-06, ~4.5 h, 11-input run-4 config with central
+  rule) → `results/cnn_test_20260706_205017.json` (log
+  `logs/run16c_cnn_11input_central.log`). R² 0.851 ± 0.121 (run 4
+  test-selected: 0.893 ± 0.088), RMSE 0.811, scatter 0.72, frac_01 0.15,
+  R2_mol mean 0.06 (negative at both edges: −2.3 / −1.3), mass 0.29 to
+  clipped ×513. §5.3 "morphology" bound updated 90 → 85 per cent.
+- **Paper UPDATED 2026-07-06/07 with runs 16b+16c** (both `paper.tex` and
+  the new `paper_short.tex`): Tables 2–3 U-Net rows, §4.2.3 checkpoint
+  paragraph (inner-val protocol + rule sensitivity replaces the ≤12 %
+  disclosure), §5.4, §5.3 11-input paragraph, §7.2, §7.5, abstract,
+  conclusions (v)+(vi), Table 2 caption; `figures/fig_model_comparison.png`
+  regenerated with `--cnn-log results/cnn_test_20260706_170201.json`
+  (variant list matching the committed figure: xgb_standard,
+  xgb_standard_sp, mlp_wide_sp, stacked_weighted, stacked_weighted_mwcal,
+  unet_baseline). Both PDFs compile clean.
 | 17 | Intra-cube random-mask seed repeats: rerun `intra_cube_section.py` rand splits with ≥3 seeds (add a `--seed` flag + loop, or a `--splits rand_*` subset flag) | a few hours | ChatGPT #9: one mask per fraction is not enough for a claim about random coverage. Current (run 11) rand_1 spread across cubes is 0.79–0.94, so instability is unlikely — this quantifies it |
 
 ### Analysis items (no GPU training — scripts over saved artifacts)
@@ -220,8 +242,8 @@ Notes:
 |---|------|------|---------|
 | A1 | Phase-threshold sensitivity: recompute phase-conditional metrics of the run-5 volumes for thresholds in [−5, −3] | minutes | **DONE 2026-07-05** — `phase_threshold_sensitivity.py` → `results/a1_phase_threshold_20260705_191051.json`. Smooth + monotone across [−5,−3]: R2_mol 0.976→0.995, R2_dif 0.881→0.932, f_mol 26→23 %; no qualitative change. Stability sentence added to §3.2 |
 | A2 | Cell-level bootstrap CIs (within fold) for the deployed pipeline's headline metrics, from the run-5 npz + truth | minutes | **DONE 2026-07-05** — `bootstrap_cis.py` (200 reps, cell-level + 16³-block) → `results/a2_bootstrap_cis_20260705_191624.json`. Cell 95 % CIs ≤0.0002 in R²; block CIs ≲0.004 (≪ fold-to-fold σ = 0.006); mass-ratio block CIs the widest, all within [0.93, 1.14]. CI sentence added to §5.5; point estimates independently re-confirm `deployed_row_metrics.json` |
-| A3 | Replot Figs 11–12 heatmaps from the saved run-10/11 JSONs with a diverging colormap clipped to [−1, 1] (values < −1 marked); enlarge in-cell text | ~1 h code | ChatGPT figure comment; no retraining — plot from `logs/*/run_20260705_*.json` |
-| A4 | (Optional) Compare mass-weighted-residual calibration vs exact log-mass-ratio fitting on the run-5 volumes | minutes | Quantifies the first-order-equivalence claim added to §4.5, if a referee asks |
+| A3 | Replot Figs 11–12 heatmaps from the saved run-10/11 JSONs with a diverging colormap clipped to [−1, 1] (values < −1 marked); enlarge in-cell text | ~1 h code | **DONE 2026-07-06** — `--replot JSON` mode added to `single_cube_extrapolation.py` and `intra_cube_section.py`; both PNGs regenerated in place from the run-10/11 JSONs (RdBu clipped to [−1, 1], white at 0, sub-−1 cells hatched with the true value printed, in-cell text enlarged to 8 pt); clipping note added to both captions; paper recompiles clean. No retraining |
+| A4 | (Optional) Compare mass-weighted-residual calibration vs exact log-mass-ratio fitting on the run-5 volumes | minutes | **DONE 2026-07-06** — `calibration_functionals.py` → `results/a4_calibration_functionals_20260706_173659.json`. On the raw deployed volumes, b_M and the exact log-mass-ratio offset differ by ≤0.018 dex per fold (mean 0.009 dex); in-sample b_M mass closure within 4.3 %. Quantitative parenthetical added to §4.5 |
 | A5 | Line-level numbers audit: every number in the abstract, §5, §7.3, and the conclusions checked against its source table/log | ~1 h | **DONE 2026-07-05.** ~200 numbers checked against run-1b/2b/3/4/deployed/run-10/run-11 logs (incl. every Table 2/3 cell, the 3-of-7 / 7-of-7 / 6-of-7 fold-count claims, and recomputed skill values). Four fixes applied to paper.tex: (1) §5.3 importance fractions 0.58/0.85 → **0.57/0.83** (recomputed from run-1b `xgb_feature_importance`; genuine error); (2) §5.2 "R² > 0.95 throughout" → "R² > 0.91 in every fold" (raw-stack fold minima are 0.916/0.927); (3) §5.4 U-Net "beating the stack on every one of them" → "in aggregate" (the stack wins interior folds G0=1.6 and 3.2 on both R² and RMSE); (4) conclusion (vi) "two orders of magnitude higher training cost" → "per-model training cost" (4.6 h vs ~3.5 min/model; vs the full 17-variant hour it is only ~5×). Paper recompiles clean. |
 
 Done 2026-07-05 without new runs (from existing artifacts): multiplicity/

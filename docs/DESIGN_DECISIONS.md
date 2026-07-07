@@ -184,8 +184,17 @@ test-set checkpoint selection as unacceptable for the primary benchmark
 table even with the bound disclosed. Now RUN_PLAN run 16:
 inner-validation-cube selection (+ record final-epoch metrics), rerun
 the run-3 (and run-4) configs, then replace the U-Net rows in
-Tables 2--3 and the §5.4 numbers. Disclosure remains in the paper until
-run 16 lands.
+Tables 2--3 and the §5.4 numbers.
+**FIXED 2026-07-06/07 (runs 16b + 16c, central inner-val rule):** all
+U-Net numbers in both papers are now leakage-free (15-input
+0.963 ± 0.047, RMSE 0.348; 11-input 0.851 ± 0.121). The ≤12 % disclosure
+is replaced by the inner-val protocol description plus a rule-sensitivity
+disclosure (nearest-rule 0.914 vs central 0.963; the nearest rule turns
+edge folds into two-step extrapolation — RUN_PLAN run 16 entry).
+Selection vs final epoch is a no-op (0.9627 vs 0.9625): the old
+test-based selection carried the U-Net's apparent edge advantage, but
+the interior-champion result survives (interior R² 0.992 vs stack
+0.984).
 
 ### 4.6 CNN trained unweighted (vs density-weighted stack)
 **Assessment:** The mass-budget comparison has an asymmetry: the headline
@@ -334,6 +343,6 @@ KEEP.
 | 13 | Weighted U-Net | future (run 14 candidate) | RUN_PLAN |
 | 14 | `mode='wrap'` robustness check | optional run 15 | RUN_PLAN |
 | 15 | Training-range clip + mass_ratio_raw; final-epoch CNN option; --save-preds | future code revision | this file |
-| 16 | Leakage-free U-Net checkpoints (disposition change of §4.5, 2026-07-05) | **run 16, blocking** | RUN_PLAN + REVIEW3_DISPOSITIONS #4 |
+| 16 | Leakage-free U-Net checkpoints (disposition change of §4.5, 2026-07-05) | **DONE 2026-07-06/07** (runs 16b+16c, central rule; papers updated) | RUN_PLAN + REVIEW3_DISPOSITIONS #4 |
 | 17 | Mass-cal functional stated exactly in §4.5 (mass-weighted residual ≠ exact log-mass-ratio closure; kept, validated OOS at 0.985–1.090; optional check A4) | paper text DONE 2026-07-05 | REVIEW3_DISPOSITIONS #6 |
 | 18 | Deployed nested rows added to Tables 2–3 below a rule, excluded from bolding; shortcut comparison kept in main text (uniform protocol; nesting all 17 variants ≈ 6× compute for no inferential gain) | paper DONE 2026-07-05 | REVIEW3_DISPOSITIONS #3/#5 |

@@ -1,0 +1,77 @@
+\relax 
+\providecommand\hyper@newdestlabel[2]{}
+\providecommand\HyField@AuxAddToFields[1]{}
+\providecommand\HyField@AuxAddToCoFields[2]{}
+\citation{Cazaux2004}
+\citation{Habing1968,Draine1996}
+\citation{Wolcott-Green2011}
+\citation{Grassi2014}
+\citation{deMijolla2019,Palud2023,Holdship2021,Grassi2022,Branca2024,Janssen2026}
+\citation{Ronneberger2015,Cicek2016}
+\newlabel{firstpage}{{}{1}{}{Doc-Start}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {1}Introduction}{1}{section.1}\protected@file@percent }
+\newlabel{sec:intro}{{1}{1}{}{section.1}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {2}Data, protocol, and metrics}{1}{section.2}\protected@file@percent }
+\newlabel{sec:setup}{{2}{1}{}{section.2}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.1}Simulation suite}{1}{subsection.2.1}\protected@file@percent }
+\newlabel{sec:data}{{2.1}{1}{}{subsection.2.1}{}}
+\citation{Chen2016}
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.2}Protocol and metrics}{2}{subsection.2.2}\protected@file@percent }
+\newlabel{sec:metrics}{{2.2}{2}{}{subsection.2.2}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {3}Models}{2}{section.3}\protected@file@percent }
+\newlabel{sec:methods}{{3}{2}{}{section.3}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.1}Spatial features, weighting, and calibration}{2}{subsection.3.1}\protected@file@percent }
+\newlabel{sec:ingredients}{{3.1}{2}{}{subsection.3.1}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.2}Model families}{2}{subsection.3.2}\protected@file@percent }
+\newlabel{sec:models}{{3.2}{2}{}{subsection.3.2}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {4}Results}{2}{section.4}\protected@file@percent }
+\newlabel{sec:results}{{4}{2}{}{section.4}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.1}What each ingredient buys}{2}{subsection.4.1}\protected@file@percent }
+\newlabel{sec:main}{{4.1}{2}{}{subsection.4.1}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {1}{\ignorespaces Leave-one-\(G_0\)-out performance (cross-fold means; mass ratio \(\mathcal  {M}\) as the min--max fold range). ``+S'' appends the 45 spatial features; ``+W'' density-weighted training; stack rows are the Ridge-stacked tree--MLP ensemble raw and with the two calibrations of Section~\ref {sec:ingredients}. RMSE\(^2 = b^2 + s^2\) exactly. \(R^2_{\mathrm  {mol}}\) is the molecular-phase (\(\log _{10}(n_{\mathrm  {H_2}})> -4\)) \(R^2\); skill is measured against the pointwise XGBoost row. \(^\dagger \)Lower bound: predictions clipped at truth \(+1\,\text  {dex}\) before the mass integral (Section~\ref {sec:metrics}). The final row is the deployed fully nested pipeline (Section~\ref {sec:deployed}), for which the clip is never active.}}{3}{table.1}\protected@file@percent }
+\newlabel{tab:main}{{1}{3}{Leave-one-\(\Gzero \)-out performance (cross-fold means; mass ratio \(\Mratio \) as the min--max fold range). ``+S'' appends the 45 spatial features; ``+W'' density-weighted training; stack rows are the Ridge-stacked tree--MLP ensemble raw and with the two calibrations of Section~\ref {sec:ingredients}. RMSE\(^2 = b^2 + s^2\) exactly. \(\Rsq _{\mathrm {mol}}\) is the molecular-phase (\(\logn > -4\)) \(\Rsq \); skill is measured against the pointwise XGBoost row. \(^\dagger \)Lower bound: predictions clipped at truth \(+1\dex \) before the mass integral (Section~\ref {sec:metrics}). The final row is the deployed fully nested pipeline (Section~\ref {sec:deployed}), for which the clip is never active}{table.1}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.2}Calibration closes the budget}{3}{subsection.4.2}\protected@file@percent }
+\newlabel{sec:massbudget}{{4.2}{3}{}{subsection.4.2}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.3}The deployed pipeline}{3}{subsection.4.3}\protected@file@percent }
+\newlabel{sec:deployed}{{4.3}{3}{}{subsection.4.3}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.4}The volumetric alternative}{3}{subsection.4.4}\protected@file@percent }
+\newlabel{sec:cnn}{{4.4}{3}{}{subsection.4.4}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.5}Dependence on the solver's shielding factor}{3}{subsection.4.5}\protected@file@percent }
+\newlabel{sec:ablation}{{4.5}{3}{}{subsection.4.5}{}}
+\citation{Grinsztajn2022}
+\@writefile{lof}{\contentsline {figure}{\numberline {1}{\ignorespaces Per-fold behaviour across the \(G_0\) sweep: log-space \(R^2\) (\emph  {a}), RMSE (\emph  {b}), and skill against the pointwise XGBoost baseline (\emph  {c}). Grey bands mark the two extrapolation folds. The 3D U-Net (dotted) is the most accurate model on the interior folds and the least robust at both boundaries; the mass-calibrated weighted stack (purple) is the only model that remains strong across the entire range.}}{4}{figure.1}\protected@file@percent }
+\newlabel{fig:modelcomp}{{1}{4}{Per-fold behaviour across the \(\Gzero \) sweep: log-space \(\Rsq \) (\emph {a}), RMSE (\emph {b}), and skill against the pointwise XGBoost baseline (\emph {c}). Grey bands mark the two extrapolation folds. The 3D U-Net (dotted) is the most accurate model on the interior folds and the least robust at both boundaries; the mass-calibrated weighted stack (purple) is the only model that remains strong across the entire range}{figure.1}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {2}{\ignorespaces The deployed pipeline, per held-out fold. \emph  {(a)} Total H\(_2\) mass ratio: the raw stack (grey) over-predicts by \(\times \)1.65--1.90 at every \(G_0\); the mass-calibrated prediction (red) is within 9 per cent of the true mass in every fold. \emph  {(b)} Cell-mean log residual. \emph  {(c)} Phase-conditional \(R^2\): molecular-phase accuracy is uniformly high; the diffuse phase is hardest at low \(G_0\), where UV-exposed gas spans the steep atomic-to-molecular transition.}}{4}{figure.2}\protected@file@percent }
+\newlabel{fig:massbudget}{{2}{4}{The deployed pipeline, per held-out fold. \emph {(a)} Total H\(_2\) mass ratio: the raw stack (grey) over-predicts by \(\times \)1.65--1.90 at every \(\Gzero \); the mass-calibrated prediction (red) is within 9 per cent of the true mass in every fold. \emph {(b)} Cell-mean log residual. \emph {(c)} Phase-conditional \(\Rsq \): molecular-phase accuracy is uniformly high; the diffuse phase is hardest at low \(\Gzero \), where UV-exposed gas spans the steep atomic-to-molecular transition}{figure.2}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {5}Discussion and conclusions}{4}{section.5}\protected@file@percent }
+\newlabel{sec:disc}{{5}{4}{}{section.5}{}}
+\citation{Paszke2019}
+\citation{Chen2016}
+\citation{Harris2020}
+\citation{Virtanen2020}
+\citation{Pedregosa2011}
+\citation{Hunter2007}
+\bibstyle{rasti}
+\bibdata{references}
+\bibcite{Branca2024}{{1}{2024}{{Branca \& Pallottini}}{{}}}
+\bibcite{Cazaux2004}{{2}{2004}{{Cazaux \& Tielens}}{{}}}
+\bibcite{Chen2016}{{3}{2016}{{Chen \& Guestrin}}{{}}}
+\bibcite{Cicek2016}{{4}{2016}{{{\c {C}}i{\c {c}}ek et~al.}}{{{\c {C}}i{\c {c}}ek, Abdulkadir, Lienkamp, Brox, \& Ronneberger}}}
+\bibcite{deMijolla2019}{{5}{2019}{{de~Mijolla et~al.}}{{de~Mijolla, Viti, Holdship, Manolopoulou, \& Yates}}}
+\bibcite{Draine1996}{{6}{1996}{{Draine \& Bertoldi}}{{}}}
+\bibcite{Grassi2014}{{7}{2014}{{Grassi et~al.}}{{Grassi, Bovino, Schleicher, Prieto, Seifried, Simoncini, \& Gianturco}}}
+\bibcite{Grassi2022}{{8}{2022}{{Grassi et~al.}}{{Grassi, Nauman, Ramsey, Bovino, Picogna, \& Ercolano}}}
+\bibcite{Grinsztajn2022}{{9}{2022}{{Grinsztajn et~al.}}{{Grinsztajn, Oyallon, \& Varoquaux}}}
+\bibcite{Habing1968}{{10}{1968}{{Habing}}{{}}}
+\bibcite{Harris2020}{{11}{2020}{{Harris et~al.}}{{Harris, Millman, van~der Walt, et~al.}}}
+\bibcite{Holdship2021}{{12}{2021}{{Holdship et~al.}}{{Holdship, Viti, Haworth, \& Ilee}}}
+\bibcite{Hunter2007}{{13}{2007}{{Hunter}}{{}}}
+\bibcite{Janssen2026}{{14}{2026}{{Janssen et~al.}}{{Janssen, Branca, \& Buck}}}
+\bibcite{Palud2023}{{15}{2023}{{Palud et~al.}}{{Palud, Einig, Le~Petit, Bron, Chainais, et~al.}}}
+\bibcite{Paszke2019}{{16}{2019}{{Paszke et~al.}}{{Paszke, Gross, Massa, et~al.}}}
+\bibcite{Pedregosa2011}{{17}{2011}{{Pedregosa et~al.}}{{Pedregosa, Varoquaux, Gramfort, et~al.}}}
+\bibcite{Ronneberger2015}{{18}{2015}{{Ronneberger et~al.}}{{Ronneberger, Fischer, \& Brox}}}
+\bibcite{Virtanen2020}{{19}{2020}{{Virtanen et~al.}}{{Virtanen, Gommers, Oliphant, et~al.}}}
+\bibcite{Wolcott-Green2011}{{20}{2011}{{Wolcott-Green et~al.}}{{Wolcott-Green, Haiman, \& Bryan}}}
+\newlabel{lastpage}{{5}{5}{}{section.5}{}}
+\gdef \@abspage@last{5}

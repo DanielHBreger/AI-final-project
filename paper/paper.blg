@@ -3,44 +3,44 @@ Capacity: max_strings=200000, hash_size=200000, hash_prime=170003
 The top-level auxiliary file: paper.aux
 The style file: rasti.bst
 Database file #1: references.bib
-You've used 29 entries,
+You've used 31 entries,
             2773 wiz_defined-function locations,
-            1189 strings with 13107 characters,
-and the built_in function-call counts, 14621 in all, are:
-= -- 1270
-> -- 925
+            1203 strings with 13418 characters,
+and the built_in function-call counts, 15631 in all, are:
+= -- 1348
+> -- 1011
 < -- 21
-+ -- 311
-- -- 282
-* -- 1492
-:= -- 2255
-add.period$ -- 58
-call.type$ -- 29
-change.case$ -- 177
-chr.to.int$ -- 29
-cite$ -- 87
-duplicate$ -- 627
-empty$ -- 967
-format.name$ -- 329
-if$ -- 2925
++ -- 340
+- -- 309
+* -- 1606
+:= -- 2426
+add.period$ -- 62
+call.type$ -- 31
+change.case$ -- 191
+chr.to.int$ -- 31
+cite$ -- 93
+duplicate$ -- 663
+empty$ -- 1025
+format.name$ -- 358
+if$ -- 3116
 int.to.chr$ -- 1
 int.to.str$ -- 1
-missing$ -- 29
-newline$ -- 120
-num.names$ -- 116
-pop$ -- 224
+missing$ -- 31
+newline$ -- 128
+num.names$ -- 124
+pop$ -- 240
 preamble$ -- 1
-purify$ -- 148
+purify$ -- 160
 quote$ -- 0
-skip$ -- 545
+skip$ -- 574
 stack$ -- 0
-substring$ -- 654
-swap$ -- 239
+substring$ -- 684
+swap$ -- 247
 text.length$ -- 10
 text.prefix$ -- 0
 top$ -- 0
-type$ -- 261
+type$ -- 279
 warning$ -- 0
-while$ -- 133
+while$ -- 141
 width$ -- 0
-write$ -- 355
+write$ -- 379

@@ -265,9 +265,14 @@ def print_table(results: list[dict], g0_vals: list[float]) -> None:
 # ── Heatmap visualization ──────────────────────────────────────────────────────
 
 def plot_heatmaps(results: list[dict], g0_vals: list[float],
-                  save_path: str) -> None:
-    """3-panel heatmap: XGB | MLP | Stacked, showing held-out test R2."""
-    split_names = [s[0] for s in SPLITS]
+                  save_path: str, split_names: list[str] | None = None) -> None:
+    """3-panel heatmap: XGB | MLP | Stacked, showing held-out test R2.
+
+    Colour scale is a diverging map clipped to R2 in [-1, 1] (white at 0);
+    cells whose true value falls below -1 keep their saturated colour and
+    are hatched, with the actual value printed in the cell."""
+    if split_names is None:
+        split_names = [s[0] for s in SPLITS]
     n_g0    = len(g0_vals)
     n_split = len(split_names)
 
@@ -289,11 +294,15 @@ def plot_heatmaps(results: list[dict], g0_vals: list[float],
     ]
 
     fig, axes = plt.subplots(1, 3, figsize=(22, 4.5))
-    fig.suptitle('Intra-cube section experiment: held-out test R2', fontsize=12)
+    fig.suptitle('Intra-cube section experiment: held-out test R2 '
+                 '(hatched cells: R2 < −1, colour saturated)', fontsize=12)
+
+    vmin, vmax = -1.0, 1.0
 
     for ax, (key, title) in zip(axes, panels):
         mat = _matrix(key)
-        im = ax.imshow(mat, vmin=0.0, vmax=1.0, cmap='RdYlGn', aspect='auto')
+        im = ax.imshow(np.clip(mat, vmin, vmax), vmin=vmin, vmax=vmax,
+                       cmap='RdBu', aspect='auto')
         ax.set_title(title, fontsize=10)
         ax.set_xticks(range(n_split))
         ax.set_xticklabels(split_names, rotation=35, ha='right', fontsize=8)
@@ -303,10 +312,17 @@ def plot_heatmaps(results: list[dict], g0_vals: list[float],
         for i in range(n_g0):
             for j in range(n_split):
                 v = mat[i, j]
-                if not np.isnan(v):
-                    color = 'k' if 0.3 < v < 0.85 else 'white'
-                    ax.text(j, i, f'{v:.3f}', ha='center', va='center',
-                            fontsize=6.5, color=color)
+                if np.isnan(v):
+                    continue
+                text  = f'{v:.3f}' if v >= -1.0 else f'{v:.1f}'
+                color = 'white' if abs(np.clip(v, vmin, vmax)) > 0.65 else 'k'
+                ax.text(j, i, text, ha='center', va='center',
+                        fontsize=8, color=color, zorder=6)
+                if v < vmin:   # mark clipped cells
+                    ax.add_patch(plt.Rectangle(
+                        (j - 0.5, i - 0.5), 1, 1, fill=False,
+                        hatch='///', edgecolor='0.75', linewidth=0, zorder=4,
+                    ))
 
         fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
 
@@ -327,8 +343,20 @@ def main() -> None:
                         help='Run only for this G0 value (default: all)')
     parser.add_argument('--quiet', action='store_true',
                         help='Suppress per-epoch MLP output')
+    parser.add_argument('--replot', type=str, default=None, metavar='JSON',
+                        help='Regenerate the heatmap PNG from a saved run '
+                             'JSON and exit (no training)')
     add_drop_args(parser)
     args = parser.parse_args()
+
+    if args.replot:
+        with open(args.replot) as f:
+            payload = json.load(f)
+        png_path = os.path.join(os.path.dirname(args.replot),
+                                f"run_{payload['timestamp']}_heatmap.png")
+        plot_heatmaps(payload['results'], payload['g0_values'], png_path,
+                      split_names=payload['splits'])
+        return
 
     feat_cols = get_feature_cols(build_drop_set(args))
 
