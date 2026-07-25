@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.29 (TeX Live 2026) (preloaded format=pdflatex 2026.4.11)  7 JUL 2026 10:00
+This is pdfTeX, Version 3.141592653-2.6-1.40.29 (TeX Live 2026) (preloaded format=pdflatex 2026.4.11)  7 JUL 2026 11:05
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -1021,28 +1021,34 @@ pdfTeX warning (ext4): destination with the same identifier (name{table.1}) has
  been already used, duplicate ignored
 <argument> ...shipout:D \box_use:N \l_shipout_box 
                                                   \__shipout_drop_firstpage_...
-l.457 
-      ] [4
+l.460 
+      ]
+Underfull \vbox (badness 10000) has occurred while \output is active []
+
+
+Underfull \vbox (badness 10000) has occurred while \output is active []
+
+ [4
 pdfTeX warning (ext4): destination with the same identifier (name{figure.1}) ha
 s been already used, duplicate ignored
 <argument> ...shipout:D \box_use:N \l_shipout_box 
                                                   \__shipout_drop_firstpage_...
-l.505 
+l.494 
       
 pdfTeX warning (ext4): destination with the same identifier (name{figure.2}) ha
 s been already used, duplicate ignored
 <argument> ...shipout:D \box_use:N \l_shipout_box 
                                                   \__shipout_drop_firstpage_...
-l.505 
+l.494 
        <../figures/fig_model_comparison.png> <../figures/fig7_massbudget.png>]
 LaTeX Font Info:    Trying to load font information for T1+ntxtt on input line 
-535.
+538.
 
 (c:/texlive/2026/texmf-dist/tex/latex/newtx/t1ntxtt.fd
 File: t1ntxtt.fd 2012/04/20 v3.1
 )
 LaTeX Font Info:    Font shape `T1/ntxtt/m/n' will be
-(Font)              scaled to size 9.0pt on input line 535.
+(Font)              scaled to size 9.0pt on input line 538.
  (./paper_short.bbl)
 [5] (./paper_short.aux)
  ***********
@@ -1078,7 +1084,7 @@ exlive/2026/texmf-dist/fonts/type1/public/newtx/txmiaX.pfb><c:/texlive/2026/tex
 mf-dist/fonts/type1/public/newtx/txsys.pfb><c:/texlive/2026/texmf-dist/fonts/ty
 pe1/public/newtx/ztmb.pfb><c:/texlive/2026/texmf-dist/fonts/type1/public/newtx/
 ztmr.pfb><c:/texlive/2026/texmf-dist/fonts/type1/public/newtx/ztmri.pfb>
-Output written on paper_short.pdf (5 pages, 648009 bytes).
+Output written on paper_short.pdf (5 pages, 648192 bytes).
 PDF statistics:
  261 PDF objects out of 1000 (max. 8388607)
  221 compressed objects within 3 object streams

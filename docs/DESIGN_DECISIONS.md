@@ -152,6 +152,14 @@ and the weighting now sits inside the headline model
 
 **Disposition:** OPTIONAL RUN (run 12 in RUN_PLAN: XGB-only α sweep;
 needs a small code change to expose α) + DISCLOSE the chosen values.
+**DONE 2026-07-07 (run 12, `weight_alpha_sweep.py`):** α sweep {10,100,
+1000} shows a flat log-space response (mean R² 0.963, RMSE 0.374 at all
+three); only the mass budget moves, and only α=10 under-corrects the
+hardest fold (0.62 vs 0.89). α=100 verified to reproduce the archived
+`xgb_standard_sp_w` rows bit-for-bit. The p99/p99.99 anchors were NOT
+swept (only α) — but α is the exponential strength that dominates the
+tail weighting, so the flat α response is the substantive test. §4.2
+disclosure sentence added. Adopted α=100 is on the flat part.
 
 ### 4.2 Ridge(α=1.0) meta-learner
 **Assessment:** 2 meta-features → insensitive to α; intercept absorbs the

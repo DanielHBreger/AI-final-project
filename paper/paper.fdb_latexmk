@@ -1,13 +1,13 @@
 # Fdb version 4
-["bibtex paper"] 1783407468.72604 "paper.aux" "paper.bbl" "paper" 1783407627.72163 0
+["bibtex paper"] 1783411539.29403 "paper.aux" "paper.bbl" "paper" 1783420759.41589 0
   "./rasti.bst" 1734527431 34137 817f91bd5901f7e3d76ebb88d13af665 ""
   "./references.bib" 1783347750 9341 0ceda97385994f62d61ad0362191654b ""
-  "paper.aux" 1783407626 29727 faa9d7b216744c920deaac649854f8ca "pdflatex"
+  "paper.aux" 1783420758 29727 ce02df50df595a7e8a3f8f3606df9147 "pdflatex"
   (generated)
   "paper.bbl"
   "paper.blg"
   (rewritten before read)
-["pdflatex"] 1783407621.66956 "paper.tex" "paper.pdf" "paper" 1783407627.72229 0
+["pdflatex"] 1783420753.34113 "paper.tex" "paper.pdf" "paper" 1783420759.41654 0
   "../figures/fig2_scatter.png" 1783198560 346773 5b26c13a6a55f43f8ba3e54b843d1158 ""
   "../figures/fig3_error_dist.png" 1783198562 262894 97f749983095c70d7193df59360f3d6c ""
   "../figures/fig4_stratified.png" 1783198564 342131 46e92836be78cb013c1a1ca34fb2adf8 ""
@@ -181,10 +181,10 @@
   "c:/texlive/2026/texmf-var/web2c/pdftex/pdflatex.fmt" 1775918869 3648464 f5d0d39dc2a579f705dfd6ee709a0d5c ""
   "c:/texlive/2026/texmf.cnf" 1775918767 713 e69b156964470283e0530f5060668171 ""
   "fig_method_diagram.png" 1777287730 93095 ecda681dc3828b385cefe947d42873e6 ""
-  "paper.aux" 1783407626 29727 faa9d7b216744c920deaac649854f8ca "pdflatex"
-  "paper.bbl" 1783407469 8126 d54a0738f16488c9aeefd7adb7318ca8 "bibtex paper"
-  "paper.out" 1783407626 5099 725de7d2015674466eb3e2affcb439c8 "pdflatex"
-  "paper.tex" 1783407540 90843 b6ecf01803390c827cba9fc8c3486168 ""
+  "paper.aux" 1783420758 29727 ce02df50df595a7e8a3f8f3606df9147 "pdflatex"
+  "paper.bbl" 1783411539 8126 d54a0738f16488c9aeefd7adb7318ca8 "bibtex paper"
+  "paper.out" 1783420758 5099 725de7d2015674466eb3e2affcb439c8 "pdflatex"
+  "paper.tex" 1783420739 92133 fae384ec7a8fed6f00a9b0b225f486cc ""
   "rasti.cls" 1734527431 62977 3a18086d13989cda17d6ae57c5e20575 ""
   (generated)
   "paper.aux"

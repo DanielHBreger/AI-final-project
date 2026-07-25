@@ -444,7 +444,10 @@ ablation loss, consistent with neighbourhood averages of density and
 extinction acting as crude column estimators, and XGBoost gain
 importance corroborates the picture (\(\log\fshield\) carries 0.57 of
 the pointwise gain, 0.83 with its spatial averages; velocity and
-magnetic-field components are negligible). The complementary bound
+magnetic-field components are negligible --- a rerun without them
+leaves XGBoost unchanged and the calibrated stack at
+\(\Rsq = 0.975\) with its mass budget closed, though the MLP branch
+destabilises in log space). The complementary bound
 comes from a U-Net trained on 11 chemistry-free inputs (temperature,
 \(\Gzero\), velocity, magnetic field): it still reaches
 \(\Rsq = 0.851 \pm 0.121\) --- the H\(_2\) \emph{morphology} is largely

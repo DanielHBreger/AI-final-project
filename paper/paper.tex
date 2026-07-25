@@ -557,7 +557,14 @@ unchanged. The weight rises from \(1\times\) at the 99th percentile to
 \(100\times\) at the 99.99th: the mass-carrying tail is upweighted without
 destabilising the bulk fit. The percentile anchors and \(\alpha\) are a
 designed choice, not tuned; their effect is reported in
-Section~\ref{sec:results_main}.
+Section~\ref{sec:results_main}. The result is insensitive to the
+weighting strength: sweeping \(\alpha \in \{10, 100, 1000\}\) on the
+weighted spatial-feature tree leaves the log-space accuracy unchanged
+(mean \(\Rsq = 0.963\), RMSE \(0.374\dex\) at all three) and moves only
+the mass budget, and only at the weakest setting --- \(\alpha = 10\)
+under-corrects the hardest fold (mass ratio 0.62 versus 0.89 at
+\(\alpha = 100\)) --- so the adopted \(\alpha = 100\) sits on the flat
+part of the response.
 
 \subsection{Models}
 \label{sec:models}
@@ -953,8 +960,20 @@ Figure~\ref{fig:importance} shows XGBoost gain importances:
 \(\log\fshield\) dominates (0.57 of total gain for the pointwise model;
 0.83 when its spatial averages are aggregated with it), followed by
 temperature, density, and \(\Gzero\); the velocity and magnetic-field
-components contribute negligibly, suggesting a minimal six-feature
-deployable set that we have not separately evaluated.
+components contribute negligibly. A dedicated rerun of the comparison
+without them (six local features and their spatial averages) confirms
+that prediction for the trees --- XGBoost is unchanged
+(\(\Rsq = 0.952\) pointwise and 0.963 with spatial features, against
+0.950 and 0.963 with all 15 inputs) --- but not for the MLP, whose
+log-space accuracy destabilises on several folds (mean \(\Rsq\)
+\(0.981 \rightarrow 0.808\)) even though its molecular-phase accuracy
+and mass budget are preserved: the velocity and field components
+evidently condition the network's fit in the diffuse phase even where
+they carry little tree gain. The mass-calibrated weighted stack absorbs
+the degradation, retaining \(\Rsq = 0.975 \pm 0.011\) at
+RMSE \(= 0.340\dex\) (a 16 per cent increase) with the mass budget
+still closed (fold ratios 0.97--1.09, molecular \(\Rsq = 0.989\)), its
+Ridge weights leaning more heavily on the tree branch.
 
 For the volumetric model the available evidence is an upper bound of a
 different kind: a U-Net trained on only 11 inputs --- temperature,

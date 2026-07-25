@@ -1,0 +1,173 @@
+Loading data...
+  G0=0.1   | rows=2,097,152 | nH2=[9.58e-12, 2.33e+03] | fh2=[8.46e-25, 4.94e-01]
+  G0=0.2   | rows=2,097,152 | nH2=[7.41e-13, 9.74e+03] | fh2=[2.26e-30, 4.75e-01]
+  G0=0.4   | rows=2,097,152 | nH2=[3.08e-12, 2.28e+03] | fh2=[3.14e-24, 5.07e-01]
+  G0=0.8   | rows=2,097,152 | nH2=[3.38e-12, 2.49e+03] | fh2=[9.28e-26, 5.07e-01]
+  G0=1.6   | rows=2,097,152 | nH2=[3.83e-12, 2.26e+03] | fh2=[2.64e-24, 5.04e-01]
+  G0=3.2   | rows=2,097,152 | nH2=[2.29e-12, 1.29e+04] | fh2=[1.20e-30, 5.05e-01]
+  G0=6.4   | rows=2,097,152 | nH2=[4.75e-12, 9.24e+03] | fh2=[2.72e-30, 5.00e-01]
+Total samples: 14,680,064  |  Features: 6
+Device: cuda
+Computing data checksum...
+Converting cubes to 128^3 volumes...
+Symmetry ops: 8  (z-preserving)
+
+--- XGBoost ---
+
+[xgb_standard]
+  xgb_standard      fold=0 (G0=0.1)  R2=0.9521
+  xgb_standard      fold=1 (G0=0.2)  R2=0.9577
+  xgb_standard      fold=2 (G0=0.4)  R2=0.9735
+  xgb_standard      fold=3 (G0=0.8)  R2=0.9737
+  xgb_standard      fold=4 (G0=1.6)  R2=0.9710
+  xgb_standard      fold=5 (G0=3.2)  R2=0.9531
+  xgb_standard      fold=6 (G0=6.4)  R2=0.8840
+
+--- MLP (100 epochs) ---
+
+[mlp_wide]
+  mlp_wide          fold=0 (G0=0.1)  R2=0.9570
+  mlp_wide          fold=1 (G0=0.2)  R2=0.9706
+  mlp_wide          fold=2 (G0=0.4)  R2=0.9783
+  mlp_wide          fold=3 (G0=0.8)  R2=0.7580
+  mlp_wide          fold=4 (G0=1.6)  R2=0.9306
+  mlp_wide          fold=5 (G0=3.2)  R2=0.6825
+  mlp_wide          fold=6 (G0=6.4)  R2=0.9902
+
+--- Spatial-feature variants ---
+  Spatial kernels: [3, 5, 7]  ->  18 spatial features  (X_sp shape: (14680064, 24))
+  xgb_standard_sp   fold=0 (G0=0.1)  R2=0.9773
+  xgb_standard_sp   fold=1 (G0=0.2)  R2=0.9827
+  xgb_standard_sp   fold=2 (G0=0.4)  R2=0.9843
+  xgb_standard_sp   fold=3 (G0=0.8)  R2=0.9826
+  xgb_standard_sp   fold=4 (G0=1.6)  R2=0.9744
+  xgb_standard_sp   fold=5 (G0=3.2)  R2=0.9563
+  xgb_standard_sp   fold=6 (G0=6.4)  R2=0.8849
+  mlp_wide_sp       fold=0 (G0=0.1)  R2=0.9867
+  mlp_wide_sp       fold=1 (G0=0.2)  R2=0.9906
+  mlp_wide_sp       fold=2 (G0=0.4)  R2=0.9590
+  mlp_wide_sp       fold=3 (G0=0.8)  R2=0.7737
+  mlp_wide_sp       fold=4 (G0=1.6)  R2=0.5426
+  mlp_wide_sp       fold=5 (G0=3.2)  R2=0.3668
+  mlp_wide_sp       fold=6 (G0=6.4)  R2=0.9594
+
+  [weighted variants]
+  xgb_standard_sp_w  fold=0 (G0=0.1)  R2=0.9771
+  xgb_standard_sp_w  fold=1 (G0=0.2)  R2=0.9827
+  xgb_standard_sp_w  fold=2 (G0=0.4)  R2=0.9843
+  xgb_standard_sp_w  fold=3 (G0=0.8)  R2=0.9826
+  xgb_standard_sp_w  fold=4 (G0=1.6)  R2=0.9745
+  xgb_standard_sp_w  fold=5 (G0=3.2)  R2=0.9565
+  xgb_standard_sp_w  fold=6 (G0=6.4)  R2=0.8851
+  mlp_wide_sp_w     fold=0 (G0=0.1)  R2=0.9867
+  mlp_wide_sp_w     fold=1 (G0=0.2)  R2=0.9898
+  mlp_wide_sp_w     fold=2 (G0=0.4)  R2=0.9627
+  mlp_wide_sp_w     fold=3 (G0=0.8)  R2=0.7597
+  mlp_wide_sp_w     fold=4 (G0=1.6)  R2=0.6726
+  mlp_wide_sp_w     fold=5 (G0=3.2)  R2=0.2943
+  mlp_wide_sp_w     fold=6 (G0=6.4)  R2=0.9923
+
+--- Ensemble variants ---
+  ens_xgb+mlp           fold=0 (G0=0.1)  R2=0.9557
+  ens_xgb+mlp           fold=1 (G0=0.2)  R2=0.9669
+  ens_xgb+mlp           fold=2 (G0=0.4)  R2=0.9772
+  ens_xgb+mlp           fold=3 (G0=0.8)  R2=0.8998
+  ens_xgb+mlp           fold=4 (G0=1.6)  R2=0.9554
+  ens_xgb+mlp           fold=5 (G0=3.2)  R2=0.8511
+  ens_xgb+mlp           fold=6 (G0=6.4)  R2=0.9575
+  ens_sp                fold=0 (G0=0.1)  R2=0.9854
+  ens_sp                fold=1 (G0=0.2)  R2=0.9888
+  ens_sp                fold=2 (G0=0.4)  R2=0.9757
+  ens_sp                fold=3 (G0=0.8)  R2=0.9126
+  ens_sp                fold=4 (G0=1.6)  R2=0.8333
+  ens_sp                fold=5 (G0=3.2)  R2=0.7513
+  ens_sp                fold=6 (G0=6.4)  R2=0.9346
+  stacked_xgb+mlp           fold=0 (G0=0.1)  R2=0.9502  massR=1.644  w={'xgb_standard': '0.741', 'mlp_wide': '0.294'}
+  stacked_xgb+mlp_cal       fold=0 (G0=0.1)  R2=0.9282  massR=0.629  offset=+0.417 dex
+  stacked_xgb+mlp_mwcal     fold=0 (G0=0.1)  R2=0.9482  massR=1.312  offset=+0.098 dex
+  stacked_xgb+mlp           fold=1 (G0=0.2)  R2=0.9546  massR=1.320  w={'xgb_standard': '0.830', 'mlp_wide': '0.189'}
+  stacked_xgb+mlp_cal       fold=1 (G0=0.2)  R2=0.9669  massR=0.795  offset=+0.221 dex
+  stacked_xgb+mlp_mwcal     fold=1 (G0=0.2)  R2=0.9619  massR=1.022  offset=+0.111 dex
+  stacked_xgb+mlp           fold=2 (G0=0.4)  R2=0.9719  massR=1.478  w={'xgb_standard': '0.794', 'mlp_wide': '0.233'}
+  stacked_xgb+mlp_cal       fold=2 (G0=0.4)  R2=0.9821  massR=0.751  offset=+0.294 dex
+  stacked_xgb+mlp_mwcal     fold=2 (G0=0.4)  R2=0.9734  massR=1.399  offset=+0.024 dex
+  stacked_xgb+mlp           fold=3 (G0=0.8)  R2=0.8814  massR=1.402  w={'xgb_standard': '0.483', 'mlp_wide': '0.542'}
+  stacked_xgb+mlp_cal       fold=3 (G0=0.8)  R2=0.9380  massR=0.706  offset=+0.298 dex
+  stacked_xgb+mlp_mwcal     fold=3 (G0=0.8)  R2=0.9009  massR=1.143  offset=+0.089 dex
+  stacked_xgb+mlp           fold=4 (G0=1.6)  R2=0.9648  massR=1.225  w={'xgb_standard': '0.757', 'mlp_wide': '0.277'}
+  stacked_xgb+mlp_cal       fold=4 (G0=1.6)  R2=0.9914  massR=0.570  offset=+0.332 dex
+  stacked_xgb+mlp_mwcal     fold=4 (G0=1.6)  R2=0.9626  massR=1.263  offset=-0.013 dex
+  stacked_xgb+mlp           fold=5 (G0=3.2)  R2=0.9130  massR=1.113  w={'xgb_standard': '0.791', 'mlp_wide': '0.241'}
+  stacked_xgb+mlp_cal       fold=5 (G0=3.2)  R2=0.9915  massR=0.493  offset=+0.354 dex
+  stacked_xgb+mlp_mwcal     fold=5 (G0=3.2)  R2=0.8907  massR=1.258  offset=-0.053 dex
+  stacked_xgb+mlp           fold=6 (G0=6.4)  R2=0.9666  massR=1.004  w={'xgb_standard': '0.766', 'mlp_wide': '0.274'}
+  stacked_xgb+mlp_cal       fold=6 (G0=6.4)  R2=0.8540  massR=0.322  offset=+0.494 dex
+  stacked_xgb+mlp_mwcal     fold=6 (G0=6.4)  R2=0.9407  massR=1.145  offset=-0.057 dex
+  stacked_sp                fold=0 (G0=0.1)  R2=0.9777  massR=1.459  w={'xgb_standard_sp': '0.734', 'mlp_wide_sp': '0.308'}
+  stacked_sp_cal            fold=0 (G0=0.1)  R2=0.9684  massR=0.821  offset=+0.250 dex
+  stacked_sp_mwcal          fold=0 (G0=0.1)  R2=0.9754  massR=1.148  offset=+0.104 dex
+  stacked_sp                fold=1 (G0=0.2)  R2=0.9873  massR=1.317  w={'xgb_standard_sp': '0.757', 'mlp_wide_sp': '0.280'}
+  stacked_sp_cal            fold=1 (G0=0.2)  R2=0.9899  massR=0.861  offset=+0.185 dex
+  stacked_sp_mwcal          fold=1 (G0=0.2)  R2=0.9897  massR=0.976  offset=+0.130 dex
+  stacked_sp                fold=2 (G0=0.4)  R2=0.9819  massR=1.446  w={'xgb_standard_sp': '0.784', 'mlp_wide_sp': '0.252'}
+  stacked_sp_cal            fold=2 (G0=0.4)  R2=0.9900  massR=0.832  offset=+0.240 dex
+  stacked_sp_mwcal          fold=2 (G0=0.4)  R2=0.9848  massR=1.267  offset=+0.058 dex
+  stacked_sp                fold=3 (G0=0.8)  R2=0.9561  massR=1.432  w={'xgb_standard_sp': '0.740', 'mlp_wide_sp': '0.295'}
+  stacked_sp_cal            fold=3 (G0=0.8)  R2=0.9841  massR=0.755  offset=+0.278 dex
+  stacked_sp_mwcal          fold=3 (G0=0.8)  R2=0.9590  massR=1.365  offset=+0.021 dex
+  stacked_sp                fold=4 (G0=1.6)  R2=0.9231  massR=1.237  w={'xgb_standard_sp': '0.740', 'mlp_wide_sp': '0.299'}
+  stacked_sp_cal            fold=4 (G0=1.6)  R2=0.9777  massR=0.596  offset=+0.317 dex
+  stacked_sp_mwcal          fold=4 (G0=1.6)  R2=0.9269  massR=1.194  offset=+0.015 dex
+  stacked_sp                fold=5 (G0=3.2)  R2=0.9084  massR=1.121  w={'xgb_standard_sp': '0.810', 'mlp_wide_sp': '0.226'}
+  stacked_sp_cal            fold=5 (G0=3.2)  R2=0.9921  massR=0.500  offset=+0.351 dex
+  stacked_sp_mwcal          fold=5 (G0=3.2)  R2=0.8897  massR=1.239  offset=-0.044 dex
+  stacked_sp                fold=6 (G0=6.4)  R2=0.9908  massR=0.932  w={'xgb_standard_sp': '0.781', 'mlp_wide_sp': '0.268'}
+  stacked_sp_cal            fold=6 (G0=6.4)  R2=0.7571  massR=0.289  offset=+0.509 dex
+  stacked_sp_mwcal          fold=6 (G0=6.4)  R2=0.9729  massR=1.092  offset=-0.069 dex
+  stacked_weighted          fold=0 (G0=0.1)  R2=0.9779  massR=1.626  w={'xgb_standard_sp_w': '0.709', 'mlp_wide_sp_w': '0.333'}
+  stacked_weighted_cal      fold=0 (G0=0.1)  R2=0.9682  massR=0.891  offset=+0.261 dex
+  stacked_weighted_mwcal    fold=0 (G0=0.1)  R2=0.9721  massR=1.044  offset=+0.192 dex
+  stacked_weighted          fold=1 (G0=0.2)  R2=0.9874  massR=1.575  w={'xgb_standard_sp_w': '0.727', 'mlp_wide_sp_w': '0.310'}
+  stacked_weighted_cal      fold=1 (G0=0.2)  R2=0.9898  massR=1.017  offset=+0.190 dex
+  stacked_weighted_mwcal    fold=1 (G0=0.2)  R2=0.9897  massR=0.972  offset=+0.210 dex
+  stacked_weighted          fold=2 (G0=0.4)  R2=0.9825  massR=1.648  w={'xgb_standard_sp_w': '0.757', 'mlp_wide_sp_w': '0.279'}
+  stacked_weighted_cal      fold=2 (G0=0.4)  R2=0.9902  massR=0.951  offset=+0.239 dex
+  stacked_weighted_mwcal    fold=2 (G0=0.4)  R2=0.9900  massR=0.998  offset=+0.218 dex
+  stacked_weighted          fold=3 (G0=0.8)  R2=0.9494  massR=1.676  w={'xgb_standard_sp_w': '0.692', 'mlp_wide_sp_w': '0.344'}
+  stacked_weighted_cal      fold=3 (G0=0.8)  R2=0.9797  massR=0.908  offset=+0.266 dex
+  stacked_weighted_mwcal    fold=3 (G0=0.8)  R2=0.9740  massR=1.059  offset=+0.200 dex
+  stacked_weighted          fold=4 (G0=1.6)  R2=0.9406  massR=1.793  w={'xgb_standard_sp_w': '0.745', 'mlp_wide_sp_w': '0.293'}
+  stacked_weighted_cal      fold=4 (G0=1.6)  R2=0.9858  massR=0.876  offset=+0.311 dex
+  stacked_weighted_mwcal    fold=4 (G0=1.6)  R2=0.9770  massR=1.094  offset=+0.215 dex
+  stacked_weighted          fold=5 (G0=3.2)  R2=0.8924  massR=1.585  w={'xgb_standard_sp_w': '0.769', 'mlp_wide_sp_w': '0.267'}
+  stacked_weighted_cal      fold=5 (G0=3.2)  R2=0.9851  massR=0.744  offset=+0.328 dex
+  stacked_weighted_mwcal    fold=5 (G0=3.2)  R2=0.9647  massR=0.967  offset=+0.215 dex
+  stacked_weighted          fold=6 (G0=6.4)  R2=0.9960  massR=1.646  w={'xgb_standard_sp_w': '0.746', 'mlp_wide_sp_w': '0.305'}
+  stacked_weighted_cal      fold=6 (G0=6.4)  R2=0.6851  massR=0.508  offset=+0.511 dex
+  stacked_weighted_mwcal    fold=6 (G0=6.4)  R2=0.9575  massR=1.071  offset=+0.187 dex
+
+======================================================================================================================================================
+  Architecture Comparison  (R2 log-space per fold; trailing columns are cross-fold means)
+======================================================================================================================================================
+  Variant               G0=0.1  G0=0.2  G0=0.4  G0=0.8  G0=1.6  G0=3.2  G0=6.4      MeanR2     Std     RMSE     bias   massR      CCC      W1    skill
+------------------------------------------------------------------------------------------------------------------------------------------------------
+  xgb_standard           +0.9521  +0.9577  +0.9735  +0.9737  +0.9710  +0.9531  +0.8840    +0.9521  0.0291    0.472   +0.218   0.684   0.9759   0.291   +0.000
+  mlp_wide               +0.9570  +0.9706  +0.9783  +0.7580  +0.9306  +0.6825  +0.9902    +0.8953  0.1139    0.634   +0.363   1.131   0.9479   0.418   -1.977
+  xgb_standard_sp        +0.9773  +0.9827  +0.9843  +0.9826  +0.9744  +0.9563  +0.8849    +0.9632  0.0332    0.372   +0.197   0.718   0.9817   0.248   +0.295
+  mlp_wide_sp            +0.9867  +0.9906  +0.9590  +0.7737  +0.5426  +0.3668  +0.9594    +0.7970  0.2319    0.753   +0.567   1.038   0.9083   0.575   -4.748
+  xgb_standard_sp_w      +0.9771  +0.9827  +0.9843  +0.9826  +0.9745  +0.9565  +0.8851    +0.9633  0.0331    0.372   +0.197   0.951   0.9817   0.247   +0.295
+  mlp_wide_sp_w          +0.9867  +0.9898  +0.9627  +0.7597  +0.6726  +0.2943  +0.9923    +0.8083  0.2413    0.721   +0.554   1.001   0.9139   0.561   -4.347
+  ens_xgb+mlp            +0.9557  +0.9669  +0.9772  +0.8998  +0.9554  +0.8511  +0.9575    +0.9377  0.0421    0.538   +0.291   0.776   0.9682   0.353   -0.635
+  ens_sp                 +0.9854  +0.9888  +0.9757  +0.9126  +0.8333  +0.7513  +0.9346    +0.9117  0.0827    0.540   +0.382   0.802   0.9562   0.409   -1.344
+  stacked_xgb+mlp        +0.9502  +0.9546  +0.9719  +0.8814  +0.9648  +0.9130  +0.9666    +0.9432  0.0311    0.549   +0.344   1.312   0.9715   0.403   -0.575
+  stacked_xgb+mlp_cal    +0.9282  +0.9669  +0.9821  +0.9380  +0.9914  +0.9915  +0.8540    +0.9503  0.0457    0.460   -0.000   0.609   0.9760   0.270   -0.006
+  stacked_xgb+mlp_mwcal   +0.9482  +0.9619  +0.9734  +0.9009  +0.9626  +0.8907  +0.9407    +0.9398  0.0296    0.546   +0.316   1.220   0.9700   0.387   -0.554
+  stacked_sp             +0.9777  +0.9873  +0.9819  +0.9561  +0.9231  +0.9084  +0.9908    +0.9607  0.0305    0.417   +0.270   1.278   0.9806   0.316   -0.114
+  stacked_sp_cal         +0.9684  +0.9899  +0.9900  +0.9841  +0.9777  +0.9921  +0.7571    +0.9513  0.0797    0.347   -0.034   0.665   0.9779   0.214   +0.298
+  stacked_sp_mwcal       +0.9754  +0.9897  +0.9848  +0.9590  +0.9269  +0.8897  +0.9729    +0.9569  0.0335    0.419   +0.239   1.183   0.9788   0.298   -0.141
+  stacked_weighted       +0.9779  +0.9874  +0.9825  +0.9494  +0.9406  +0.8924  +0.9960    +0.9609  0.0337    0.412   +0.263   1.650   0.9807   0.311   -0.102
+  stacked_weighted_cal   +0.9682  +0.9898  +0.9902  +0.9797  +0.9858  +0.9851  +0.6851    +0.9405  0.1045    0.360   -0.038   0.842   0.9740   0.229   +0.205
+  stacked_weighted_mwcal   +0.9721  +0.9897  +0.9900  +0.9740  +0.9770  +0.9647  +0.9575    +0.9750  0.0111    0.340   +0.058   1.029   0.9877   0.205   +0.414
+======================================================================================================================================================
+
+Comparison log saved -> results/ablation_novelB_20260707.json
