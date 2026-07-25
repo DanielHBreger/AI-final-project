@@ -5,10 +5,17 @@ Evaluate the current UNet3D (ResConvBlock-based) under leave-one-G0-out CV.
 Runs only CNN variants — use compare_architectures.py for full model comparison.
 
 Checkpoint selection is leakage-free (since 2026-07-05): each fold holds out
-one *training* cube as an inner validation cube (nearest to the test cube in
-log10 G0, ties -> lower G0) and selects the best epoch on it; the test cube
-never influences which checkpoint is evaluated.  Final-epoch (no-selection)
-metrics are recorded alongside as `metrics_final`.
+one *training* cube as an inner validation cube and selects the best epoch on
+it; the test cube never influences which checkpoint is evaluated. Final-epoch
+(no-selection) metrics are recorded alongside as `metrics_final`.
+
+--inner-val-rule defaults to 'central' (nearest to the median log10 G0 of the
+six training cubes), the rule ADOPTED FOR THE PAPER: it keeps every fold's
+one-step G0 neighbour in training. The alternative, 'nearest' (nearest to the
+held-out cube), removes the two boundary folds' only adjacent training cube,
+turning those folds into two-step extrapolation -- a confound discovered when
+comparing the two rules (run 16 vs 16b in docs/RUN_PLAN.md). 'nearest' is kept
+only for that rule-sensitivity comparison; do not use it for headline numbers.
 
 Variants
 --------

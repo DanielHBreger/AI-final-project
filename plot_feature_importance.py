@@ -55,6 +55,15 @@ def _importance(variant: dict) -> tuple[list[str], np.ndarray, np.ndarray]:
     return fi['feature_names'], per.mean(axis=0), per.std(axis=0)
 
 
+def _importance_per_fold(variant: dict) -> tuple[list[str], np.ndarray]:
+    """Return (names, per_fold) with per_fold of shape (n_folds, n_features),
+    for aggregations that must sum across features fold-by-fold rather than
+    combine already-collapsed per-feature means/stds (which would wrongly
+    assume feature importances are independent across scales)."""
+    fi = variant['xgb_feature_importance']
+    return fi['feature_names'], np.asarray(fi['per_fold'], dtype=float)
+
+
 def _barh(ax, names, mean, std, colors, title):
     y = np.arange(len(names))
     ax.barh(y, mean, xerr=std, color=colors, edgecolor='k', linewidth=0.4,
@@ -125,16 +134,24 @@ def main() -> None:
                          fontsize=8, fontweight='bold')
         panel += 1
 
-        # (c) aggregated per base field: local + all neighbourhood scales
-        agg: dict[str, float] = {}
-        agg_sd: dict[str, float] = {}
-        for i, n in enumerate(names):
-            root = re.sub(r'_k\d+$', '', n)
-            agg[root]    = agg.get(root, 0.0) + mean[i]
-            agg_sd[root] = agg_sd.get(root, 0.0) + std[i] ** 2
-        roots  = sorted(agg, key=agg.get, reverse=True)
-        vals   = np.array([agg[r] for r in roots])
-        sds    = np.sqrt([agg_sd[r] for r in roots])
+        # (c) aggregated per base field: local + all neighbourhood scales.
+        # Sum importances per FOLD first (7 aggregate values per field), then
+        # take mean/std of those — NOT sqrt(sum(std_i^2)) over features, which
+        # would assume per-feature importances are independent. They aren't:
+        # XGBoost gain importance is compositional/correlated across the
+        # local feature and its k3/k5/k7 neighbourhood means of the same
+        # physical field.
+        names_pf, per_fold = _importance_per_fold(spat)
+        roots_all = [re.sub(r'_k\d+$', '', n) for n in names_pf]
+        unique_roots = sorted(set(roots_all))
+        agg_per_fold = np.zeros((per_fold.shape[0], len(unique_roots)))
+        for j, root in enumerate(unique_roots):
+            cols = [i for i, r in enumerate(roots_all) if r == root]
+            agg_per_fold[:, j] = per_fold[:, cols].sum(axis=1)
+        order_c = np.argsort(agg_per_fold.mean(axis=0))[::-1]
+        roots = [unique_roots[i] for i in order_c]
+        vals  = agg_per_fold.mean(axis=0)[order_c]
+        sds   = agg_per_fold.std(axis=0)[order_c]
         _barh(axes[panel], roots, vals, sds, '0.55',
               'Aggregated per field (all scales)')
         axes[panel].text(-0.22, 1.02, f'({chr(97 + panel)})',

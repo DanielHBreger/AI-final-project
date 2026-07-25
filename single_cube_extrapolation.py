@@ -2,7 +2,7 @@
 """
 single_cube_extrapolation.py
 ============================
-Train stacked_sp on a SINGLE G0 cube and predict all 7 cubes.
+Train the weighted spatial stack on a SINGLE G0 cube and predict all 7 cubes.
 
 Builds a 7x7 R2 matrix:  row = source (training) cube, col = target cube.
 Diagonal entries (source == target) are in-sample fits.
@@ -11,9 +11,12 @@ Off-diagonal entries are fully out-of-sample extrapolations.
 Question answered: how much information does one UV-field simulation contain
 for predicting chemistry at other UV field strengths?
 
-Architecture: stacked_sp — Ridge meta-learner over xgb_standard_sp + mlp_wide_sp
+Architecture: Ridge meta-learner over xgb_standard_sp + mlp_wide_sp, both
 with multi-scale spatial neighbourhood features (3^3, 5^3, 7^3 kernels).
-Ridge is fit on the in-sample base-model predictions of the source cube.
+Despite the "stacked_sp" name used loosely below, this is the WEIGHTED stack:
+_fit_xgb/_fit_mlp (model_helpers.py) always apply density weighting
+(_compute_weights) — there is no unweighted variant here. Ridge is fit on
+the in-sample base-model predictions of the source cube.
 
 Usage
 -----

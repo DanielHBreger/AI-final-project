@@ -3,6 +3,15 @@ compare_architectures.py
 Systematic comparison of architectural variants for XGBoost, MLP, and CNN under
 leave-one-G0-out cross-validation (7 folds, one held-out cube per fold).
 
+*** --cnn's checkpoint selection is leakage-optimistic, NOT the paper's path.
+*** The CNN training path here selects the best epoch by loss on the
+*** HELD-OUT test cube itself, the protocol both external paper reviews
+*** flagged as unacceptable for a headline number (see
+*** docs/DESIGN_DECISIONS.md §4.5, "FIXED 2026-07-06/07"). Every U-Net
+*** number in the paper instead comes from test_cnn.py's inner-validation
+*** protocol. Use --cnn here only for quick tabular-vs-CNN sanity checks,
+*** never to reproduce a reported U-Net result.
+
 Architecture selection rationale
 ---------------------------------
 XGBoost (1 variant)

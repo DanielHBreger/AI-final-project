@@ -14,8 +14,14 @@ COLS = ['ix', 'iy', 'iz', 'nH', 'nH2', 'T', 'vx', 'vy', 'vz',
         'nHp', 'ext', 'fh2', 'bxl', 'bxr', 'byl', 'byr', 'bzl', 'bzr']
 
 # Features used for all models.
-# fh2 (H2 self-shielding factor) is included: it is an independent physical
-# quantity — not algebraically derived from nH2 — so it is not data leakage.
+# fh2 (H2 self-shielding factor) is included by default but is NOT an
+# innocuous input: it is a column integral over the H2 field computed by the
+# solver the surrogate aims to replace (not algebraically derived from the
+# local nH2 of a cell, but target-adjacent through the solver's radiative-
+# transfer step). It would not be available in a deployment where the solver
+# has not been run. Its contribution is quantified by ablation
+# (--no-fh2 in every script's add_drop_args), and the no-fh2 configuration
+# is the one we call deployable. See docs/DESIGN_DECISIONS.md.
 FEATURE_COLS = ['log_nH', 'log_T', 'log_nHp', 'ext', 'log_fh2', 'log_G0',
                 'vx', 'vy', 'vz', 'bxl', 'bxr', 'byl', 'byr', 'bzl', 'bzr']
 

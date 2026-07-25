@@ -12,10 +12,17 @@ cross-validation over a seven-simulation UV-field sweep.
 
 | Model | R² |
 |---|---|
-| Ridge-stacked ensemble (XGBoost + MLP, spatial features) | **0.988 ± 0.013** |
-| Wide MLP + spatial features | 0.968 |
-| XGBoost + spatial features | 0.963 |
-| 3D U-Net (best configuration) | 0.974 ± 0.035 |
+| Mass-calibrated weighted stack (XGBoost + MLP, spatial, nested) | **0.990 ± 0.006** |
+| Wide MLP + spatial features | 0.982 ± 0.017 |
+| XGBoost + spatial features | 0.963 ± 0.033 |
+| 3D U-Net (leakage-free checkpoint selection) | 0.963 ± 0.047 |
+
+The U-Net number uses leakage-free inner-validation checkpoint selection
+(`test_cnn.py --inner-val-rule central`, the rule adopted for the paper);
+earlier numbers in this repo's history selected the checkpoint on the
+held-out test cube's own loss, which is optimistic. See
+`docs/DESIGN_DECISIONS.md` §4.5 and `docs/RUN_PLAN.md` (run 16/16b) for
+the full story.
 
 The spatial features (box-filter means at 3/5/7-voxel scales, ~30 s to
 compute for the full suite) improve every tabular model, and the tabular
@@ -72,8 +79,10 @@ python compare_architectures.py --no-fh2      # solver-independent ablation
 python compare_architectures.py --cnn         # include U-Net variants (slow)
 
 # 3D U-Net training / focused CNN tests
-python train_cnn.py
-python test_cnn.py --variants unet_baseline
+# NOTE: train_cnn.py and `compare_architectures.py --cnn` select the U-Net's
+# checkpoint on the held-out test cube's own loss (optimistic, superseded).
+# test_cnn.py is the leakage-free path used for all paper numbers:
+python test_cnn.py --variants unet_baseline   # --inner-val-rule central by default
 
 # Train the best model, predict a held-out cube, save prediction volumes
 python predict_and_visualize.py --all

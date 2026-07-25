@@ -263,10 +263,14 @@ def predict_bias(slope: float, intercept: float, g0: float) -> float:
 def mass_weighted_bias(y_pred: np.ndarray, y_true: np.ndarray) -> float:
     """Mass-weighted mean residual (dex): weights 10**y_true (linear nH2).
 
-    Unlike the unweighted mean residual, this is the quantity whose
-    subtraction (as a constant dex offset) centres the predicted total H2
-    mass on the true mass — dense cells dominate both the weights and the
-    mass budget."""
+    Unlike the unweighted mean residual, subtracting this (as a constant dex
+    offset) APPROXIMATELY centres the predicted total H2 mass on the true
+    mass — dense cells dominate both the weights and the mass budget. This
+    is a first-order approximation, not an exact closure: the exact
+    constant-offset correction is c = log10(sum(10**y_pred) / sum(10**y_true))
+    (see calibration_functionals.py), which differs from this function's
+    return value by <=0.018 dex on the deployed volumes (paper Section 4.5).
+    Do not describe this quantity as exactly mass-closing."""
     yt = np.asarray(y_true, dtype=np.float64)
     w  = 10.0 ** yt
     r  = np.asarray(y_pred, dtype=np.float64) - yt

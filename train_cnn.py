@@ -3,6 +3,16 @@ train_cnn.py
 Train the 3D U-Net with leave-one-G0-out cross-validation and on-the-fly
 symmetry augmentation.
 
+*** CHECKPOINT SELECTION HERE IS LEAKAGE-OPTIMISTIC — NOT the paper's path.
+*** This script selects the best epoch by validation loss on the HELD-OUT
+*** test cube itself (see train_one_fold's val_ds), the protocol that both
+*** external paper reviews flagged as unacceptable for a headline number
+*** (docs/DESIGN_DECISIONS.md §4.5, "FIXED 2026-07-06/07"). Every U-Net
+*** number in paper.tex/paper_short.tex instead comes from test_cnn.py,
+*** which selects the checkpoint on an inner VALIDATION cube drawn from
+*** the six training cubes, never on the test cube. Use this script only
+*** for quick architecture smoke-tests, not for any reported result.
+
 Each training cube is converted to a multi-channel volume at native 128³
 resolution (pass --downsample to average-pool to 64³, the legacy behaviour
 for constrained VRAM), then augmented with the safe z-preserving operations

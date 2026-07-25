@@ -236,6 +236,19 @@ Notes:
   unet_baseline). Both PDFs compile clean.
 | 17 | Intra-cube random-mask seed repeats: rerun `intra_cube_section.py` rand splits with ≥3 seeds (add a `--seed` flag + loop, or a `--splits rand_*` subset flag) | a few hours | ChatGPT #9: one mask per fraction is not enough for a claim about random coverage. Current (run 11) rand_1 spread across cubes is 0.79–0.94, so instability is unlikely — this quantifies it |
 
+## Code-hygiene backlog (from the 2026-07-07 ChatGPT code review; see
+docs/CHATGPT_CODE_REVIEW_DISPOSITIONS.md for the full disposition of all
+17 points — most confirmed and either fixed same-session or deliberately
+deferred below; not scientific-correctness fixes, no paper numbers affected)
+
+| # | Item | Why deferred |
+|---|------|--------------|
+| 18 | Run/prediction manifest: `predict_and_visualize.py --all` should write `predictions/<run_id>/manifest.json` (git SHA, feature list, CLI args, seed, package versions, data checksum, G0 values) instead of the current "latest npz per G0" selection duplicated in `statistical_analysis.py`/`bootstrap_cis.py` | Needs the writer and every reader touched together; risks invalidating the exact prediction files the current paper figures come from if done blind |
+| 19 | Coverage-normalised intra-cube spatial mean (`filter(X·M)/filter(M)`) as a SECOND, explicitly labelled variant alongside the existing zero-fill one in `intra_cube_section.py` | The current zero-fill behaviour is a deliberate, disclosed choice (paper Eq. 8); the normalised version answers a different question (best estimate given an oracle coverage mask) and must not silently replace the numbers behind §6.2 |
+| 20 | Add `mass_ratio_raw` (uncalibrated by the held-out-truth clip) as an explicit companion field in `compute_metrics`'s return dict | Touches the primary-metric semantics used in every table; do only as a deliberate revision, not a drive-by patch |
+| 21 | Full SHA-256 fingerprint of each data CSV in `compute_data_checksum` (currently filename+size+first 8KB only) | Cheap and correct, but invalidates the checksum recorded in every archived log for zero scientific consequence — pure bookkeeping, do whenever convenient |
+| 22 | `requirements.txt`/pinned environment; `cube_to_volumes` shape/coordinate assertions; broader `.gitignore` policy; protocol-level tests (CV isolation, spatial-indexing invariance, augmentation correctness, nested-stacking isolation) beyond `smoke_test_metrics.py` | Good software-engineering hygiene, no effect on any current paper claim |
+
 ### Analysis items (no GPU training — scripts over saved artifacts)
 
 | # | Task | Time | Purpose |

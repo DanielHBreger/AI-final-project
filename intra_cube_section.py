@@ -2,7 +2,10 @@
 """
 intra_cube_section.py
 =====================
-Train stacked_sp on a SPATIAL SECTION of one cube and predict the remaining cells.
+Train the weighted spatial stack on a SPATIAL SECTION of one cube and predict
+the remaining cells. Despite the "stacked_sp" name used loosely below, this is
+the WEIGHTED stack: _fit_xgb/_fit_mlp (model_helpers.py) always apply density
+weighting (_compute_weights) — there is no unweighted variant here.
 
 For each of the 7 G0 cubes, and for each split strategy, the model is fit on a
 subset of the cube's cells (the "training section") and evaluated on the
@@ -13,6 +16,16 @@ positions are zeroed before applying neighbourhood means (uniform_filter), so
 the model never sees structural context leaking from the held-out region.
 Raw physical features (X_flat) are still taken from all cells since those are
 fully observed simulation outputs.
+
+NOTE on the zero-fill: uniform_filter is applied directly to the masked
+volume with NO renormalisation by the local observed-cell count, so a
+window with k of k^3 cells observed reports a mean diluted by (k^3-k) zeros,
+not the mean of the k observed cells. This is deliberate (paper Eq. 8):
+the intent is "what does the model see if it doesn't know which
+neighbours are missing," not "what is the best possible estimate from the
+observed neighbours." An observed-count-normalised variant would answer a
+different, easier question and would change the sparse-coverage numbers
+below (RUN_PLAN.md); do not conflate the two without re-deriving results.
 
 Question answered: how well does the model interpolate within a single cube?
 How much spatial data is needed for near-lossless reconstruction?
@@ -39,7 +52,8 @@ volume at a random position; the remainder is held out for testing.  This
 contrasts with random-voxel splits (scattered interpolation) and half-space
 splits (planar extrapolation), sitting between the two in spatial locality.
 
-Architecture: stacked_sp (xgb_standard_sp + mlp_wide_sp + Ridge meta-learner).
+Architecture: xgb_standard_sp_w + mlp_wide_sp_w + Ridge meta-learner
+(the weighted pair — see note above).
 Ridge is fit on in-sample base-model predictions of the training section.
 
 Usage
