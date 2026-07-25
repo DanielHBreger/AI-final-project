@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.29 (TeX Live 2026) (preloaded format=pdflatex 2026.4.11)  7 JUL 2026 13:39
+This is pdfTeX, Version 3.141592653-2.6-1.40.29 (TeX Live 2026) (preloaded format=pdflatex 2026.4.11)  26 JUL 2026 02:07
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -1044,34 +1044,35 @@ File: fig_method_diagram.png Graphic file (type png)
 <use fig_method_diagram.png>
 Package pdftex.def Info: fig_method_diagram.png  used on input line 526.
 (pdftex.def)             Requested size: 508.0pt x 241.82866pt.
- [5] [6
+ [5]
+Underfull \vbox (badness 3977) has occurred while \output is active []
+
+ [6
 pdfTeX warning (ext4): destination with the same identifier (name{figure.2}) ha
 s been already used, duplicate ignored
 <argument> ...shipout:D \box_use:N \l_shipout_box 
                                                   \__shipout_drop_firstpage_...
-l.753 
+l.738 
        <./fig_method_diagram.png>]
 <../figures/fig_model_comparison.png, id=359, 764.8575pt x 222.3507pt>
 File: ../figures/fig_model_comparison.png Graphic file (type png)
 <use ../figures/fig_model_comparison.png>
 Package pdftex.def Info: ../figures/fig_model_comparison.png  used on input lin
-e 861.
+e 867.
 (pdftex.def)             Requested size: 508.0pt x 147.68153pt.
 <../figures/fig7_massbudget.png, id=367, 764.1348pt x 223.3143pt>
 File: ../figures/fig7_massbudget.png Graphic file (type png)
 <use ../figures/fig7_massbudget.png>
-Package pdftex.def Info: ../figures/fig7_massbudget.png  used on input line 917
+Package pdftex.def Info: ../figures/fig7_massbudget.png  used on input line 923
 .
 (pdftex.def)             Requested size: 508.0pt x 148.46124pt.
-<../figures/fig_feature_importance.png, id=372, 774.0117pt x 289.5618pt>
+ [7]
+<../figures/fig_feature_importance.png, id=381, 774.0117pt x 289.5618pt>
 File: ../figures/fig_feature_importance.png Graphic file (type png)
 <use ../figures/fig_feature_importance.png>
 Package pdftex.def Info: ../figures/fig_feature_importance.png  used on input l
-ine 1018.
+ine 1024.
 (pdftex.def)             Requested size: 508.0pt x 190.04654pt.
- [7]
-Underfull \vbox (badness 10000) has occurred while \output is active []
-
 
 Underfull \vbox (badness 10000) has occurred while \output is active []
 
@@ -1080,20 +1081,17 @@ pdfTeX warning (ext4): destination with the same identifier (name{table.2}) has
  been already used, duplicate ignored
 <argument> ...shipout:D \box_use:N \l_shipout_box 
                                                   \__shipout_drop_firstpage_...
-l.1064 
+l.1091 
        
 pdfTeX warning (ext4): destination with the same identifier (name{table.3}) has
  been already used, duplicate ignored
 <argument> ...shipout:D \box_use:N \l_shipout_box 
                                                   \__shipout_drop_firstpage_...
-l.1064 
-       
-pdfTeX warning (ext4): destination with the same identifier (name{table.4}) has
- been already used, duplicate ignored
-<argument> ...shipout:D \box_use:N \l_shipout_box 
-                                                  \__shipout_drop_firstpage_...
-l.1064 
+l.1091 
        ]
+Underfull \vbox (badness 10000) has occurred while \output is active []
+
+
 Underfull \vbox (badness 10000) has occurred while \output is active []
 
  [9
@@ -1101,63 +1099,67 @@ pdfTeX warning (ext4): destination with the same identifier (name{figure.3}) ha
 s been already used, duplicate ignored
 <argument> ...shipout:D \box_use:N \l_shipout_box 
                                                   \__shipout_drop_firstpage_...
-l.1114 
+l.1120 
        
 pdfTeX warning (ext4): destination with the same identifier (name{figure.4}) ha
 s been already used, duplicate ignored
 <argument> ...shipout:D \box_use:N \l_shipout_box 
                                                   \__shipout_drop_firstpage_...
-l.1114 
+l.1120 
+       
+pdfTeX warning (ext4): destination with the same identifier (name{table.4}) has
+ been already used, duplicate ignored
+<argument> ...shipout:D \box_use:N \l_shipout_box 
+                                                  \__shipout_drop_firstpage_...
+l.1120 
         <../figures/fig_model_comparison.png> <../figures/fig7_massbudget.png>]
 <../figures/fig2_scatter.png, id=408, 1008.1665pt x 472.164pt>
 File: ../figures/fig2_scatter.png Graphic file (type png)
 <use ../figures/fig2_scatter.png>
-Package pdftex.def Info: ../figures/fig2_scatter.png  used on input line 1130.
+Package pdftex.def Info: ../figures/fig2_scatter.png  used on input line 1136.
 (pdftex.def)             Requested size: 508.0pt x 237.91139pt.
 <../figures/fig3_error_dist.png, id=409, 1011.5391pt x 452.6511pt>
 File: ../figures/fig3_error_dist.png Graphic file (type png)
 <use ../figures/fig3_error_dist.png>
 Package pdftex.def Info: ../figures/fig3_error_dist.png  used on input line 114
-2.
+8.
 (pdftex.def)             Requested size: 508.0pt x 227.31958pt.
 
-Underfull \vbox (badness 10000) has occurred while \output is active []
+Underfull \vbox (badness 6741) has occurred while \output is active []
 
 <../figures/fig4_stratified.png, id=413, 423.984pt x 406.3983pt>
 File: ../figures/fig4_stratified.png Graphic file (type png)
 <use ../figures/fig4_stratified.png>
 Package pdftex.def Info: ../figures/fig4_stratified.png  used on input line 117
-0.
+6.
 (pdftex.def)             Requested size: 508.0pt x 486.94379pt.
 <../figures/fig6_distributions.png, id=414, 1010.8164pt x 445.665pt>
 File: ../figures/fig6_distributions.png Graphic file (type png)
 <use ../figures/fig6_distributions.png>
 Package pdftex.def Info: ../figures/fig6_distributions.png  used on input line 
-1187.
+1193.
 (pdftex.def)             Requested size: 508.0pt x 223.9744pt.
 <../figures/fig8_slices.png, id=417, 589.2414pt x 1166.9196pt>
 File: ../figures/fig8_slices.png Graphic file (type png)
 <use ../figures/fig8_slices.png>
-Package pdftex.def Info: ../figures/fig8_slices.png  used on input line 1205.
+Package pdftex.def Info: ../figures/fig8_slices.png  used on input line 1211.
 (pdftex.def)             Requested size: 292.73184pt x 579.71916pt.
-<../logs/single_cube_extrapolation/heatmap_20260705_114057.png, id=419, 933.246
-6pt x 321.6015pt>
-File: ../logs/single_cube_extrapolation/heatmap_20260705_114057.png Graphic fil
-e (type png)
-<use ../logs/single_cube_extrapolation/heatmap_20260705_114057.png>
-Package pdftex.def Info: ../logs/single_cube_extrapolation/heatmap_20260705_114
-057.png  used on input line 1247.
-(pdftex.def)             Requested size: 508.0pt x 175.06078pt.
-
-Underfull \vbox (badness 4647) has occurred while \output is active []
-
  [10
 pdfTeX warning (ext4): destination with the same identifier (name{figure.5}) ha
 s been already used, duplicate ignored
 <argument> ...shipout:D \box_use:N \l_shipout_box 
                                                   \__shipout_drop_firstpage_...
-l.1272 
+l.1250 
         <../figures/fig_feature_importance.png>]
+<../logs/single_cube_extrapolation/heatmap_20260705_114057.png, id=433, 933.246
+6pt x 321.6015pt>
+File: ../logs/single_cube_extrapolation/heatmap_20260705_114057.png Graphic fil
+e (type png)
+<use ../logs/single_cube_extrapolation/heatmap_20260705_114057.png>
+Package pdftex.def Info: ../logs/single_cube_extrapolation/heatmap_20260705_114
+057.png  used on input line 1253.
+(pdftex.def)             Requested size: 508.0pt x 175.06078pt.
+
 Underfull \vbox (badness 10000) has occurred while \output is active []
 
 
@@ -1168,15 +1170,14 @@ pdfTeX warning (ext4): destination with the same identifier (name{figure.6}) ha
 s been already used, duplicate ignored
 <argument> ...shipout:D \box_use:N \l_shipout_box 
                                                   \__shipout_drop_firstpage_...
-l.1287 \end{equation}
-                     
+l.1278 
+       
 pdfTeX warning (ext4): destination with the same identifier (name{figure.7}) ha
 s been already used, duplicate ignored
 <argument> ...shipout:D \box_use:N \l_shipout_box 
                                                   \__shipout_drop_firstpage_...
-l.1287 \end{equation}
-                      <../figures/fig2_scatter.png> <../figures/fig3_error_dist
-.png>]
+l.1278 
+        <../figures/fig2_scatter.png> <../figures/fig3_error_dist.png>]
 Underfull \vbox (badness 10000) has occurred while \output is active []
 
  [12
@@ -1184,22 +1185,25 @@ pdfTeX warning (ext4): destination with the same identifier (name{figure.8}) ha
 s been already used, duplicate ignored
 <argument> ...shipout:D \box_use:N \l_shipout_box 
                                                   \__shipout_drop_firstpage_...
-l.1312 
+l.1304 
         <../figures/fig4_stratified.png>]
-<../logs/intra_cube_section/run_20260705_121037_heatmap.png, id=454, 1577.895pt
+<../logs/intra_cube_section/run_20260705_121037_heatmap.png, id=453, 1577.895pt
  x 322.806pt>
 File: ../logs/intra_cube_section/run_20260705_121037_heatmap.png Graphic file (
 type png)
 <use ../logs/intra_cube_section/run_20260705_121037_heatmap.png>
 Package pdftex.def Info: ../logs/intra_cube_section/run_20260705_121037_heatmap
-.png  used on input line 1336.
+.png  used on input line 1342.
 (pdftex.def)             Requested size: 508.0pt x 103.92558pt.
+
+Underfull \vbox (badness 10000) has occurred while \output is active []
+
  [13
 pdfTeX warning (ext4): destination with the same identifier (name{figure.9}) ha
 s been already used, duplicate ignored
 <argument> ...shipout:D \box_use:N \l_shipout_box 
                                                   \__shipout_drop_firstpage_...
-l.1404 
+l.1410 
         <../figures/fig6_distributions.png>]
 Underfull \vbox (badness 10000) has occurred while \output is active []
 
@@ -1208,28 +1212,28 @@ pdfTeX warning (ext4): destination with the same identifier (name{figure.10}) h
 as been already used, duplicate ignored
 <argument> ...shipout:D \box_use:N \l_shipout_box 
                                                   \__shipout_drop_firstpage_...
-l.1404 
+l.1410 
         <../figures/fig8_slices.png>] [15
 pdfTeX warning (ext4): destination with the same identifier (name{figure.11}) h
 as been already used, duplicate ignored
 <argument> ...shipout:D \box_use:N \l_shipout_box 
                                                   \__shipout_drop_firstpage_...
-l.1461 
+l.1453 
        
 pdfTeX warning (ext4): destination with the same identifier (name{figure.12}) h
 as been already used, duplicate ignored
 <argument> ...shipout:D \box_use:N \l_shipout_box 
                                                   \__shipout_drop_firstpage_...
-l.1461 
+l.1453 
         <../logs/single_cube_extrapolation/heatmap_20260705_114057.png> <../log
 s/intra_cube_section/run_20260705_121037_heatmap.png>]
-Underfull \hbox (badness 2173) in paragraph at lines 1462--1469
+Underfull \hbox (badness 2173) in paragraph at lines 1468--1475
 []\T1/ntxtlf/m/it/9 Simulation prove-nance. \T1/ntxtlf/m/n/9 This pa-per char-a
 c-terises sur-ro-gate
  []
 
 
-Underfull \vbox (badness 10000) has occurred while \output is active []
+Underfull \vbox (badness 1558) has occurred while \output is active []
 
  [16]
 (./paper.bbl) [17] (./paper.aux)
@@ -1248,7 +1252,7 @@ Package rerunfilecheck Info: File `paper.out' has not changed.
 Here is how much of TeX's memory you used:
  19527 strings out of 467349
  353383 string characters out of 5419862
- 784150 words of memory out of 5000000
+ 780244 words of memory out of 5000000
  48211 multiletter control sequences out of 15000+600000
  757286 words of font info for 227 fonts, out of 8000000 for 9000
  1141 hyphenation exceptions out of 8191
@@ -1268,7 +1272,7 @@ nts/type1/public/newtx/txmiaX.pfb><c:/texlive/2026/texmf-dist/fonts/type1/publi
 c/newtx/txsys.pfb><c:/texlive/2026/texmf-dist/fonts/type1/public/newtx/ztmb.pfb
 ><c:/texlive/2026/texmf-dist/fonts/type1/public/newtx/ztmr.pfb><c:/texlive/2026
 /texmf-dist/fonts/type1/public/newtx/ztmri.pfb>
-Output written on paper.pdf (17 pages, 3727845 bytes).
+Output written on paper.pdf (17 pages, 3727918 bytes).
 PDF statistics:
  610 PDF objects out of 1000 (max. 8388607)
  520 compressed objects within 6 object streams

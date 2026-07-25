@@ -132,12 +132,13 @@ Severity labels below are the review's own; disposition is mine.
 ## Confirmed but lower priority / declined as stated
 
 12. **Medium — U-Net trains on 5 cubes (train + inner-val) while
-    tabular models train on 6.** Real asymmetry, but the review's
-    proposed fix (freeze the epoch count from inner-val, then retrain
-    fresh on all 6 outer-training cubes) reintroduces exactly the
-    epoch-count guessing problem the inner-validation protocol was built
-    to eliminate on the final fit. Disclosed already
-    (DESIGN_DECISIONS §4.5 update); not implementing the proposed fix.
+    tabular models train on 6.** Real asymmetry. My first-pass dismissal
+    ("reintroduces epoch-count guessing") was WRONG and retracted in
+    round 2 below — the proposed procedure (fix the epoch count via
+    inner-val, discard that model, retrain fresh on all 6, evaluate
+    once) is a standard model-selection/final-refit split, not epoch
+    guessing. Reclassified as a genuine, not-yet-implemented fairness
+    improvement; see round 2 disposition.
 
 13. **Medium — InstanceNorm plausibly erodes the constant `log_G0`
     conditioning channel; FiLM-style conditioning suggested.** Plausible
@@ -184,3 +185,87 @@ Severity labels below are the review's own; disposition is mine.
   broader `.gitignore` policy, protocol-level tests (CV isolation,
   spatial-indexing invariance, augmentation transform correctness,
   nested-stacking isolation) (item 17).
+
+## Round 2 (ChatGPT's response to the above, 2026-07-07)
+
+ChatGPT re-checked the round-1 fixes against the actual repo (not just
+the disposition text) and found one real miss, agreed with five fixes as
+complete, revised its own original position on one item after reading my
+counter-argument, and pushed back on three of my dispositions. Each
+re-verified directly before acting.
+
+**Real miss, fixed immediately:** `test_cnn.py`'s `--inner-val-rule`
+parser default was still `default='nearest'` — I had rewritten the
+docstring above it to say "defaults to central" without touching the
+actual `argparse` line, so code and documentation contradicted each
+other (worse than the original bug). Confirmed by direct read, fixed:
+`default='central'`.
+
+**Confirmed complete, no changes:** README correction, `fh2` comment,
+`mass_weighted_bias` docstring, feature-importance error bars,
+weighted-model labelling in the two supplementary scripts.
+
+**I revise my own original review:** the intra-cube zero-masking item —
+ChatGPT's round-1 "mathematically wrong" claim is withdrawn once it saw
+the paper explicitly defines the no-renormalisation behaviour (Eq. 8) as
+deliberate. Agreed on both sides; no code change, matches item 9 above.
+
+**Accepted and acted on:**
+- The two leaking CNN paths (`train_cnn.py`, `compare_architectures.py
+  --cnn`) needed "mechanically difficult to misuse," not just a
+  docstring warning someone can scroll past. Added a `--allow-leaky-cnn`
+  flag to both; without it, both scripts print the leakage warning to
+  stderr and exit(1) before loading any data. Smoke-tested: the gate
+  fires immediately, `--help` still parses cleanly, and passing the flag
+  runs the script exactly as before.
+- `compare_architectures.py`'s architecture-selection comment still
+  quoted a stale CNN result (`R2=0.803`) predating every subsequent CNN
+  rerun, same class of error as the README miss. Removed the number;
+  points readers at `test_cnn.py`/RUN_PLAN instead.
+- README's "every experiment writes... package versions and a SHA-256
+  fingerprint" overclaimed: only `compare_architectures.py`/`train_cnn.py`
+  record that metadata; the supplementary scripts (verified by grep, no
+  `compute_data_checksum` call outside those two plus `data_loader.py`
+  itself) do not. Reworded to state this precisely.
+- The "nested scores higher, therefore the shortcut table is
+  conservative" claim, which appears in both papers (not just my
+  disposition doc), is a real overclaim: empirically nested > shortcut,
+  but other details also differ between those two runs (training
+  schedule, data splits within the outer fold), so nesting is not
+  isolated as the sole cause and the conclusion doesn't follow.
+  Reworded in both `paper.tex` and `paper_short.tex` to state the
+  empirical fact (nested scores higher) without the unsupported causal
+  claim (shortcut is therefore conservative) — now says the stricter
+  protocol does not *contradict* the comparison-table numbers, which is
+  all the evidence actually supports.
+- Checksum backward-compatibility: I had deferred a full SHA-256 pass
+  partly because it would "invalidate" existing checksums. ChatGPT
+  correctly pointed out this doesn't require invalidating anything —
+  add `sha256_full` alongside the existing `sha256_partial`, old logs
+  stay interpretable under the old key. Implemented in
+  `compute_data_checksum` (both hashes now computed in one pass over
+  each file; smoke-tested, ~1.7 s for all 7 cubes, negligible next to
+  the minutes-long CSV parse). Reason for deferring was wrong; the
+  underlying priority call (low, but now free to do) stands.
+
+**Reclassified after reconsideration:** the U-Net 5-vs-6-training-cube
+asymmety (item 12). ChatGPT's proposed procedure — use inner-val to pick
+the epoch count, discard that model, retrain fresh on all 6 outer-training
+cubes for exactly that many epochs, evaluate once — is a standard
+model-selection/final-refit split (train/val to pick a hyperparameter,
+then refit on train+val). My original objection ("reintroduces epoch
+guessing") conflated this with reusing the held-out cube itself, which it
+does not do. This is a legitimate, not-yet-implemented fairness
+improvement to the U-Net protocol, not something to decline. NOT
+implemented this session (it changes the CNN training entry point and
+would need a fresh ~4.6 h run to produce numbers under the new
+procedure) — added to RUN_PLAN backlog explicitly as item 23, separate
+from the already-existing items 18–22.
+
+**Declined, with reasons stated:** removing XGBoost's `StandardScaler`
+(ChatGPT now frames this as a "should eventually" item, not urgent;
+agreed, unchanged), rerunning the full comparison table fully nested
+(ChatGPT now says this is "future research/cleanup," matching item 11's
+disposition; unchanged), replacing the intra-cube experiment or
+redesigning the U-Net architecture before finishing the project (ChatGPT
+explicitly agrees these should not happen now).

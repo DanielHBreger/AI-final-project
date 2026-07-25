@@ -163,24 +163,36 @@ def cube_to_volumes(df: pd.DataFrame, cols: list[str]) -> dict[str, np.ndarray]:
 def compute_data_checksum(data_root: str = 'data/UVonly') -> dict:
     """Compute a reproducibility fingerprint of the dataset CSV files.
 
-    Hashes the first 8 KB + file size of every CSV to detect any change in
-    the input data without reading the full files.  Include the returned dict
-    in every experiment log so readers can verify they used the same data.
+    'sha256_partial' hashes only the first 8 KB + file size of every CSV
+    (fast, but a same-size edit past the first 8 KB would go undetected).
+    'sha256_full' hashes the complete file content (~2.8 GB total across 7
+    files; a few seconds of disk I/O, negligible next to the minutes-long
+    CSV parse every experiment already does). Include the returned dict in
+    every experiment log so readers can verify they used the same data.
+    'sha256_partial' is kept so older logs remain checkable against new
+    runs on the same key; 'sha256_full' is the one to trust.
     """
     csv_paths = sorted(glob.glob(os.path.join(data_root, '*', '*.csv')))
-    h = hashlib.sha256()
+    h_partial = hashlib.sha256()
+    h_full    = hashlib.sha256()
     file_info = []
     for path in csv_paths:
         size = os.path.getsize(path)
         with open(path, 'rb') as f:
             head = f.read(8192)
-        h.update(path.encode())
-        h.update(size.to_bytes(8, 'little'))
-        h.update(head)
+            h_partial.update(path.encode())
+            h_partial.update(size.to_bytes(8, 'little'))
+            h_partial.update(head)
+            h_file = hashlib.sha256(head)
+            for chunk in iter(lambda: f.read(1 << 20), b''):
+                h_file.update(chunk)
+        h_full.update(path.encode())
+        h_full.update(h_file.digest())
         file_info.append({'path': os.path.relpath(path).replace('\\', '/'),
-                          'size_bytes': size})
+                          'size_bytes': size, 'sha256': h_file.hexdigest()})
     return {
-        'sha256_partial': h.hexdigest(),
+        'sha256_partial': h_partial.hexdigest(),
+        'sha256_full': h_full.hexdigest(),
         'n_files': len(csv_paths),
         'files': file_info,
     }

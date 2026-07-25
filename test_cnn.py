@@ -341,10 +341,11 @@ def main() -> None:
                              'behaviour for constrained VRAM; default trains '
                              'at native 128^3)')
     parser.add_argument('--inner-val-rule', choices=['nearest', 'central'],
-                        default='nearest',
+                        default='central',
                         help='Which training cube becomes the inner '
                              'validation cube for checkpoint selection '
-                             '(see pick_inner_val)')
+                             '(see pick_inner_val). Default matches the '
+                             'rule adopted for the paper.')
     add_drop_args(parser)
     args = parser.parse_args()
 

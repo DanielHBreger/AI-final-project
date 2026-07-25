@@ -657,8 +657,14 @@ nested. The deployed pipeline of Section~\ref{sec:per_fold} instead uses
 fully nested stacking: for each held-out cube, base models are retrained
 on five training cubes to generate the OOF predictions, and final base
 models on all six; the held-out cube is excluded throughout. The nested
-pipeline scores slightly \emph{higher} than the shortcut rows, so the
-comparison-table stacking numbers are, if anything, conservative. The
+pipeline scores slightly \emph{higher} than the shortcut rows; since
+several other details also differ between the two runs (the training
+schedule and data splits within each outer fold), this is consistent
+with the shortcut's indirect leakage being harmless rather than
+positively biasing the comparison-table numbers, but the two runs do
+not isolate nesting as the only changed variable, so we do not claim
+the table rows are conservative --- only that they are not
+contradicted by the stricter protocol. The
 two base models have complementary inductive biases ---
 piecewise-constant, conservative extrapolation for the trees; smooth
 interpolation for the MLP --- and stacking them outperforms either alone

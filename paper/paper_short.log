@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.29 (TeX Live 2026) (preloaded format=pdflatex 2026.4.11)  7 JUL 2026 11:05
+This is pdfTeX, Version 3.141592653-2.6-1.40.29 (TeX Live 2026) (preloaded format=pdflatex 2026.4.11)  26 JUL 2026 02:08
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -1002,30 +1002,30 @@ Underfull \hbox (badness 2512) in paragraph at lines 154--167
  []
 
 LaTeX Font Info:    Font shape `T1/ntxtlf/m/it' will be
-(Font)              scaled to size 12.0pt on input line 321.
+(Font)              scaled to size 12.0pt on input line 318.
 [2]
 <../figures/fig_model_comparison.png, id=148, 764.8575pt x 222.3507pt>
 File: ../figures/fig_model_comparison.png Graphic file (type png)
 <use ../figures/fig_model_comparison.png>
 Package pdftex.def Info: ../figures/fig_model_comparison.png  used on input lin
-e 359.
+e 361.
 (pdftex.def)             Requested size: 508.0pt x 147.68153pt.
 <../figures/fig7_massbudget.png, id=151, 764.1348pt x 223.3143pt>
 File: ../figures/fig7_massbudget.png Graphic file (type png)
 <use ../figures/fig7_massbudget.png>
-Package pdftex.def Info: ../figures/fig7_massbudget.png  used on input line 391
+Package pdftex.def Info: ../figures/fig7_massbudget.png  used on input line 393
 .
 (pdftex.def)             Requested size: 508.0pt x 148.46124pt.
+
+Underfull \vbox (badness 10000) has occurred while \output is active []
+
  [3
 pdfTeX warning (ext4): destination with the same identifier (name{table.1}) has
  been already used, duplicate ignored
 <argument> ...shipout:D \box_use:N \l_shipout_box 
                                                   \__shipout_drop_firstpage_...
-l.460 
+l.462 
       ]
-Underfull \vbox (badness 10000) has occurred while \output is active []
-
-
 Underfull \vbox (badness 10000) has occurred while \output is active []
 
  [4
@@ -1033,22 +1033,22 @@ pdfTeX warning (ext4): destination with the same identifier (name{figure.1}) ha
 s been already used, duplicate ignored
 <argument> ...shipout:D \box_use:N \l_shipout_box 
                                                   \__shipout_drop_firstpage_...
-l.494 
+l.496 
       
 pdfTeX warning (ext4): destination with the same identifier (name{figure.2}) ha
 s been already used, duplicate ignored
 <argument> ...shipout:D \box_use:N \l_shipout_box 
                                                   \__shipout_drop_firstpage_...
-l.494 
+l.496 
        <../figures/fig_model_comparison.png> <../figures/fig7_massbudget.png>]
 LaTeX Font Info:    Trying to load font information for T1+ntxtt on input line 
-538.
+540.
 
 (c:/texlive/2026/texmf-dist/tex/latex/newtx/t1ntxtt.fd
 File: t1ntxtt.fd 2012/04/20 v3.1
 )
 LaTeX Font Info:    Font shape `T1/ntxtt/m/n' will be
-(Font)              scaled to size 9.0pt on input line 538.
+(Font)              scaled to size 9.0pt on input line 540.
  (./paper_short.bbl)
 [5] (./paper_short.aux)
  ***********
@@ -1084,7 +1084,7 @@ exlive/2026/texmf-dist/fonts/type1/public/newtx/txmiaX.pfb><c:/texlive/2026/tex
 mf-dist/fonts/type1/public/newtx/txsys.pfb><c:/texlive/2026/texmf-dist/fonts/ty
 pe1/public/newtx/ztmb.pfb><c:/texlive/2026/texmf-dist/fonts/type1/public/newtx/
 ztmr.pfb><c:/texlive/2026/texmf-dist/fonts/type1/public/newtx/ztmri.pfb>
-Output written on paper_short.pdf (5 pages, 648192 bytes).
+Output written on paper_short.pdf (5 pages, 648324 bytes).
 PDF statistics:
  261 PDF objects out of 1000 (max. 8388607)
  221 compressed objects within 3 object streams

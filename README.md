@@ -76,12 +76,13 @@ python classical_models.py
 # Full model comparison with leave-one-G0-out CV (~2.5 h on a 3090)
 python compare_architectures.py
 python compare_architectures.py --no-fh2      # solver-independent ablation
-python compare_architectures.py --cnn         # include U-Net variants (slow)
 
 # 3D U-Net training / focused CNN tests
 # NOTE: train_cnn.py and `compare_architectures.py --cnn` select the U-Net's
-# checkpoint on the held-out test cube's own loss (optimistic, superseded).
-# test_cnn.py is the leakage-free path used for all paper numbers:
+# checkpoint on the held-out test cube's own loss (optimistic, superseded) --
+# both now refuse to run without --allow-leaky-cnn, to prevent accidentally
+# reproducing the superseded methodology. test_cnn.py is the leakage-free
+# path used for all paper numbers:
 python test_cnn.py --variants unet_baseline   # --inner-val-rule central by default
 
 # Train the best model, predict a held-out cube, save prediction volumes
@@ -98,9 +99,11 @@ python intra_cube_section.py                  # within-cube sampling geometry
 python merit_metrics.py                       # mass-budget / phase-conditional check
 ```
 
-Every experiment writes a timestamped JSON log (under `results/`) with the
-full configuration, per-fold metrics, package versions, and a SHA-256
-fingerprint of the input data. See `docs/RUN_PLAN.md` for the complete run
+Every experiment writes a timestamped JSON log (under `results/` or `logs/`)
+with its full configuration and per-fold metrics. The core comparison
+experiments (`compare_architectures.py`, `train_cnn.py`) additionally record
+package versions and a SHA-256 fingerprint of the input data; the
+supplementary scripts do not yet. See `docs/RUN_PLAN.md` for the complete run
 book used for the paper.
 
 ## Repository layout

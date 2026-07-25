@@ -32,7 +32,10 @@ CNN (3 variants)
     Tests whether reduced capacity closes the train/val gap (training loss
     collapses to ~0.005 with base_ch=32, suggesting over-parameterisation).
 
-  unet_standard  base_ch=32  ~5.8 M params  [BASELINE — current best, R2=0.803]
+  unet_standard  base_ch=32  ~5.8 M params  [architecture baseline]
+    (R2 not quoted here: the leakage-optimistic result this script produces
+    is superseded by test_cnn.py's leakage-free numbers -- see the warning
+    at the top of this file and docs/RUN_PLAN.md runs 16/16b/16c.)
 
   unet_large  base_ch=64  ~23 M params
     Upper bound on CNN capacity.
@@ -73,6 +76,7 @@ import argparse
 import json
 import datetime
 import math
+import sys
 import numpy as np
 import torch
 import torch.nn as nn
@@ -828,7 +832,14 @@ if __name__ == '__main__':
     parser.add_argument('--skip-mlp',   action='store_true',
                         help='Skip all MLP variants')
     parser.add_argument('--cnn',        action='store_true',
-                        help='Include CNN variants (slow; off by default)')
+                        help='Include CNN variants (slow; off by default). '
+                             'Selects checkpoints on the held-out test cube '
+                             '-- leakage-optimistic, not the paper protocol. '
+                             'Requires --allow-leaky-cnn.')
+    parser.add_argument('--allow-leaky-cnn', action='store_true',
+                        help='Confirm you want --cnn\'s leakage-optimistic '
+                             'checkpoint selection (test-cube loss). Use '
+                             'test_cnn.py for a leakage-free U-Net result.')
     parser.add_argument('--cnn-epochs', type=int, default=150,
                         help='CNN epochs per variant/fold (default 150)')
     parser.add_argument('--cnn-downsample', action='store_true',
@@ -851,6 +862,16 @@ if __name__ == '__main__':
                              '(default: results/arch_comparison_TIMESTAMP.json)')
     add_drop_args(parser)
     args = parser.parse_args()
+
+    if args.cnn and not args.allow_leaky_cnn:
+        print("ERROR: --cnn selects the U-Net checkpoint on the held-out "
+              "test cube's own loss -- leakage-optimistic, not the paper's "
+              "protocol (see docs/DESIGN_DECISIONS.md sec 4.5). Every "
+              "reported U-Net number instead comes from test_cnn.py, which "
+              "selects on an inner validation cube drawn from the training "
+              "set. Pass --allow-leaky-cnn to run this path anyway (e.g. "
+              "for a quick architecture smoke-test).", file=sys.stderr)
+        sys.exit(1)
 
     _drop = build_drop_set(args)
     feat_cols = get_feature_cols(_drop)

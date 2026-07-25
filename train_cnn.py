@@ -27,6 +27,7 @@ import argparse
 import json
 import datetime
 import math
+import sys
 import numpy as np
 import torch
 import torch.nn as nn
@@ -355,8 +356,22 @@ if __name__ == '__main__':
                              'at native 128^3)')
     parser.add_argument('--log',      type=str,   default=None,
                         help='Path for JSON training log (default: results/cnn_training_TIMESTAMP.json)')
+    parser.add_argument('--allow-leaky-cnn', action='store_true',
+                        help='Confirm you want this script\'s leakage-optimistic '
+                             'checkpoint selection (test-cube loss). Use '
+                             'test_cnn.py for a leakage-free U-Net result.')
     add_drop_args(parser)
     args = parser.parse_args()
+
+    if not args.allow_leaky_cnn:
+        print("ERROR: train_cnn.py selects the U-Net checkpoint on the "
+              "held-out test cube's own loss -- leakage-optimistic, not the "
+              "paper's protocol (see docs/DESIGN_DECISIONS.md sec 4.5). "
+              "Every reported U-Net number instead comes from test_cnn.py, "
+              "which selects on an inner validation cube drawn from the "
+              "training set. Pass --allow-leaky-cnn to run this path anyway "
+              "(e.g. for a quick architecture smoke-test).", file=sys.stderr)
+        sys.exit(1)
 
     feat_cols = get_feature_cols(build_drop_set(args))
     run_cnn_cv(safe_only=not args.all_ops,
